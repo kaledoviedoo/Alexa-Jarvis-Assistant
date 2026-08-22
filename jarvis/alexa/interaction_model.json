@@ -1,0 +1,927 @@
+{
+  "_comentario": [
+    "IMPORTANTE: el slot usa un TIPO PERSONALIZADO, no AMAZON.SearchQuery.",
+    "Motivo: SearchQuery prohibe una muestra que sea solo '{comando}', y sin",
+    "esa muestra la invocacion 'dile a mi asistente QUE cree un archivo'",
+    "no casa con nada: Alexa consume 'dile a ... que' y el resto ('cree un",
+    "archivo...') se queda sin muestra que lo recoja, asi que la skill solo",
+    "se abre y nunca llega un IntentRequest.",
+    "Un tipo personalizado SI admite la muestra desnuda '{comando}'.",
+    "Los valores de ComandoLibre no son una lista cerrada: entrenan a Alexa",
+    "para reconocer la FORMA de las ordenes y generalizar a otras parecidas.",
+    "Este bloque _comentario lo ignora la consola: puedes dejarlo o borrarlo."
+  ],
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "mi asistente",
+      "intents": [
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": [
+            "pausa",
+            "pausa jarvis",
+            "jarvis pausa",
+            "haz una pausa",
+            "para",
+            "para ya",
+            "detente",
+            "descansa",
+            "basta",
+            "ya esta",
+            "ya está",
+            "gracias",
+            "gracias jarvis",
+            "adios",
+            "adiós",
+            "hasta luego",
+            "chao",
+            "suelta",
+            "suelta a alexa",
+            "libera a alexa",
+            "devuelve el microfono",
+            "devuelve el micrófono",
+            "cierra la sesion",
+            "cierra la sesión",
+            "modo espera",
+            "duerme",
+            "silencio",
+            "callate",
+            "cállate",
+            "termina",
+            "salir",
+            "sal",
+            "listo",
+            "eso es todo",
+            "nada mas",
+            "nada más",
+            "pausa asistente",
+            "asistente pausa",
+            "gracias asistente",
+            "para asistente"
+          ]
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": [
+            "pausa",
+            "pausa jarvis",
+            "jarvis pausa",
+            "haz una pausa",
+            "para",
+            "para ya",
+            "detente",
+            "descansa",
+            "basta",
+            "ya esta",
+            "ya está",
+            "gracias",
+            "gracias jarvis",
+            "adios",
+            "adiós",
+            "hasta luego",
+            "chao",
+            "suelta",
+            "suelta a alexa",
+            "libera a alexa",
+            "devuelve el microfono",
+            "devuelve el micrófono",
+            "cierra la sesion",
+            "cierra la sesión",
+            "modo espera",
+            "duerme",
+            "silencio",
+            "callate",
+            "cállate",
+            "termina",
+            "salir",
+            "sal",
+            "listo",
+            "eso es todo",
+            "nada mas",
+            "nada más"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "ComandoIntent",
+          "slots": [
+            {
+              "name": "comando",
+              "type": "ComandoLibre"
+            }
+          ],
+          "samples": [
+            "a ver {comando}",
+            "ahora {comando}",
+            "ayudame a {comando}",
+            "comprueba si {comando}",
+            "comprueba {comando}",
+            "dime si {comando}",
+            "dime {comando}",
+            "ejecuta {comando}",
+            "haz que {comando}",
+            "hazme {comando}",
+            "jarvis {comando}",
+            "luego {comando}",
+            "me puedes {comando}",
+            "mira si {comando}",
+            "mira {comando}",
+            "necesito que {comando}",
+            "necesito {comando}",
+            "oye {comando}",
+            "podrias {comando}",
+            "por favor {comando}",
+            "puedes {comando}",
+            "que {comando}",
+            "quiero que {comando}",
+            "quiero {comando}",
+            "revisa si {comando}",
+            "revisa {comando}",
+            "tambien {comando}",
+            "vamos a {comando}",
+            "y {comando}",
+            "{comando}",
+            "asistente {comando}"
+          ]
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "MensajeIntent",
+          "slots": [
+            {
+              "name": "texto",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "que {texto}",
+            "que le digas que {texto}",
+            "que diga {texto}",
+            "dile que {texto}",
+            "dile {texto}",
+            "escribe {texto}",
+            "escribele {texto}",
+            "ponle {texto}",
+            "pon {texto}",
+            "el mensaje es {texto}",
+            "mandale {texto}",
+            "avisale que {texto}",
+            "digale que {texto}",
+            "contestale que {texto}",
+            "responde que {texto}"
+          ]
+        },
+        {
+          "name": "AMAZON.YesIntent",
+          "samples": [
+            "si",
+            "sí",
+            "claro",
+            "dale",
+            "hazlo",
+            "adelante",
+            "confirmo",
+            "correcto",
+            "exacto",
+            "eso es",
+            "por supuesto",
+            "venga",
+            "envialo",
+            "mandalo"
+          ]
+        },
+        {
+          "name": "AMAZON.NoIntent",
+          "samples": [
+            "no",
+            "nop",
+            "mejor no",
+            "cancela",
+            "dejalo",
+            "olvidalo",
+            "para",
+            "borralo",
+            "no lo mandes"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "ComandoLibre",
+          "values": [
+            {
+              "name": {
+                "value": "crea un archivo llamado prueba punto py con el codigo print hola"
+              }
+            },
+            {
+              "name": {
+                "value": "cree un archivo llamado prueba punto py con el codigo print hola"
+              }
+            },
+            {
+              "name": {
+                "value": "crea un archivo llamado notas punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "cree un archivo llamado notas punto txt que diga hola mundo"
+              }
+            },
+            {
+              "name": {
+                "value": "crea un documento word llamado informe"
+              }
+            },
+            {
+              "name": {
+                "value": "cree una carpeta llamada proyectos"
+              }
+            },
+            {
+              "name": {
+                "value": "lee el archivo notas punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "lea el archivo notas punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "agrega una linea al archivo notas punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "agregue una linea al archivo notas punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "reemplaza hola por adios en notas punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "reemplace hola por adios en notas punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "mueve el archivo reporte punto docx a documentos"
+              }
+            },
+            {
+              "name": {
+                "value": "mueva el archivo reporte punto docx a documentos"
+              }
+            },
+            {
+              "name": {
+                "value": "copia prueba punto py a descargas"
+              }
+            },
+            {
+              "name": {
+                "value": "elimina el archivo basura punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "elimine el archivo basura punto txt"
+              }
+            },
+            {
+              "name": {
+                "value": "que archivos hay en el escritorio"
+              }
+            },
+            {
+              "name": {
+                "value": "busca el archivo llamado informe"
+              }
+            },
+            {
+              "name": {
+                "value": "busque el archivo llamado informe"
+              }
+            },
+            {
+              "name": {
+                "value": "como esta el cpu"
+              }
+            },
+            {
+              "name": {
+                "value": "me diga como esta el cpu"
+              }
+            },
+            {
+              "name": {
+                "value": "cuanta memoria ram queda"
+              }
+            },
+            {
+              "name": {
+                "value": "me diga cuanta memoria ram queda"
+              }
+            },
+            {
+              "name": {
+                "value": "como esta la grafica"
+              }
+            },
+            {
+              "name": {
+                "value": "me diga como esta la grafica"
+              }
+            },
+            {
+              "name": {
+                "value": "cuanta vram queda libre"
+              }
+            },
+            {
+              "name": {
+                "value": "cuanto espacio libre tengo en el disco"
+              }
+            },
+            {
+              "name": {
+                "value": "dame el estado general del equipo"
+              }
+            },
+            {
+              "name": {
+                "value": "me de el estado general del equipo"
+              }
+            },
+            {
+              "name": {
+                "value": "que programas estan consumiendo mas"
+              }
+            },
+            {
+              "name": {
+                "value": "activa el modo gaming"
+              }
+            },
+            {
+              "name": {
+                "value": "active el modo gaming"
+              }
+            },
+            {
+              "name": {
+                "value": "modo gaming"
+              }
+            },
+            {
+              "name": {
+                "value": "modo dedicado"
+              }
+            },
+            {
+              "name": {
+                "value": "activa el modo dedicado"
+              }
+            },
+            {
+              "name": {
+                "value": "active el modo dedicado"
+              }
+            },
+            {
+              "name": {
+                "value": "modo normal"
+              }
+            },
+            {
+              "name": {
+                "value": "vuelve al modo normal"
+              }
+            },
+            {
+              "name": {
+                "value": "vuelva al modo normal"
+              }
+            },
+            {
+              "name": {
+                "value": "sal del modo juego"
+              }
+            },
+            {
+              "name": {
+                "value": "en que modo estas"
+              }
+            },
+            {
+              "name": {
+                "value": "me voy a jugar"
+              }
+            },
+            {
+              "name": {
+                "value": "abre spotify"
+              }
+            },
+            {
+              "name": {
+                "value": "abra spotify"
+              }
+            },
+            {
+              "name": {
+                "value": "abre steam"
+              }
+            },
+            {
+              "name": {
+                "value": "abra visual studio code"
+              }
+            },
+            {
+              "name": {
+                "value": "inicia visual studio code"
+              }
+            },
+            {
+              "name": {
+                "value": "cierra chrome"
+              }
+            },
+            {
+              "name": {
+                "value": "cierre chrome"
+              }
+            },
+            {
+              "name": {
+                "value": "busca en internet el clima de bogota"
+              }
+            },
+            {
+              "name": {
+                "value": "busque en internet el clima de bogota"
+              }
+            },
+            {
+              "name": {
+                "value": "investiga como funciona un transformer"
+              }
+            },
+            {
+              "name": {
+                "value": "investigue como funciona un transformer"
+              }
+            },
+            {
+              "name": {
+                "value": "pon musica relajante en youtube"
+              }
+            },
+            {
+              "name": {
+                "value": "ponga musica relajante en youtube"
+              }
+            },
+            {
+              "name": {
+                "value": "abre la pagina github"
+              }
+            },
+            {
+              "name": {
+                "value": "abra la pagina github"
+              }
+            },
+            {
+              "name": {
+                "value": "toma una captura de pantalla"
+              }
+            },
+            {
+              "name": {
+                "value": "tome una captura de pantalla"
+              }
+            },
+            {
+              "name": {
+                "value": "escribe hola que tal"
+              }
+            },
+            {
+              "name": {
+                "value": "escriba hola que tal"
+              }
+            },
+            {
+              "name": {
+                "value": "presiona el atajo copiar"
+              }
+            },
+            {
+              "name": {
+                "value": "presione el atajo copiar"
+              }
+            },
+            {
+              "name": {
+                "value": "minimiza todo"
+              }
+            },
+            {
+              "name": {
+                "value": "sube el volumen"
+              }
+            },
+            {
+              "name": {
+                "value": "suba el volumen"
+              }
+            },
+            {
+              "name": {
+                "value": "bloquea el equipo"
+              }
+            },
+            {
+              "name": {
+                "value": "bloquee el equipo"
+              }
+            },
+            {
+              "name": {
+                "value": "apaga el equipo en cinco minutos"
+              }
+            },
+            {
+              "name": {
+                "value": "apague el equipo en cinco minutos"
+              }
+            },
+            {
+              "name": {
+                "value": "cancela el apagado"
+              }
+            },
+            {
+              "name": {
+                "value": "cancele el apagado"
+              }
+            },
+            {
+              "name": {
+                "value": "resume el contenido del informe"
+              }
+            },
+            {
+              "name": {
+                "value": "explicame que es la fotosintesis"
+              }
+            },
+            {
+              "name": {
+                "value": "como quedo lo ultimo"
+              }
+            },
+            {
+              "name": {
+                "value": "pausa"
+              }
+            },
+            {
+              "name": {
+                "value": "pausa jarvis"
+              }
+            },
+            {
+              "name": {
+                "value": "jarvis pausa"
+              }
+            },
+            {
+              "name": {
+                "value": "haz una pausa"
+              }
+            },
+            {
+              "name": {
+                "value": "para"
+              }
+            },
+            {
+              "name": {
+                "value": "para ya"
+              }
+            },
+            {
+              "name": {
+                "value": "detente"
+              }
+            },
+            {
+              "name": {
+                "value": "descansa"
+              }
+            },
+            {
+              "name": {
+                "value": "basta"
+              }
+            },
+            {
+              "name": {
+                "value": "ya esta"
+              }
+            },
+            {
+              "name": {
+                "value": "ya está"
+              }
+            },
+            {
+              "name": {
+                "value": "gracias"
+              }
+            },
+            {
+              "name": {
+                "value": "gracias jarvis"
+              }
+            },
+            {
+              "name": {
+                "value": "adios"
+              }
+            },
+            {
+              "name": {
+                "value": "adiós"
+              }
+            },
+            {
+              "name": {
+                "value": "hasta luego"
+              }
+            },
+            {
+              "name": {
+                "value": "chao"
+              }
+            },
+            {
+              "name": {
+                "value": "suelta"
+              }
+            },
+            {
+              "name": {
+                "value": "suelta a alexa"
+              }
+            },
+            {
+              "name": {
+                "value": "libera a alexa"
+              }
+            },
+            {
+              "name": {
+                "value": "devuelve el microfono"
+              }
+            },
+            {
+              "name": {
+                "value": "devuelve el micrófono"
+              }
+            },
+            {
+              "name": {
+                "value": "cierra la sesion"
+              }
+            },
+            {
+              "name": {
+                "value": "cierra la sesión"
+              }
+            },
+            {
+              "name": {
+                "value": "modo espera"
+              }
+            },
+            {
+              "name": {
+                "value": "duerme"
+              }
+            },
+            {
+              "name": {
+                "value": "silencio"
+              }
+            },
+            {
+              "name": {
+                "value": "callate"
+              }
+            },
+            {
+              "name": {
+                "value": "cállate"
+              }
+            },
+            {
+              "name": {
+                "value": "termina"
+              }
+            },
+            {
+              "name": {
+                "value": "salir"
+              }
+            },
+            {
+              "name": {
+                "value": "sal"
+              }
+            },
+            {
+              "name": {
+                "value": "listo"
+              }
+            },
+            {
+              "name": {
+                "value": "eso es todo"
+              }
+            },
+            {
+              "name": {
+                "value": "nada mas"
+              }
+            },
+            {
+              "name": {
+                "value": "nada más"
+              }
+            },
+            {
+              "name": {
+                "value": "revisa mi vault de obsidian y dime si hay algun proyecto abierto"
+              }
+            },
+            {
+              "name": {
+                "value": "mira mi boveda de obsidian y dime que proyectos tengo"
+              }
+            },
+            {
+              "name": {
+                "value": "dime si hay algun proyecto abierto en mis notas"
+              }
+            },
+            {
+              "name": {
+                "value": "abre una pestana en comet y busca oferta y demanda"
+              }
+            },
+            {
+              "name": {
+                "value": "dame el estado general del equipo y dime si algo va mal"
+              }
+            },
+            {
+              "name": {
+                "value": "busca en mis notas todo lo que tenga que ver con el proyecto"
+              }
+            },
+            {
+              "name": {
+                "value": "que archivos hay en el escritorio y cual es el mas reciente"
+              }
+            },
+            {
+              "name": {
+                "value": "apunta en el diario de obsidian que termine la configuracion"
+              }
+            },
+            {
+              "name": {
+                "value": "cierra todos los programas que no este usando"
+              }
+            },
+            {
+              "name": {
+                "value": "explicame que es la oferta y la demanda"
+              }
+            },
+            {
+              "name": {
+                "value": "cuanta memoria ram me queda libre ahora mismo"
+              }
+            },
+            {
+              "name": {
+                "value": "cambia a modo dedicado y dime que modelo estas usando"
+              }
+            },
+            {
+              "name": {
+                "value": "cuantas notas tengo en obsidian"
+              }
+            },
+            {
+              "name": {
+                "value": "que proyectos tengo abiertos"
+              }
+            },
+            {
+              "name": {
+                "value": "manda un mensaje a familia que llego en diez minutos"
+              }
+            },
+            {
+              "name": {
+                "value": "mandale un mensaje a andres que voy en camino"
+              }
+            },
+            {
+              "name": {
+                "value": "envia un whatsapp a mama diciendo que ya llegue"
+              }
+            },
+            {
+              "name": {
+                "value": "escribele a juan que nos vemos a las cinco"
+              }
+            },
+            {
+              "name": {
+                "value": "manda un correo a soporte que necesito ayuda con el equipo"
+              }
+            },
+            {
+              "name": {
+                "value": "responde al ultimo correo que lo reviso mañana"
+              }
+            },
+            {
+              "name": {
+                "value": "abre el chat de familia"
+              }
+            },
+            {
+              "name": {
+                "value": "lee el chat de whatsapp"
+              }
+            },
+            {
+              "name": {
+                "value": "cambia a la ventana de chrome"
+              }
+            },
+            {
+              "name": {
+                "value": "por que tengo lag en el juego"
+              }
+            },
+            {
+              "name": {
+                "value": "cierra los procesos que no estoy usando"
+              }
+            },
+            {
+              "name": {
+                "value": "que archivos puedo borrar para liberar espacio"
+              }
+            },
+            {
+              "name": {
+                "value": "haz clic en el archivo debajo del mensaje del profesor"
+              }
+            },
+            {
+              "name": {
+                "value": "abre valorant"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
