@@ -1,0 +1,47 @@
+# ============================================================================
+#  Lo que NUNCA sale de este equipo.
+#
+#  El orden importa poco, pero el primer bloque sí: ahí está el ID de la skill
+#  de Alexa y el dominio del túnel. Con esas dos cosas, cualquiera puede
+#  mandarle órdenes a tu ordenador.
+# ============================================================================
+
+# Secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+authtoken*
+ngrok.yml
+
+# Lo que Jarvis va escribiendo mientras funciona: logs con lo que le dijiste,
+# el índice de tu bóveda, la papelera. Nada de esto le sirve a nadie más y
+# todo habla de ti.
+.jarvis/
+*.log
+logs/
+aplicaciones.json
+aprendizaje.jsonl
+memoria_vault.json
+estado.json
+papelera/
+
+# Tu contexto personal. El repositorio lleva contexto.ejemplo.md como
+# plantilla; el de verdad se queda en tu equipo.
+contexto.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
