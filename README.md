@@ -1,10 +1,10 @@
 # Jarvis
 
-Un asistente de voz que corre entero en mi PC y se maneja hablándole a un Echo.
+Un asistente de voz que corre entero en mi PC y se maneja hablándole.
 
-Alexa pone el micrófono y el altavoz. Todo lo demás —entender la orden,
+Alexa pone el micrófono y el altavoz. Todo lo demás (entender la orden,
 decidir qué hacer, abrir programas, leer la pantalla, escribir en WhatsApp,
-buscar en mis notas— pasa en una RTX 3050 de 6 GB dentro de mi pc. Ninguna
+buscar en mis notas) pasa en una RTX 3050 de 6 GB dentro de mi pc. Ninguna
 frase que digo sale hacia un modelo en la nube.
 
 ```text
