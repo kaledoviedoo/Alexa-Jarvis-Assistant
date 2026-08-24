@@ -1,7 +1,7 @@
 """
 Las reglas de la boveda, leidas de la propia boveda.
 
-El usuario tiene un CLAUDE.md en la raiz del vault con como esta organizado todo:
+Kaled tiene un CLAUDE.md en la raiz del vault con como esta organizado todo:
 que carpeta para cada cosa, que plantilla usar, que tags existen, y las reglas
 de enlazado. Este modulo lo lee y lo pone a disposicion del resto.
 
@@ -15,8 +15,6 @@ red de seguridad para cuando ese archivo no exista.
 
 import logging
 import re
-
-from config import NOMBRE_USUARIO
 
 from tools import obsidian
 
@@ -171,7 +169,7 @@ def resumen_para_modelo() -> str:
     if not carpetas:
         return ""
 
-    lineas = [f"Reglas de la boveda de Obsidian de {NOMBRE_USUARIO}:"]
+    lineas = ["Reglas de la boveda de Obsidian de Kaled:"]
     descripciones = {
         "clase": "apuntes de una materia",
         "documento": "un archivo importante (pdf, guia, entrega)",
