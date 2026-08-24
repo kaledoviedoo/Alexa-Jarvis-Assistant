@@ -360,6 +360,15 @@ CASOS = [
     ("dale al buscador", "clic_intencion", lambda a, k: a[0] == "buscar"),
     ("pincha en aceptar", "clic_intencion", lambda a, k: a[0] == "aceptar"),
     ("dale a cancelar", "clic_intencion", lambda a, k: a[0] == "cerrar"),
+
+    # ---------------------------------------------------------------
+    # MEMORIA DEL PROPIO CODIGO
+    # ---------------------------------------------------------------
+    # "donde esta X" a secas NO entra aqui: es ambiguo y se llevaba por
+    # delante "donde esta el contexto". Hace falta decir codigo o archivo.
+    ("indexa el código", "al_fondo", None),
+    ("indexa el proyecto", "al_fondo", None),
+    ("dónde está el contexto", "donde_contexto", None),
 ]
 
 # Frases que SI se resuelven aqui, pero contestando en vez de ejecutar.
@@ -379,6 +388,60 @@ DEBEN_IR_AL_MODELO = [
     "qué opinas de mi código",
     "escríbeme un correo formal para pedir vacaciones y guárdalo",
 ]
+
+
+def probar_intenciones() -> list[str]:
+    """
+    Que cada frase canonica de la capa semantica siga siendo una orden real.
+
+    La capa de intencion no ejecuta nada: traduce lo que dijiste a una frase
+    que el router entiende y la vuelve a pasar por el. Toda su utilidad
+    depende de que esas frases canonicas SIGAN estando en nlu.INTENTS.
+
+    Si alguien cambia un patron y una canonica deja de casar, la capa no da
+    error: devuelve una traduccion que no lleva a ninguna parte y la orden se
+    va al modelo, o sea al comportamiento lento de antes, sin que nadie se
+    entere. Esta prueba es lo unico que lo hace visible.
+
+    No se comprueban los parecidos porque eso necesita el modelo de vectores
+    corriendo; aqui solo se valida la parte que puede romperse en frio.
+    """
+    from tools import intencion
+    fallos = []
+
+    print()
+    print("-" * 70)
+    print("  INTENCIONES: LAS CANONICAS SIGUEN SIENDO ORDENES")
+    print("-" * 70)
+
+    for canonica in intencion.EJEMPLOS:
+        registro.clear()
+        foco.olvidar()
+        try:
+            respuesta = nlu.enrutar(canonica)
+        except Exception as e:
+            fallos.append(f"CANONICA {canonica!r} revienta: {e}")
+            print(f"  FALLO  {canonica[:44]:<46} -> excepción: {e}")
+            continue
+
+        if not respuesta:
+            fallos.append(f"CANONICA {canonica!r} ya no la reconoce el router")
+            print(f"  FALLO  {canonica[:44]:<46} -> el router no la reconoce")
+        else:
+            quien = registro[0][0] if registro else "(sin herramienta)"
+            print(f"  OK     {canonica[:44]:<46} -> {quien}")
+
+    # Y que ningun ejemplo este duplicado entre dos ordenes distintas: eso
+    # seria un empate garantizado, y los empates se descartan a proposito.
+    vistos = {}
+    for canonica, variantes in intencion.EJEMPLOS.items():
+        for frase in variantes:
+            if frase in vistos:
+                fallos.append(f"EJEMPLO duplicado {frase!r}: {vistos[frase]} y {canonica}")
+                print(f"  FALLO  ejemplo repetido: {frase!r}")
+            vistos[frase] = canonica
+
+    return fallos
 
 
 def probar_keep_warm() -> list[str]:
@@ -704,6 +767,7 @@ def main() -> int:
     fallos.extend(probar_modelos_instalados())
     fallos.extend(probar_freno_de_mano())
     fallos.extend(probar_keep_warm())
+    fallos.extend(probar_intenciones())
 
     for frase, esperado, comprobar in CASOS:
         registro.clear()
@@ -777,7 +841,7 @@ def main() -> int:
 
     print()
     print("=" * 70)
-    total = len(CASOS) + len(SIN_HERRAMIENTA) + len(DEBEN_IR_AL_MODELO) + 6 + 5 + 12 + 4
+    total = len(CASOS) + len(SIN_HERRAMIENTA) + len(DEBEN_IR_AL_MODELO) + 6 + 5 + 12 + 4 + len(__import__('tools.intencion', fromlist=['x']).EJEMPLOS)
     if fallos:
         print(f"  RESULTADO: {total - len(fallos)}/{total} correctos, {len(fallos)} fallos")
         print("=" * 70)

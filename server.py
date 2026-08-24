@@ -134,7 +134,7 @@ async def medir_y_registrar(request, call_next):
 # comprobar desde fuera QUE VERSION esta corriendo de verdad. Si el proceso
 # viejo sigue vivo y agarrado al puerto, el nuevo no arranca y tu crees que si.
 # Sube este numero cada vez que cambie algo que se note desde Alexa.
-SELLO_CODIGO = "2026-08-22-gpu-libre-29"
+SELLO_CODIGO = "2026-08-22-semantico-30"
 
 
 # -------------------------------------------------------------------------
@@ -290,9 +290,23 @@ def _programar_trabajo_de_fondo() -> None:
             from tools import memoria
             if memoria.modelo_disponible():
                 log.info("Memoria vault    : %s", memoria.indexar())
+
+                # El codigo del propio proyecto, para poder preguntarle por
+                # sus propios archivos. Incremental: si no has tocado nada,
+                # esto termina en un suspiro.
+                log.info("Memoria código   : %s", memoria.indexar_proyecto())
+
+                # Los ejemplos de intencion, para entenderte cuando no dices
+                # la palabra exacta. Se vectorizan una vez y se guardan; solo
+                # se rehace cuando cambia la lista.
+                from tools import intencion
+                indice = intencion.cargar()
+                log.info("Intenciones      : %d ejemplos listos",
+                         len(indice.get("entradas") or []))
             else:
                 log.info("Memoria vault    : falta %s (ollama pull %s)",
                          memoria.MODELO, memoria.MODELO)
+                log.info("Intenciones      : sin vectores, se queda en el router literal")
         except Exception as e:
             log.warning("No pude poner al día la memoria semántica: %s", e)
 
@@ -304,6 +318,51 @@ def _programar_trabajo_de_fondo() -> None:
 # -------------------------------------------------------------------------
 # NÚCLEO: procesar un comando
 # -------------------------------------------------------------------------
+def _segunda_oportunidad(texto: str) -> tuple[str | None, str]:
+    """
+    Traduce lo que dijiste a una orden que el router SI entiende.
+
+    Devuelve (respuesta, origen) o (None, "") si no se parece a nada.
+
+    El caso que resuelve: "quitame el spotify de encima". El router no lo
+    reconoce porque busca el verbo "cierra", y la frase se iba al modelo, que
+    tarda segundos para algo que se resuelve en uno.
+
+    La traduccion vuelve a pasar por el MISMO router. Eso es lo que evita
+    tener dos tablas de ordenes que mantener en paralelo: aqui no hay logica
+    nueva, solo una frase distinta entrando por la misma puerta.
+    """
+    try:
+        from tools import intencion
+    except Exception:
+        return None, ""
+
+    if not intencion.disponible():
+        return None, ""
+
+    try:
+        canonica, nota = intencion.traducir(texto)
+    except Exception as e:
+        # Que esto falle no puede costar la orden: se sigue al modelo, que es
+        # exactamente lo que pasaba antes de que esta capa existiera.
+        log.warning("La capa de intencion falló: %s", e)
+        return None, ""
+
+    if not canonica:
+        return None, ""
+
+    respuesta = nlu.enrutar(canonica)
+    if respuesta is None:
+        # La canonica ya no la reconoce el router. Pasa si alguien cambia un
+        # patron y se olvida de los ejemplos; hay una prueba que lo vigila,
+        # pero si se cuela, que no se lleve la orden por delante.
+        log.warning("La canónica %r ya no la reconoce el router. Al modelo.", canonica)
+        return None, ""
+
+    log.info("Resuelto por parecido (%.2f): %r -> %r", nota, texto[:40], canonica)
+    return respuesta, "intención"
+
+
 def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
     """
     Resuelve un comando. Primero el router rápido, luego el LLM.
@@ -323,6 +382,16 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
 
     respuesta = nlu.enrutar(texto)
     origen = "router"
+
+    # Segunda oportunidad ANTES del modelo: puede que sea una orden conocida
+    # dicha con otras palabras. Cuesta unos 30 ms (un vector) frente a los
+    # varios segundos del modelo, asi que si acierta, sale muy a cuenta.
+    #
+    # No adivina: si no se parece lo suficiente, o si empata entre dos
+    # ordenes distintas, se calla y deja pasar la frase al modelo. Ejecutar
+    # lo que no era es peor que tardar.
+    if respuesta is None:
+        respuesta, origen = _segunda_oportunidad(texto)
 
     if respuesta is None:
         log.info("Sin coincidencia local, delegando al modelo.")

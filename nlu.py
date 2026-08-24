@@ -571,6 +571,43 @@ def _memoria_estado(m) -> str:
     return memoria.estado()
 
 
+def _codigo_indexar(m) -> str:
+    return _al_fondo(
+        "indexar el código del proyecto",
+        memoria.indexar_proyecto,
+        "Voy a leerme mi propio código y recordarlo. Pregúntame cómo quedó lo último.",
+    )
+
+
+def _codigo_buscar(m) -> str:
+    """
+    Buscar por significado DENTRO del propio proyecto.
+
+    Distinto de la busqueda en la boveda aunque compartan indice: aqui se
+    filtra a los fragmentos que vienen del repo, porque preguntar "donde esta
+    el freno de mano" y que conteste con una nota de clase no sirve de nada.
+    """
+    g = m.groupdict()
+    consulta = (g.get("q") or g.get("q2") or g.get("q3") or "").strip()
+    if not consulta:
+        return "¿Qué parte del código buscas?"
+
+    encontrados = [t for t in memoria.buscar(consulta, cuantos=12, minimo=0.35)
+                   if str(t.get("ruta", "")).startswith(str(memoria.RAIZ_PROYECTO))]
+
+    if not encontrados:
+        return (f"No encuentro nada del código que trate de {consulta}. "
+                "Si nunca lo indexé, dime: indexa el código.")
+
+    primero = encontrados[0]
+    resto = {t["titulo"] for t in encontrados[1:4]} - {primero["titulo"]}
+
+    respuesta = f"Eso está en {primero['titulo']}"
+    if resto:
+        respuesta += f". También sale en {', '.join(sorted(resto))}"
+    return respuesta + "."
+
+
 def _memoria_buscar(m) -> str:
     """Buscar por significado. Rapido: un vector y una comparacion."""
     g = m.groupdict()
@@ -1514,7 +1551,10 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
     (
         re.compile(r"\bqu[eé]\s+(?:tengo|hay|tienes)\s+(?:seleccionad[oa]s?|cogid[oa]s?|marcad[oa]s?)\b|"
                    r"\bcu[aá]ntos\s+(?:tengo\s+)?seleccionad[oa]s?\b|"
-                   r"\bla\s+selecci[oó]n\b\s*$", _F),
+                   # Solo "la seleccion" a secas. Antes bastaba con que la
+                   # frase TERMINARA asi, y se llevaba por delante "en que
+                   # archivo esta la seleccion", que pregunta por el codigo.
+                   r"^\s*(?:la\s+)?selecci[oó]n\s*$", _F),
         _sel_que_hay,
     ),
 
@@ -1658,6 +1698,28 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
                    r"(?:b[oó]veda|vault|memoria(?:\s+sem[aá]ntica)?|notas)\b"
                    r"(?:.*?(?P<todo>desde\s+cero|completa|entera|todo))?", _F),
         _memoria_indexar,
+    ),
+
+    # El codigo del propio proyecto. Va antes que la busqueda en la boveda
+    # porque comparte los verbos "busca" y "donde esta", y aqui la palabra
+    # que decide es "codigo" o "proyecto".
+    (
+        re.compile(r"\b(?:indexa|indexe|relee|actualiza|rastrea)\s+"
+                   r"(?:el\s+|tu\s+|mi\s+)?(?:c[oó]digo|proyecto|repositorio|repo)\b", _F),
+        _codigo_indexar,
+    ),
+    (
+        # "donde esta X" a secas se queda FUERA a proposito: es demasiado
+        # ambiguo y se llevaba por delante "donde esta el contexto", que
+        # pregunta por un archivo de configuracion, no por el codigo. Tiene
+        # que haber una señal explicita de que hablas del proyecto.
+        re.compile(r"\b(?:en\s+)?qu[eé]\s+archivo\s+(?:est[aá]|tiene|hace|maneja|vive)\s+"
+                   r"(?P<q>.+?)\s*$|"
+                   r"\b(?:busca|buscame)\s+en\s+(?:el\s+|tu\s+|mi\s+)?"
+                   r"(?:c[oó]digo|proyecto|repositorio|repo)\s+(?P<q2>.+?)\s*$|"
+                   r"\bd[oó]nde\s+est[aá]\s+(?P<q3>.+?)\s+en\s+(?:el\s+|tu\s+|mi\s+)?"
+                   r"(?:c[oó]digo|proyecto|repositorio|repo)\s*$", _F),
+        _codigo_buscar,
     ),
     (
         re.compile(r"\bc[oó]mo\s+(?:va|est[aá])\s+(?:la\s+|tu\s+)?memoria\s+"

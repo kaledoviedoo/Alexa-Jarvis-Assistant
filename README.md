@@ -1,27 +1,19 @@
 # Jarvis
 
-Un asistente de voz que corre entero en mi PC y se maneja hablándole.
+Un asistente de voz que corre entero en mi PC y se maneja hablándole a un Echo.
 
-Alexa pone el micrófono y el altavoz. Todo lo demás (entender la orden,
+Alexa pone el micrófono y el altavoz. Todo lo demás —entender la orden,
 decidir qué hacer, abrir programas, leer la pantalla, escribir en WhatsApp,
-buscar en mis notas) pasa en una RTX 3050 de 6 GB dentro de mi pc. Ninguna
+buscar en mis notas— pasa en una RTX 3050 de 6 GB dentro de mi casa. Ninguna
 frase que digo sale hacia un modelo en la nube.
 
-```text
+```
 Echo  ──▶  Amazon  ──▶  túnel  ──▶  FastAPI  ──▶  router  ──▶  herramientas
                                         │            │              (43)
                                         │            └── ¿no encaja?
                                         │                    ▼
                                         └────────────── Ollama (local)
 ```
-
-## Tecnologías y Herramientas
-
-* **Lenguajes y Frameworks:** Python (`FastAPI`, `Uvicorn`, `asyncio`, `psutil`), PowerShell 5.1.
-* **IA y Procesamiento:** Ollama con **Llama 3.2 (3B)**, NLU Determinista (~2400 líneas de Regex), *Function Calling* (43 herramientas), OCR.
-* **Infraestructura y Redes:** **Tailscale** (Túnel VPN), DNS-over-HTTPS, TLS/SNI.
-* **Ecosistema:** Amazon Alexa Skills, SSML, integración con Windows y apps locales (WhatsApp, Spotify, Epic, Steam).
-* **Hardware base:** Windows, NVIDIA GeForce RTX 3050 (6GB VRAM).
 
 ## El problema que manda sobre todo lo demás
 
@@ -139,7 +131,7 @@ Copy-Item contexto.ejemplo.md contexto.md
 py -m pip install -r requirements.txt
 ollama pull llama3.2:3b
 
-.\scripts\configurar_tailscale.ps1
+.\scripts\configurar_tailscale.ps1   # o configurar_ngrok.ps1
 .\scripts\instalar_autoarranque.ps1
 .\reiniciar_jarvis.ps1
 ```

@@ -311,6 +311,176 @@ def indexar_en_segundo_plano(forzar: bool = False) -> None:
 
 
 # -------------------------------------------------------------------------
+# EL CODIGO DEL PROPIO PROYECTO
+# -------------------------------------------------------------------------
+# La boveda guarda lo que estudias; esto guarda lo que construyes. Sirve para
+# preguntarle a Jarvis por su propio codigo: "donde esta lo que decide si una
+# orden es peligrosa", "que hace el modulo de seleccion", "en que archivo esta
+# el freno de mano".
+#
+# Se indexa aparte de la boveda pero en el MISMO indice, porque buscar() ya
+# sabe recorrerlo y no hay razon para tener dos busquedas distintas.
+
+RAIZ_PROYECTO = Path(__file__).resolve().parent.parent
+
+# Que se lee. Nada de binarios ni de datos: solo lo que un humano escribio.
+EXTENSIONES_CODIGO = {".py", ".md", ".ps1", ".json", ".txt"}
+
+# Que NO se lee nunca. El .env queda fuera por motivos obvios; el resto es
+# ruido que ensuciaria las busquedas.
+CARPETAS_IGNORADAS = {"__pycache__", ".git", ".venv", "venv", "node_modules",
+                      ".pytest_cache", ".idea", ".vscode"}
+ARCHIVOS_IGNORADOS = {".env", ".env.respaldo", "intenciones.json",
+                      "memoria_vault.json", "aplicaciones.json"}
+
+# Tope por archivo. nlu.py son cien mil caracteres: sin tope se comeria el
+# indice entero y las busquedas devolverian siempre lo mismo.
+MAXIMO_TROZOS_POR_ARCHIVO = 12
+
+
+def _trozos_de_codigo(texto: str, ruta: Path) -> list[str]:
+    """
+    Parte un archivo de codigo por sus definiciones, no por parrafos.
+
+    Un fragmento util de codigo es una funcion entera con su docstring, no
+    quince lineas cortadas por donde cayera. Se usa el arbol sintactico para
+    saber donde empieza y acaba cada def y cada class.
+
+    Si el archivo no es Python o no compila (algo a medio escribir), se cae
+    al troceado normal por parrafos, que para markdown y PowerShell es lo
+    correcto de todas formas.
+    """
+    if ruta.suffix.lower() != ".py":
+        return _trozos(texto, ruta.stem)
+
+    try:
+        import ast
+        arbol = ast.parse(texto)
+    except (SyntaxError, ValueError):
+        return _trozos(texto, ruta.stem)
+
+    lineas = texto.splitlines()
+    piezas = []
+
+    # La cabecera del modulo: su docstring explica para que existe el archivo,
+    # que suele ser lo mas util de todo para orientarse.
+    docstring = ast.get_docstring(arbol)
+    if docstring:
+        piezas.append(f"[{ruta.name}] Para que sirve este archivo:\n{docstring}")
+
+    for nodo in arbol.body:
+        if not isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        desde = nodo.lineno - 1
+        hasta = getattr(nodo, "end_lineno", nodo.lineno)
+        cuerpo = "\n".join(lineas[desde:hasta])[:1800]
+        piezas.append(f"[{ruta.name}] {nodo.name}\n{cuerpo}")
+
+    if not piezas:
+        return _trozos(texto, ruta.stem)
+
+    return piezas[:MAXIMO_TROZOS_POR_ARCHIVO]
+
+
+def _archivos_del_proyecto():
+    """Los archivos del repo que vale la pena recordar."""
+    for ruta in RAIZ_PROYECTO.rglob("*"):
+        if not ruta.is_file():
+            continue
+        if ruta.suffix.lower() not in EXTENSIONES_CODIGO:
+            continue
+        if ruta.name in ARCHIVOS_IGNORADOS or ruta.name.startswith(".env"):
+            continue
+        if any(parte in CARPETAS_IGNORADAS for parte in ruta.parts):
+            continue
+        yield ruta
+
+
+def indexar_proyecto(forzar: bool = False) -> str:
+    """
+    Mete el codigo del propio Jarvis en la memoria.
+
+    Va aparte de `indexar()` a proposito: la boveda cambia cuando estudias y
+    el codigo cambia cuando programas, y no tiene sentido revectorizar
+    ochenta notas porque tocaste un archivo .py. Comparten indice, asi que
+    `buscar()` los encuentra a los dos sin saber que hay dos origenes.
+
+    Incremental igual que el otro: solo se revectoriza lo que cambio de
+    verdad, comparando la firma del archivo.
+    """
+    if not modelo_disponible():
+        return (f"Me falta el modelo {MODELO}. Instálalo con: ollama pull {MODELO}.")
+
+    indice = _cargar()
+    notas_previas = indice["notas"]
+    trozos = list(indice["trozos"])
+
+    inicio = time.perf_counter()
+    vistos, nuevos, actualizados = set(), 0, 0
+
+    for ruta in _archivos_del_proyecto():
+        clave = str(ruta)
+        vistos.add(clave)
+        firma = _firma(ruta)
+
+        if not forzar and notas_previas.get(clave) == firma:
+            continue
+
+        try:
+            texto = ruta.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        if clave in notas_previas:
+            trozos = [t for t in trozos if t["ruta"] != clave]
+            actualizados += 1
+        else:
+            nuevos += 1
+
+        for i, trozo in enumerate(_trozos_de_codigo(texto, ruta)):
+            vector = _vector(trozo)
+            if vector is None:
+                continue
+            trozos.append({
+                "ruta": clave,
+                "titulo": ruta.name,
+                "n": i,
+                "texto": trozo[:1400],
+                "v": vector,
+            })
+
+        notas_previas[clave] = firma
+
+    # Archivos borrados del proyecto: fuera. Se comparan SOLO contra los que
+    # hemos mirado ahora, no contra todo el indice, porque ahi tambien estan
+    # las notas de la boveda y las barreriamos enteras.
+    del_proyecto = {c for c in notas_previas
+                    if c.startswith(str(RAIZ_PROYECTO))}
+    borrados = del_proyecto - vistos
+    for clave in borrados:
+        notas_previas.pop(clave, None)
+    if borrados:
+        trozos = [t for t in trozos if t["ruta"] not in borrados]
+
+    indice["trozos"] = trozos
+    indice["generado"] = time.time()
+    _guardar(indice)
+
+    global _indice
+    _indice = indice
+
+    tardo = time.perf_counter() - inicio
+    log.info("Memoria del proyecto: %d nuevos, %d actualizados, %d borrados, %.1f s",
+             nuevos, actualizados, len(borrados), tardo)
+
+    if not nuevos and not actualizados and not borrados:
+        return "El código ya estaba indexado."
+
+    return (f"Indexé el proyecto: {nuevos} archivos nuevos, "
+            f"{actualizados} actualizados.")
+
+
+# -------------------------------------------------------------------------
 # BUSCAR
 # -------------------------------------------------------------------------
 def buscar(consulta: str, cuantos: int = 5, minimo: float = 0.45) -> list[dict]:

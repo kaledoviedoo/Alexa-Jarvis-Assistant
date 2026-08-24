@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as TimeoutFuturo
 
 import modes
 import tareas
-from config import MAX_PASOS_TOOLS, NOMBRE_USUARIO, PRESUPUESTO_SEGUNDOS
+from config import MAX_PASOS_TOOLS, PRESUPUESTO_SEGUNDOS
 from tools import archivos, avanzado, entrada, navegador, obsidian, sistema
 
 log = logging.getLogger("jarvis.ollama")
@@ -487,7 +487,7 @@ REGLAS:
 9. Responde solo con lo que hay que decir. No narres lo que vas a hacer, no repitas la orden y no escribas prefijos como "Alexa lee en voz alta:" ni "Respuesta:". Esas palabras acabarian sonando por el altavoz.
 
 COMO HABLAS:
-Hablas con {NOMBRE_USUARIO}, que es quien te construyo. Tuteale.
+Hablas con Kaled, que es quien te construyo. Tuteale.
 
 Suena a persona, no a manual. Un asistente que contesta "Operacion completada satisfactoriamente" a cada cosa cansa en dos dias. Di "listo", "hecho", "ya esta", "ahi lo tienes", y varia: repetir siempre la misma formula suena tan robotico como la formula mas formal.
 
@@ -508,7 +508,7 @@ def construir_prompt_sistema() -> str:
     usuario imaginario y con rutas inventadas. Con esto sabe donde esta, que
     hardware tiene y como quiere trabajar la persona.
     """
-    partes = [PROMPT_BASE.replace("{NOMBRE_USUARIO}", NOMBRE_USUARIO or "el usuario")]
+    partes = [PROMPT_BASE]
 
     try:
         partes.append("\n--- ESTE EQUIPO ---\n" + avanzado.resumen_equipo_para_modelo())
