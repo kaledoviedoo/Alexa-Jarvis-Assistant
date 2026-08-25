@@ -1,10 +1,10 @@
 # Jarvis
 
-Un asistente de voz que corre entero en mi PC y se maneja hablándole a un Echo.
+Un asistente de voz que corre entero en mi PC y se maneja hablándole a un dispositivo echo dot.
 
-Alexa pone el micrófono y el altavoz. Todo lo demás —entender la orden,
+Alexa pone el micrófono y el altavoz. Todo lo demás (entender la orden,
 decidir qué hacer, abrir programas, leer la pantalla, escribir en WhatsApp,
-buscar en mis notas— pasa en una RTX 3050 de 6 GB dentro de mi casa. Ninguna
+buscar en mis notas) pasa en una RTX 3050 de 6 GB dentro de mi casa. Ninguna
 frase que digo sale hacia un modelo en la nube.
 
 ```
@@ -15,7 +15,7 @@ Echo  ──▶  Amazon  ──▶  túnel  ──▶  FastAPI  ──▶  route
                                         └────────────── Ollama (local)
 ```
 
-## El problema que manda sobre todo lo demás
+## El problema que tuve
 
 **Alexa corta a los ocho segundos.** No es una recomendación: si el servidor
 no ha contestado, la sesión se cae con un error genérico y el usuario oye
@@ -82,7 +82,6 @@ página de códigos del sistema, y en pantalla sale `Camino al tÃºnel`.
 ## De qué está hecho
 
 | Pieza | Qué hace |
-|---|---|
 | `server.py` | FastAPI. Verifica la firma de Amazon, mide tiempos reales, responde en SSML. |
 | `nlu.py` | El router determinista. Donde se resuelve casi todo. |
 | `ollama_client.py` | *Function calling* con presupuesto, saneado de respuestas y el freno de mano. |
