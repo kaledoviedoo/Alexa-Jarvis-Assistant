@@ -80,7 +80,7 @@ sin un solo carácter no-ASCII dentro. Y al leer el log hay que pasarle
 página de códigos del sistema, y en pantalla sale `Camino al tÃºnel`.
 
 ## De qué está hecho
-
+|---|---|
 | Pieza | Qué hace |
 | `server.py` | FastAPI. Verifica la firma de Amazon, mide tiempos reales, responde en SSML. |
 | `nlu.py` | El router determinista. Donde se resuelve casi todo. |
