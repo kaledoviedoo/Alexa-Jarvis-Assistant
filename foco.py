@@ -1,30 +1,8 @@
-"""
-Foco de sesion: memoria muy corta de lo ultimo que se hizo.
+"""Memoria de una sola frase, para que los pronombres funcionen.
 
-De donde viene la idea
-----------------------
-Es el patron converse() de Mycroft. Cuando un skill acaba de responder, tiene
-derecho de tanteo sobre la frase siguiente: la ve ANTES que el enrutado
-general, y si la reconoce se la queda.
-
-Que problema resuelve aqui
---------------------------
-Las frases con pronombre no dicen de que hablan: "cierralo", "borralo", "abre
-el segundo", "ese". El router de patrones no puede resolverlas porque el
-sujeto esta en el turno anterior, asi que acababan en el modelo: seis segundos
-y medio de presupuesto, una RTX 3050 calentandose y un 3b adivinando, para
-algo que aqui se resuelve leyendo una variable.
-
-Como funciona
--------------
-Cada handler que actua sobre algo concreto deja constancia:
-
-    foco.recordar("app", "spotify")
-    foco.recordar("archivo", "notas.txt", lista=["notas.txt", "prueba.py"])
-
-Y caduca: dos minutos o tres turnos, lo que llegue antes. Es memoria de
-conversacion, no una base de datos. Un "cierralo" veinte minutos despues no
-debe cerrar nada: mas vale preguntar que acertar por accidente.
+Guarda de que se acaba de hablar durante unos pocos turnos, y asi "cierralo"
+o "el primero" saben a que se refieren. Caduca rapido a proposito: un foco
+que dura demasiado acaba aplicando una orden a algo de hace cinco minutos.
 """
 
 import logging
@@ -85,11 +63,6 @@ def olvidar() -> None:
         _estado.clear()
 
 
-# -------------------------------------------------------------------------
-# ORDINALES
-# -------------------------------------------------------------------------
-# "abre el segundo" tras haber listado archivos. Se aceptan tanto la palabra
-# como el numero, porque Alexa transcribe "el 2" y "el segundo" indistintamente.
 ORDINALES = {
     "primero": 0, "primera": 0, "1": 0, "uno": 0, "una": 0,
     "segundo": 1, "segunda": 1, "2": 1, "dos": 1,

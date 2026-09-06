@@ -1,15 +1,9 @@
-"""
-Cambiar de ventana por voz.
+"""Cambiar, listar, minimizar y maximizar ventanas.
 
-Se apoya en pygetwindow, que ya viene con pyautogui, asi que no hay nada
-nuevo que instalar.
-
-Detalle que parece tonto y no lo es: Windows se niega a que un proceso
-cualquiera ponga otra ventana en primer plano. Es una proteccion contra
-programas que se cuelan encima de lo que estas haciendo. `activate()` falla
-con un error de acceso denegado bastante a menudo, asi que aqui se intenta
-primero minimizar y restaurar, que es el truco que si funciona: al restaurar,
-Windows le concede el foco.
+Envoltorio de pygetwindow con dos arreglos practicos: busca por parecido
+(porque el titulo de una ventana casi nunca es el nombre del programa) y,
+cuando Windows no deja traer una ventana al frente, la minimiza y la
+restaura, que consigue el mismo efecto.
 """
 
 import difflib
@@ -120,9 +114,6 @@ def cambiar_a(nombre: str) -> str:
         time.sleep(0.1)
         ventana.activate()
     except Exception as e:
-        # activate() falla a menudo aunque la ventana YA se haya puesto
-        # delante con el rodeo anterior. Comprobamos el resultado real en vez
-        # de fiarnos del error.
         log.debug("activate() se quejó: %s", e)
         try:
             if gw.getActiveWindow() and gw.getActiveWindow().title == ventana.title:

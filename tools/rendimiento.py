@@ -1,17 +1,8 @@
-"""
-Diagnostico de rendimiento: "por que tengo lag".
+"""Diagnostico de por que el equipo va lento.
 
-La idea
--------
-Un informe de CPU, RAM y GPU no sirve de nada mientras juegas: son numeros y
-tu quieres una respuesta. Esto mira todo a la vez, decide QUIEN tiene la culpa
-y lo dice en una frase. Si hay algo que cerrar, lo propone y espera tu si.
-
-Lo que NO hace
---------------
-No cierra nada por su cuenta y no toca procesos del sistema. La lista de lo
-intocable esta en config.PROCESOS_PROTEGIDOS y aqui se respeta sin excepcion:
-matar el proceso equivocado en mitad de una partida es peor que el lag.
+Mira CPU, memoria, disco y GPU a la vez, identifica que procesos no son
+esenciales y propone cerrarlos. Propone: nunca cierra nada sin que lo digas,
+y los procesos del sistema estan protegidos.
 """
 
 import logging
@@ -97,12 +88,7 @@ def candidatos_a_cerrar() -> list[dict]:
 
 
 def diagnostico() -> str:
-    """
-    Por que va lento el equipo, en una frase.
-
-    Mira todo a la vez y se moja: dice cual es el cuello de botella en vez de
-    soltar cuatro numeros y que decidas tu.
-    """
+    """Por que va lento el equipo, en una frase."""
     from tools import sistema
 
     cpu = psutil.cpu_percent(interval=0.4)

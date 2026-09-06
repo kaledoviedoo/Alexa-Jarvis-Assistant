@@ -1,23 +1,7 @@
-"""
-Microsoft Teams sin API ni permisos de administrador.
+"""Abrir Teams, navegar por canales y leer lo que hay en pantalla.
 
-Lo que se puede y lo que no, sin adornos
-----------------------------------------
-Teams no guarda los mensajes en tu disco de forma legible: viven en el
-servidor de Microsoft. Para leerlos "de verdad" (historico, busqueda) haria
-falta Microsoft Graph, y eso exige registrar una app en Azure y consentimiento
-de un administrador que, en una cuenta de trabajo o de universidad, casi nunca
-llega.
-
-Asi que aqui se hace lo que si se puede hacer hoy, sin pedirle permiso a nadie:
-
-- ABRIR Teams y NAVEGAR con enlaces msteams:, que es el mecanismo oficial de
-  la propia aplicacion.
-- LEER lo que este en pantalla, con el OCR de tools/pantalla.py.
-
-O sea: Jarvis lee lo que TU verias mirando. Ni mas ni menos. Si el canal esta
-abierto y hay mensajes a la vista, los lee. Lo que no se ve, no existe para el.
-Es una limitacion real y no la disimulamos en las respuestas.
+Usa los enlaces msteams: para abrir y el OCR para leer, porque Teams no
+expone una API local. Es lo que se puede hacer sin permisos de organizacion.
 """
 
 import logging
@@ -76,14 +60,7 @@ def abrir(seccion: str = "") -> str:
 
 
 def abrir_canal(nombre: str) -> str:
-    """
-    Abre la busqueda de Teams con el nombre del canal escrito.
-
-    No se puede saltar directo a un canal por su nombre: el enlace msteams:
-    de canal necesita identificadores internos que solo da la API. Lo que si
-    funciona, y es lo que hace un humano, es abrir la busqueda con el texto
-    ya puesto para que este a un Enter de distancia.
-    """
+    """Abre la busqueda de Teams con el nombre del canal escrito."""
     texto = (nombre or "").strip()
     if not texto:
         return "¿Qué canal quieres abrir?"
@@ -97,19 +74,9 @@ def abrir_canal(nombre: str) -> str:
 
 
 def leer_lo_visible(cuantas_lineas: int = 10) -> str:
-    """
-    Lee los mensajes que esten a la vista en Teams.
-
-    Damos un momento a que la ventana termine de pintar: si se lee demasiado
-    pronto, el OCR pilla la pantalla a medio cargar y devuelve trozos sueltos
-    que suenan a galimatias.
-    """
+    """Lee los mensajes que esten a la vista en Teams."""
     time.sleep(1.2)
 
-    # Recortamos la barra lateral izquierda y la de titulo. Ahi solo hay
-    # nombres de menu y de equipos sueltos que, mezclados con los mensajes,
-    # convierten la lectura en una lista de palabras sin sentido. Los mensajes
-    # viven en la franja central-derecha.
     texto = pantalla.leer_pantalla(maximo_lineas=cuantas_lineas,
                                    zona=(0.22, 0.08, 1.0, 0.94))
     if texto.startswith("No pude") or texto.startswith("No veo"):

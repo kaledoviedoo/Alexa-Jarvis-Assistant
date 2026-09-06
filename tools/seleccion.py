@@ -1,28 +1,13 @@
-"""
-Un puñado de archivos en la mano, para hacerles algo después.
+"""Coger varios archivos por voz para hacerles algo despues.
 
-Por voz no se puede arrastrar el ratón sobre cuatro archivos. Esto es el
-equivalente hablado: te paras en una carpeta, dices qué quieres coger, y
-queda ahí guardado hasta que digas qué hacer con ello.
+El equivalente hablado de arrastrar el raton sobre cuatro archivos: te paras
+en una carpeta, dices cuales quieres (los tres primeros, todos los pdf, los
+que digan calculo) y quedan guardados hasta que digas que hacer con ellos.
 
-    "entra a descargas"                 -> se para ahí y te dice qué hay
-    "selecciona los 3 primeros"         -> coge tres
-    "selecciona todos los pdf"          -> coge por tipo
-    "selecciona los que digan calculo"  -> coge por lo que ponga en el nombre
-    "que tengo seleccionado"            -> te los lee
-    "muevelos a documentos"             -> los mueve
-    "archivalos en la boveda"           -> los reparte por el vault razonando
-
-Dos decisiones que valen la pena explicar:
-
-**El orden es el que ves en el explorador**, o sea alfabético, no por fecha.
-"Los 3 primeros" tiene que significar lo mismo mirando la pantalla que
-diciéndolo en voz alta, o la orden es una lotería. Para lo otro está
-"selecciona los 3 más recientes", que lo dice explícito.
-
-**La selección caduca a los cinco minutos.** Coger cuatro archivos y moverlos
-media hora después, cuando ya no te acuerdas de cuáles eran, es la receta
-para mover lo que no era. Si caducó, lo dice y no hace nada.
+El orden es alfabetico, el mismo que ves en el explorador, para que "los
+tres primeros" signifique lo mismo mirando la pantalla que hablando. Y la
+seleccion caduca a los cinco minutos, porque mover archivos que ya no
+recuerdas cuales eran es la forma de mover los que no eran.
 """
 
 import logging
@@ -80,9 +65,6 @@ ALIAS_FAMILIA = {
 }
 
 
-# =========================================================================
-# EL ESTADO
-# =========================================================================
 _carpeta: Path = ESCRITORIO
 _elegidos: list[Path] = []
 _sellado: float = 0.0
@@ -116,9 +98,6 @@ def seleccionados() -> list[Path]:
     return [r for r in _elegidos if r.exists()]
 
 
-# =========================================================================
-# MOVERSE
-# =========================================================================
 def _listar(carpeta: Path) -> list[Path]:
     """Los archivos de una carpeta, en el mismo orden que los ves."""
     try:
@@ -172,9 +151,6 @@ def entrar_en(nombre_carpeta: str) -> str:
             f"{subcarpetas} carpetas. El primero es {dentro[0].name}.")
 
 
-# =========================================================================
-# COGER
-# =========================================================================
 def _familia_de(palabra: str) -> tuple | None:
     clave = (palabra or "").strip().lower()
     familia = ALIAS_FAMILIA.get(clave)
@@ -201,12 +177,7 @@ def _describir(elegidos: list[Path], que_hice: str) -> str:
 
 
 def seleccionar(criterio: str = "", cantidad: int = 0, recientes: bool = False) -> str:
-    """
-    Coge archivos de la carpeta actual.
-
-    `criterio` puede ser una familia ("pdf", "word"), un trozo del nombre, o
-    nada, que significa todos. `cantidad` recorta a los N primeros.
-    """
+    """Coge archivos de la carpeta actual."""
     global _elegidos
 
     dentro = _listar(_carpeta)
@@ -269,12 +240,7 @@ def que_hay() -> str:
 
 
 def leer_titulos() -> str:
-    """
-    Los nombres completos, uno a uno.
-
-    Distinto de `que_hay`: ahi se dicen sin extension y resumidos, aqui se
-    leen enteros porque lo que quieres es identificarlos antes de moverlos.
-    """
+    """Los nombres completos, uno a uno."""
     vivos = seleccionados()
     if not vivos:
         return "No tengo nada seleccionado."
@@ -287,9 +253,6 @@ def leer_titulos() -> str:
     return "; ".join(r.name for r in vivos) + "."
 
 
-# =========================================================================
-# HACERLES ALGO
-# =========================================================================
 def mover_a(destino: str) -> str:
     """Mueve lo seleccionado a otra carpeta permitida."""
     vivos = seleccionados()
@@ -321,9 +284,6 @@ def mover_a(destino: str) -> str:
         try:
             final = carpeta_destino / ruta.name
             if final.exists():
-                # Nunca se pisa un archivo existente sin avisar. Renombrar en
-                # silencio esconde el choque; fallar entero por uno castiga a
-                # los otros nueve. Se salta ese y se cuenta.
                 chocaron += 1
                 continue
             ruta.replace(final)
@@ -347,18 +307,7 @@ def contar() -> int:
 
 
 def archivar_en_boveda() -> str:
-    """
-    Reparte lo seleccionado por la boveda, razonando carpeta por carpeta.
-
-    Cada archivo se clasifica por separado a proposito. Un lote de descargas
-    no es homogeneo: en los mismos cuatro archivos suele haber un pdf de una
-    materia, una entrega y algo que no encaja en nada. Meterlos todos donde
-    vaya el primero es peor que no archivarlos.
-
-    Tarda: por cada archivo hay que leerlo, clasificarlo con el modelo y
-    buscarle notas relacionadas. Quien llame a esto tiene que hacerlo en
-    segundo plano, nunca dentro de los ocho segundos de Alexa.
-    """
+    """Reparte lo seleccionado por la boveda, razonando carpeta por carpeta."""
     from tools import archivar as archivador
 
     vivos = seleccionados()
@@ -374,10 +323,6 @@ def archivar_en_boveda() -> str:
             fallados.append(f"{ruta.stem}: {e}")
             continue
 
-        # archivar_ruta contesta en lenguaje normal, y las frases de fallo
-        # empiezan por "No". No hay codigo de error que mirar, asi que se
-        # distingue por ahi: es fragil, pero lo alternativo seria cambiar la
-        # firma de una funcion que ya usan otras dos cosas.
         if resultado.startswith(("No ", "Ya ", "Copié el archivo pero")):
             fallados.append(f"{ruta.stem} ({resultado[:60]})")
         else:

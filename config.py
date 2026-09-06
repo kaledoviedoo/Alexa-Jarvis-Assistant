@@ -1,10 +1,9 @@
-"""
-Configuración central de Jarvis.
+"""Configuracion y deteccion del entorno.
 
-Todo lo ajustable vive aquí. Si algo no te funciona, es muy probable que
-la solución sea cambiar un valor de este archivo y no tocar el resto.
-
-Las variables se pueden sobrescribir desde un archivo .env (ver .env.example).
+Lee el .env, localiza las carpetas del usuario (Escritorio, Descargas,
+Documentos) incluso cuando OneDrive las ha movido, y define los limites de
+seguridad: que rutas se pueden tocar, que procesos no se pueden matar y que
+atajos de teclado estan permitidos.
 """
 
 import os
@@ -12,9 +11,6 @@ import re
 import shutil
 from pathlib import Path
 
-# -------------------------------------------------------------------------
-# Carga de .env (sin dependencias externas)
-# -------------------------------------------------------------------------
 _ENV_PATH = Path(__file__).parent / ".env"
 if _ENV_PATH.exists():
     for _linea in _ENV_PATH.read_text(encoding="utf-8").splitlines():
@@ -36,9 +32,6 @@ def _env_bool(nombre: str, defecto: bool) -> bool:
     return valor.strip().lower() in ("1", "true", "si", "sí", "yes", "on")
 
 
-# -------------------------------------------------------------------------
-# RUTAS
-# -------------------------------------------------------------------------
 HOME = Path.home()
 
 # OneDrive suele "secuestrar" el Escritorio en Windows. Probamos ambas rutas.
@@ -59,14 +52,7 @@ _CLAVES_REGISTRO = {
 
 
 def _carpeta_por_registro(cual: str) -> Path | None:
-    """
-    Pregunta a Windows dónde está de verdad una carpeta conocida.
-
-    Es la única forma fiable: cuando OneDrive hace copia de seguridad del
-    Escritorio o los Documentos, los redirige a OneDrive\\... pero deja las
-    carpetas antiguas en su sitio. Probar rutas a ojo acierta la equivocada
-    la mitad de las veces; el registro guarda la que Windows considera buena.
-    """
+    """Pregunta a Windows dónde está de verdad una carpeta conocida."""
     if os.name != "nt":
         return None
     try:
@@ -102,12 +88,6 @@ ESCRITORIO = _detectar_escritorio()
 DESCARGAS = _carpeta_por_registro("descargas") or (HOME / "Downloads")
 DOCUMENTOS = _carpeta_por_registro("documentos") or (HOME / "Documents")
 
-# Carpetas donde Jarvis tiene permitido leer y escribir. Cualquier ruta fuera
-# de estas se rechaza. Esto es lo que impide que un comando mal interpretado
-# (o alguien que descubra tu túnel) toque C:\Windows.
-# Incluimos TODOS los escritorios que existan, no solo el principal. Con
-# OneDrive es habitual tener dos, y así Jarvis puede leer archivos de
-# cualquiera de los dos aunque escriba siempre en el que marca el registro.
 _TODAS = [ESCRITORIO, DESCARGAS, DOCUMENTOS, HOME / "Jarvis"] + _CANDIDATOS_ESCRITORIO + [
     HOME / "OneDrive" / "Documents",
     HOME / "OneDrive" / "Documentos",
@@ -134,18 +114,6 @@ ARCHIVO_ESTADO = CARPETA_DATOS / "estado.json"
 PAPELERA = CARPETA_DATOS / "papelera"
 PAPELERA.mkdir(parents=True, exist_ok=True)
 
-
-# -------------------------------------------------------------------------
-# MODOS DE OPERACIÓN
-# -------------------------------------------------------------------------
-# Perfilado para una RTX 3050 de 6 GB (PC de torre).
-#
-#   num_gpu = -1  -> Ollama sube todas las capas que quepan a la GPU
-#   num_gpu = 0   -> inferencia 100% en CPU, la VRAM queda libre para juegos
-#
-# keep_alive define cuánto tiempo se queda el modelo cargado en VRAM. Es la
-# variable MÁS importante para la velocidad: si el modelo se descarga, la
-# siguiente orden tarda 20-40s en arrancar en frío y Alexa corta la sesión.
 
 MODO_NORMAL = "normal"
 MODO_DEDICADO = "dedicado"
@@ -223,56 +191,22 @@ PROCESOS_PROTEGIDOS = {
 }
 
 
-# -------------------------------------------------------------------------
-# OLLAMA
-# -------------------------------------------------------------------------
 OLLAMA_HOST = _env("OLLAMA_HOST", "http://127.0.0.1:11434")
 
 # Máximo de vueltas del bucle de herramientas (evita bucles infinitos).
 MAX_PASOS_TOOLS = 4
 
 
-# -------------------------------------------------------------------------
-# PRESUPUESTO DE TIEMPO DE ALEXA  (¡crítico!)
-# -------------------------------------------------------------------------
-# Amazon corta la skill si el endpoint no responde en ~8 segundos. Reservamos
-# margen para la red y el túnel: si el LLM no terminó en este tiempo, Jarvis
-# contesta "lo estoy procesando" PERO la tarea sigue ejecutándose en segundo
-# plano y el resultado queda guardado para la siguiente pregunta.
 PRESUPUESTO_SEGUNDOS = float(_env("JARVIS_PRESUPUESTO_SEGUNDOS", "6.5"))
 
 # Longitud máxima de lo que Alexa va a pronunciar.
 MAX_CARACTERES_VOZ = 600
 
-# -------------------------------------------------------------------------
-# SESIÓN CONTINUA
-# -------------------------------------------------------------------------
-# Con esto en True, tras cada orden Alexa deja el micrófono abierto y puedes
-# encadenar comandos sin repetir "Alexa, dile a mi asistente que...".
-#
-# Se cierra diciendo una despedida ("pausa", "gracias", "hasta luego") o
-# quedándote callado unos segundos: Alexa cierra la sesión sola y vuelve a
-# estar disponible para sus propios servicios.
 SESION_CONTINUA = _env_bool("JARVIS_SESION_CONTINUA", True)
 
 
-# -------------------------------------------------------------------------
-# MANTENER EL CAMINO CALIENTE
-# -------------------------------------------------------------------------
-# Sintoma que resuelve: la primera orden tras un rato falla y al repetirla
-# funciona. No es el servidor (el router responde en menos de 1 s siempre),
-# sino el tunel, que tras estar ocioso tiene que rehacer la conexion y se come
-# los 8 segundos que Alexa concede.
-#
-# Con esto, Jarvis se pide a si mismo su URL publica cada pocos minutos, de
-# forma que DNS, TLS y la ruta del tunel nunca se enfrian.
 MANTENER_CALIENTE = _env_bool("JARVIS_MANTENER_CALIENTE", True)
 
-# Cada cuantos segundos. 240 (4 minutos) mantiene la ruta viva sin gastar nada:
-# son unos 360 pings al dia de menos de 1 KB cada uno.
-# 90 segundos: ahora el ping recorre de verdad el camino publico (ver
-# mantener_caliente.py), asi que cada uno cuesta un saludo TLS. Sale barato
-# comparado con que Alexa se rinda a los 8 segundos en la primera orden.
 INTERVALO_CALIENTE = int(_env("JARVIS_INTERVALO_CALIENTE", "90"))
 
 # URL publica: sirve tanto la de Tailscale como la de ngrok, la que este puesta.
@@ -281,19 +215,8 @@ if TUNEL_URL and not TUNEL_URL.startswith(("http://", "https://")):
     TUNEL_URL = "https://" + TUNEL_URL
 
 
-# -------------------------------------------------------------------------
-# SEGURIDAD
-# -------------------------------------------------------------------------
-# ID de tu skill. Lo copias de la consola de desarrollador de Alexa.
-# Formato: amzn1.ask.skill.xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ALEXA_SKILL_ID = _env("ALEXA_SKILL_ID", "")
 
-# Nombre de invocación de la skill, tal cual está en la consola.
-#
-# Amazon no admite nombres de una sola palabra salvo que sean marca propia,
-# así que tiene que ser de dos o más ("jarvis local", "mi asistente"...).
-# Jarvis lo usa para recortarlo del comando: Alexa a veces lo deja dentro
-# del slot y sin quitarlo el router no reconocería la orden.
 ALEXA_INVOCATION_NAME = _env("ALEXA_INVOCATION_NAME", "jarvis")
 
 # Verificación criptográfica de la firma de Amazon. Déjalo en True en producción.
@@ -304,16 +227,10 @@ VERIFICAR_FIRMA = _env_bool("JARVIS_VERIFICAR_FIRMA", True)
 TOLERANCIA_TIMESTAMP_SEGUNDOS = 150
 
 
-# -------------------------------------------------------------------------
-# NAVEGADOR (Comet)
-# -------------------------------------------------------------------------
 _LOCAL = Path(_env("LOCALAPPDATA", str(HOME / "AppData" / "Local")))
 _PROGRAMAS = Path(_env("PROGRAMFILES", r"C:\Program Files"))
 _PROGRAMAS86 = Path(_env("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
 
-# Comet es de Perplexity y se instala en sitios distintos segun la version.
-# Aqui van las rutas conocidas; si ninguna acierta, mas abajo se busca de
-# verdad en el disco y en el registro.
 _CANDIDATOS_COMET = [
     _LOCAL / "Perplexity" / "Comet" / "Application" / "Comet.exe",
     _LOCAL / "Perplexity" / "Comet" / "Application" / "comet.exe",
@@ -328,12 +245,7 @@ _CANDIDATOS_COMET = [
 
 
 def _exe_por_registro(nombre_exe: str) -> str:
-    """
-    Busca un ejecutable en "App Paths" del registro.
-
-    Windows mantiene ahi la ruta de casi todo lo que se instala. Es mas fiable
-    que adivinar carpetas, porque lo escribe el propio instalador.
-    """
+    """Busca un ejecutable en "App Paths" del registro."""
     if os.name != "nt":
         return ""
     try:
@@ -355,13 +267,7 @@ def _exe_por_registro(nombre_exe: str) -> str:
 
 
 def _exe_por_acceso_directo(nombre: str) -> str:
-    """
-    Busca el .lnk del menu Inicio y lee a donde apunta.
-
-    Si el programa sale en el menu Inicio, existe. Leemos el destino del
-    acceso directo sin depender de librerias externas: el .lnk guarda la ruta
-    en texto plano (UTF-16) y basta con pescarla.
-    """
+    """Busca el .lnk del menu Inicio y lee a donde apunta."""
     if os.name != "nt":
         return ""
 
@@ -410,15 +316,7 @@ def _exe_buscando_en_disco(nombre_exe: str) -> str:
 
 
 def localizar_ejecutable(nombre_exe: str, candidatos: list | None = None) -> str:
-    """
-    Encuentra un .exe probandolo todo, de lo barato a lo caro.
-
-    Existe porque "start comet" no abre nada: `start` solo funciona con lo que
-    esta en el PATH o registrado como protocolo, y los navegadores modernos
-    se instalan en la carpeta del usuario sin tocar ninguna de las dos cosas.
-    Windows respondia con su sonido de error mientras Jarvis decia "Abriendo
-    comet" tan tranquilo.
-    """
+    """Encuentra un .exe probandolo todo, de lo barato a lo caro."""
     for ruta in (candidatos or []):
         if Path(ruta).is_file():
             return str(ruta)
@@ -449,30 +347,15 @@ def detectar_comet() -> str:
 MOTOR_BUSQUEDA = _env("JARVIS_MOTOR_BUSQUEDA", "https://www.perplexity.ai/search?q={q}")
 
 
-# -------------------------------------------------------------------------
-# QUIEN ERES
-# -------------------------------------------------------------------------
 NOMBRE_USUARIO = _env("JARVIS_NOMBRE_USUARIO", "Kaled")
 
-# Cada cuantas respuestas se usa el nombre, aproximadamente. Uno de cada
-# cuatro: llamarte por tu nombre en cada frase suena a teleoperador, y no
-# hacerlo nunca suena a maquina. El termino medio es lo natural.
 FRECUENCIA_NOMBRE = int(_env("JARVIS_FRECUENCIA_NOMBRE", "4"))
 
 
-# -------------------------------------------------------------------------
-# CORREO (Outlook de escritorio, en local)
-# -------------------------------------------------------------------------
-# Sin nube y sin OAuth: se habla con el Outlook que ya tienes abierto a traves
-# de COM. Solo lectura.
 CORREO_MAXIMO = int(_env("JARVIS_CORREO_MAXIMO", "5"))
 CORREO_CARACTERES = int(_env("JARVIS_CORREO_CARACTERES", "300"))
 
 
-# -------------------------------------------------------------------------
-# PANTALLA
-# -------------------------------------------------------------------------
-# Ruta de Tesseract. Si esta en el PATH no hace falta tocar nada.
 TESSERACT_EXE = _env("JARVIS_TESSERACT_EXE", "")
 IDIOMA_OCR = _env("JARVIS_IDIOMA_OCR", "spa+eng")
 
@@ -481,18 +364,9 @@ IDIOMA_OCR = _env("JARVIS_IDIOMA_OCR", "spa+eng")
 MODELO_VISION = _env("JARVIS_MODELO_VISION", "llava:7b")
 
 
-# -------------------------------------------------------------------------
-# OBSIDIAN
-# -------------------------------------------------------------------------
-# Ruta del vault. Si se deja vacia, Jarvis lo busca solo por la carpeta
-# oculta .obsidian, que es la firma de todo vault.
 OBSIDIAN_VAULT = _env("JARVIS_OBSIDIAN_VAULT", "")
 
 
-# -------------------------------------------------------------------------
-# CONTROL DE TECLADO Y MOUSE (modo acotado)
-# -------------------------------------------------------------------------
-# Solo se permiten estos atajos. No hay clics a coordenadas ciegas.
 ATAJOS_PERMITIDOS = {
     "copiar": ["ctrl", "c"],
     "pegar": ["ctrl", "v"],

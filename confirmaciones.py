@@ -1,24 +1,8 @@
-"""
-Confirmacion de las ordenes que no tienen vuelta atras.
+"""Las ordenes sin vuelta atras se ejecutan en dos turnos.
 
-Por que existe
---------------
-Alexa oye mal a veces. Ya paso: "apague el equipo" se ejecuto tal cual y el PC
-se apago en mitad de una prueba. Y el modelo, cuando no entiende algo, tiende a
-llamar a la herramienta que le suene: llego a intentar CERRAR una aplicacion
-inventada porque la orden decia "esta consumiendo mas recursos".
-
-Con archivos hay red (nada se borra de verdad, va a la papelera), pero apagar,
-reiniciar o cerrar todo no se deshacen. Para esas, una pregunta corta cuesta
-un turno y evita un disgusto.
-
-Como funciona
--------------
-La orden peligrosa no se ejecuta: se guarda y se pregunta. El "si" del turno
-siguiente la dispara. Cualquier otra cosa la descarta.
-
-Caduca a los 45 segundos a proposito. Un "si" suelto tres minutos despues,
-contestando a otra cosa, no puede apagar el equipo.
+Apagar el equipo o borrar varios archivos primero preguntan, y solo el "si"
+del turno siguiente dispara la accion. Existe porque Alexa oye mal de vez en
+cuando, y equivocarse aqui no se puede deshacer.
 """
 
 import logging
@@ -42,17 +26,7 @@ _NO = re.compile(r"^\s*(?:no|nop|nada|d[eé]jalo|cancela|cancelar|olvidalo|"
 
 
 def pedir(descripcion: str, accion, al_rechazar=None, pregunta: str = "") -> str:
-    """
-    Guarda la accion y devuelve la pregunta que Alexa dira.
-
-    `al_rechazar` es lo que hay que hacer si dices que no. No siempre basta
-    con no hacer nada: en WhatsApp el mensaje YA esta escrito en la caja
-    cuando se pregunta, asi que un "no" tiene que borrarlo. Dejarlo ahi seria
-    peor que no haber empezado, porque a la siguiente pulsacion de Enter se
-    manda solo.
-
-    `pregunta` permite una frase a medida en vez de la formula generica.
-    """
+    """Guarda la accion y devuelve la pregunta que Alexa dira."""
     with _candado:
         _pendiente.clear()
         _pendiente.update({
@@ -77,12 +51,7 @@ def hay_pendiente() -> bool:
 
 
 def resolver(texto: str) -> str | None:
-    """
-    Interpreta la respuesta del usuario.
-
-    Devuelve el resultado si habia algo que confirmar, o None si esta frase
-    no tiene nada que ver y debe seguir su camino por el router.
-    """
+    """Interpreta la respuesta del usuario."""
     if not hay_pendiente():
         return None
 

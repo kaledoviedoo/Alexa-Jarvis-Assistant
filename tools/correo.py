@@ -1,20 +1,9 @@
-"""
-Lectura del correo de Outlook, en local y sin permisos de nadie.
+"""Lectura y envio de correo por Outlook de escritorio.
 
-Por que COM y no la API de Microsoft
-------------------------------------
-Graph seria mas potente (historico, busqueda del servidor), pero exige
-registrar una app en Azure y, para cuentas de trabajo o universidad, el
-consentimiento de un administrador que casi nunca llega. COM habla con el
-Outlook que ya tienes instalado y con la sesion que ya tienes iniciada: cero
-configuracion, cero credenciales guardadas, cero trafico fuera del equipo.
-
-Solo lectura, a proposito
--------------------------
-Aqui no se envia, ni se borra, ni se marca nada. Un asistente de voz que se
-equivoca al transcribir y manda un correo es un problema mucho mas caro que
-uno que solo sabe leerlos. Si algun dia hace falta enviar, que sea una
-funcion aparte y con confirmacion.
+Usa COM via pywin32, asi que no hace falta ni token ni nube: habla con el
+Outlook que ya tienes abierto y autenticado. Cada hilo que lo use tiene que
+llamar antes a CoInitialize, que es el detalle que hace fallar esto de
+formas incomprensibles si se olvida.
 """
 
 import logging
@@ -40,9 +29,6 @@ def _outlook():
         return None
 
     try:
-        # Imprescindible: esto corre en un hilo del servidor, y COM exige que
-        # cada hilo se inicialice. Sin esto falla con un error críptico sobre
-        # apartamentos ("CoInitialize has not been called").
         pythoncom.CoInitialize()
         return win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
     except Exception as e:
@@ -122,9 +108,6 @@ def _mensajes(carpeta, cuantos: int, solo_sin_leer: bool = False) -> list:
     return salida
 
 
-# -------------------------------------------------------------------------
-# ORDENES
-# -------------------------------------------------------------------------
 def ultimos_correos(cuantos: int = 3, con_cuerpo: bool = False) -> str:
     """Los ultimos correos recibidos."""
     espacio = _outlook()
@@ -244,23 +227,8 @@ def buscar_correos(quien: str, cuantos: int = 3) -> str:
     return f"De {encontrados[0]['de']}: {detalle}"
 
 
-# -------------------------------------------------------------------------
-# ENVIAR
-# -------------------------------------------------------------------------
-# Aqui hay una ventaja grande frente a WhatsApp: Outlook RESUELVE el
-# destinatario contra tu libreta de direcciones. Le das "andres" y te devuelve
-# "Andres Ramirez <a.ramirez@...>" o te dice que no lo encuentra. No hay que
-# leer la pantalla ni adivinar: es el propio Outlook quien confirma a quien le
-# vas a escribir, y eso es mucho mas fiable que un OCR.
-#
-# Aun asi se pide confirmacion, porque un correo enviado tampoco se recoge.
-
 def _resolver_destinatario(mensaje, quien: str):
-    """
-    Anade el destinatario y deja que Outlook lo resuelva.
-
-    Devuelve (nombre_resuelto, direccion) o (None, None).
-    """
+    """Anade el destinatario y deja que Outlook lo resuelva."""
     try:
         destinatario = mensaje.Recipients.Add(quien)
         if not destinatario.Resolve():
@@ -287,11 +255,7 @@ def _resolver_destinatario(mensaje, quien: str):
 
 
 def preparar_correo(quien: str, asunto: str, cuerpo: str):
-    """
-    Redacta el correo y lo deja listo para enviar.
-
-    Devuelve (mensaje_com, nombre, direccion, error).
-    """
+    """Redacta el correo y lo deja listo para enviar."""
     espacio = _outlook()
     if espacio is None:
         return None, None, None, "No puedo llegar a Outlook."

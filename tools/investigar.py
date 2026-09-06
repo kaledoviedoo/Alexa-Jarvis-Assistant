@@ -1,21 +1,8 @@
-"""
-Buscar en internet y RAZONAR sobre lo que sale.
+"""Buscar en internet y razonar sobre los resultados.
 
-La diferencia con "busca X en Comet"
-------------------------------------
-Esa orden abre el navegador y te deja a ti leyendo. Esta trae los resultados
-al equipo, se los da al modelo local y te devuelve una conclusion: cual es mas
-barato, cual conviene, que dicen los que ya lo probaron.
-
-Todo se queda en casa: la busqueda sale a internet, pero el razonamiento lo
-hace Ollama en tu maquina. Ninguna API de pago y ninguna clave que guardar.
-
-Por que va en segundo plano, siempre
-------------------------------------
-Buscar tarda un par de segundos, y leer diez resultados y compararlos son
-miles de tokens: quince segundos largos con un modelo local. Alexa concede
-ocho. Se contesta al momento y el resultado se recoge con "como quedo lo
-ultimo".
+Compara precios y opciones y da una recomendacion con el porque, en vez de
+soltar una lista de enlaces. Corre en segundo plano porque implica varias
+busquedas y una pasada del modelo.
 """
 
 import html
@@ -80,10 +67,6 @@ def buscar(consulta: str, cuantos: int = MAX_RESULTADOS) -> list[dict]:
         if len(salida) >= cuantos:
             break
 
-    # Plan B: si la pagina llego pero no encajo el patron, es que DuckDuckGo
-    # cambio sus clases de CSS. Sacamos al menos los titulos, que es mejor que
-    # devolver nada, y lo dejamos escrito en el registro para saber POR QUE
-    # las respuestas salieron pobres.
     if not salida and len(pagina) > 2000:
         log.warning(
             "La búsqueda devolvió %d caracteres pero el analizador no encontró "
@@ -105,12 +88,7 @@ def buscar(consulta: str, cuantos: int = MAX_RESULTADOS) -> list[dict]:
 
 
 def diagnostico() -> str:
-    """
-    Comprueba que la busqueda funciona de verdad.
-
-    Sirve para separar tres fallos que se parecen mucho desde fuera: no hay
-    internet, DuckDuckGo bloquea, o el analizador se quedo obsoleto.
-    """
+    """Comprueba que la busqueda funciona de verdad."""
     url = URL_BUSQUEDA.format(consulta=urllib.parse.quote_plus("prueba"))
     peticion = urllib.request.Request(url, headers={"User-Agent": AGENTE})
 
@@ -182,9 +160,6 @@ def _razonar(instruccion: str, material: str) -> str:
         return f"Encontré los resultados pero no pude analizarlos: {e}"
 
 
-# -------------------------------------------------------------------------
-# ORDENES
-# -------------------------------------------------------------------------
 def _sin_resultados(consulta: str) -> str:
     return (f"No conseguí resultados para {consulta}. "
             "Puede que no haya conexión, o prueba a decirlo de otra forma.")
@@ -204,9 +179,6 @@ def investigar(consulta: str) -> str:
 
 def comparar(consulta: str) -> str:
     """Compara opciones o precios y recomienda."""
-    # Añadimos las palabras que hacen aflorar comparativas y precios: sin
-    # ellas, la busqueda devuelve paginas de producto sueltas y no hay nada
-    # que comparar.
     resultados = buscar(f"{consulta} precio comparativa opiniones")
     if not resultados:
         return _sin_resultados(consulta)

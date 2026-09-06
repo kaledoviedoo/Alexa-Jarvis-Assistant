@@ -1,9 +1,10 @@
-"""
-Herramientas de archivos: crear, leer, editar, mover, copiar, listar y buscar.
+"""Crear, leer, editar, mover, copiar, listar y buscar archivos.
 
-Todas las rutas pasan por `resolver_ruta`, que impide salir de las carpetas
-permitidas en config.CARPETAS_PERMITIDAS. Nada de esto puede tocar C:\\Windows
-aunque el modelo se confunda o alguien intente inyectar "../../".
+Todas las rutas pasan por `resolver_ruta`, que rechaza los saltos de carpeta
+(`..`, letras de unidad, separadores codificados) antes de tocar el disco y
+comprueba que el resultado quede dentro de las carpetas autorizadas.
+
+Nada se borra de verdad: eliminar mueve a la papelera de Jarvis.
 """
 
 import logging
@@ -43,12 +44,7 @@ ALIAS_CARPETAS = {
 
 
 def resolver_ruta(nombre: str, base: Path | None = None) -> Path:
-    """
-    Convierte un nombre hablado en una ruta absoluta segura.
-
-    Acepta 'notas.txt', 'proyectos/notas.txt' o una ruta absoluta, siempre que
-    el resultado quede dentro de una carpeta permitida.
-    """
+    """Convierte un nombre hablado en una ruta absoluta segura."""
     nombre = (nombre or "").strip().strip('"').strip("'")
     if not nombre:
         raise RutaNoPermitida("No se indicó ningún nombre de archivo.")
@@ -57,21 +53,12 @@ def resolver_ruta(nombre: str, base: Path | None = None) -> Path:
     candidata = Path(nombre)
     es_absoluta = candidata.is_absolute()
 
-    # Rechazo explícito de componentes de escalada ANTES de tocar el disco.
-    #
-    # No basta con confiar en resolve(): en Linux una cadena como '..\\..\\x'
-    # no se interpreta como escalada (la barra invertida no es separador allí),
-    # así que comprobamos ambos separadores a mano. Así el sandbox se comporta
-    # igual en Windows, en WSL y en Linux.
     if not es_absoluta:
         # Separadores codificados en URL: nunca los decodificamos, así que no
         # escapan del sandbox, pero solo pueden venir de un intento de ataque.
         if re.search(r"%2[fF]|%5[cC]", nombre):
             raise RutaNoPermitida(f"'{nombre}' tiene caracteres codificados no permitidos.")
 
-        # Letra de unidad (C:\...): en Windows pathlib ya la trata como
-        # absoluta, pero en Linux o WSL quedaría como un nombre literal
-        # absurdo dentro del Escritorio. La rechazamos en cualquier sistema.
         if re.match(r"^[a-zA-Z]:[\\/]", nombre):
             raise RutaNoPermitida(
                 f"'{nombre}' apunta a una unidad del sistema y no está permitido."
@@ -79,9 +66,6 @@ def resolver_ruta(nombre: str, base: Path | None = None) -> Path:
 
         componentes = re.split(r"[\\/]+", nombre)
         for componente in componentes:
-            # '..' es escalada; '...' o '....' son nombres raros que no aportan
-            # nada legítimo y que en algunos sistemas se normalizan de formas
-            # inesperadas. Los bloqueamos todos.
             if componente and set(componente) == {"."} and len(componente) >= 2:
                 raise RutaNoPermitida(
                     f"'{nombre}' contiene una ruta de escalada y no está permitida."
@@ -118,9 +102,6 @@ def _base_desde_alias(carpeta: str | None) -> Path:
     return ALIAS_CARPETAS.get(clave, ESCRITORIO / carpeta)
 
 
-# -------------------------------------------------------------------------
-# CREAR
-# -------------------------------------------------------------------------
 def crear_archivo(nombre_archivo: str, contenido: str = "", carpeta: str = "") -> str:
     """Crea un archivo (.py, .txt, .md, .json, .csv, .docx, .xlsx) en el equipo."""
     try:
@@ -170,9 +151,6 @@ def crear_archivo(nombre_archivo: str, contenido: str = "", carpeta: str = "") -
         return f"Hubo un error al crear {ruta.name}: {e}"
 
 
-# -------------------------------------------------------------------------
-# LEER
-# -------------------------------------------------------------------------
 def leer_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     """Lee el contenido de un archivo de texto."""
     try:
@@ -203,9 +181,6 @@ def leer_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     return f"Contenido de {ruta.name}:\n{texto[:2000]}"
 
 
-# -------------------------------------------------------------------------
-# EDITAR
-# -------------------------------------------------------------------------
 def editar_archivo(
     nombre_archivo: str,
     accion: str = "agregar",
@@ -214,12 +189,7 @@ def editar_archivo(
     reemplazar: str = "",
     carpeta: str = "",
 ) -> str:
-    """
-    Edita un archivo de texto existente.
-
-    accion: 'agregar' (al final), 'anteponer' (al inicio),
-            'reemplazar' (buscar->reemplazar) o 'sobrescribir'.
-    """
+    """Edita un archivo de texto existente."""
     try:
         ruta = resolver_ruta(nombre_archivo, _base_desde_alias(carpeta))
     except RutaNoPermitida as e:
@@ -276,9 +246,6 @@ def editar_archivo(
     return resumen
 
 
-# -------------------------------------------------------------------------
-# MOVER / COPIAR / ELIMINAR
-# -------------------------------------------------------------------------
 def mover_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     """Mueve un archivo a otra carpeta."""
     try:
@@ -345,11 +312,7 @@ def copiar_archivo(origen: str, destino: str, carpeta: str = "") -> str:
 
 
 def eliminar_archivo(nombre_archivo: str, carpeta: str = "") -> str:
-    """
-    Manda un archivo a la papelera interna de Jarvis.
-
-    Nunca borra de forma definitiva: siempre se puede recuperar de ~/.jarvis/papelera.
-    """
+    """Manda un archivo a la papelera interna de Jarvis."""
     try:
         ruta = resolver_ruta(nombre_archivo, _base_desde_alias(carpeta))
     except RutaNoPermitida as e:
@@ -368,9 +331,6 @@ def eliminar_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     return f"Mandé {ruta.name} a la papelera de Jarvis. Se puede recuperar."
 
 
-# -------------------------------------------------------------------------
-# LISTAR / BUSCAR
-# -------------------------------------------------------------------------
 def listar_archivos(carpeta: str = "escritorio", limite: int = 15) -> str:
     """Lista los archivos de una carpeta."""
     base = _base_desde_alias(carpeta)
@@ -461,13 +421,7 @@ def crear_carpeta(nombre: str, carpeta: str = "") -> str:
 
 
 def eliminar_varios(patron: str, carpeta: str = "", limite: int = 20) -> str:
-    """
-    Manda a la papelera todos los archivos cuyo nombre contenga el patron.
-
-    Pensado para ordenes como "elimina las capturas del escritorio". El limite
-    existe a proposito: si una orden mal entendida fuera a barrer media carpeta,
-    preferimos no hacerlo y decirlo.
-    """
+    """Manda a la papelera todos los archivos cuyo nombre contenga el patron."""
     patron = (patron or "").strip().lower()
     if not patron:
         return "¿Qué archivos quieres que elimine?"

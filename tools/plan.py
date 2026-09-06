@@ -1,27 +1,9 @@
-"""
-Descomponer una orden compleja en pasos y ejecutarlos.
+"""Planificador de ordenes que necesitan varios pasos.
 
-"Preparame para el parcial del lunes de bases de datos" no es una accion: son
-cuatro. Buscar las notas, resumirlas, generar preguntas, y dejarlo escrito en
-la boveda. Hasta ahora eso no se podia pedir de una vez.
-
-Como se mantiene honesto
-------------------------
-Un modelo de 3B suelto planificando es una fuente de desastres: se inventa
-pasos, llama a herramientas que no existen y da por hecho que salio bien lo
-que fallo. Aqui hay tres frenos:
-
-  1. CATALOGO CERRADO. Solo puede usar los pasos de ACCIONES, ninguno de los
-     cuales borra, envia ni cierra nada. Si el plan pide algo que no esta en
-     la lista, ese paso se descarta antes de ejecutar.
-  2. LIMITE DE PASOS. Maximo cinco. Un plan de quince pasos con un 3B no es
-     ambicioso, es ruido.
-  3. SE COMPRUEBA. Cada paso devuelve lo que de verdad paso, y el resumen
-     final se construye con eso, no con lo que el plan esperaba. Si tres pasos
-     fallan, se dice que fallaron.
-
-Todo va en segundo plano: un plan son varias llamadas al modelo, decenas de
-segundos. Alexa concede ocho.
+El modelo propone una secuencia y aqui se filtra: solo se ejecutan pasos de
+un catalogo cerrado de acciones no destructivas, con un maximo de cinco. Los
+pasos inventados se descartan, y si uno falla se dice cuantos salieron de
+verdad en vez de cantar exito.
 """
 
 import json
@@ -35,12 +17,6 @@ log = logging.getLogger("jarvis.plan")
 MAX_PASOS = 5
 
 
-# -------------------------------------------------------------------------
-# CATALOGO DE PASOS PERMITIDOS
-# -------------------------------------------------------------------------
-# Deliberadamente corto y sin nada destructivo. Un plan generado por un modelo
-# pequeño no va a borrar archivos, cerrar programas ni mandar mensajes: esas
-# cosas siguen pidiendose de una en una y con confirmacion.
 def _accion_buscar_notas(argumento: str) -> str:
     from tools import estudio
     notas = estudio.buscar_por_relacion(argumento, cuantas=5)
@@ -104,9 +80,6 @@ ACCIONES = {
 }
 
 
-# -------------------------------------------------------------------------
-# PLANIFICAR
-# -------------------------------------------------------------------------
 def _modelo():
     import modes
     import ollama_client
@@ -178,12 +151,7 @@ def _pedir_plan(orden: str) -> list[dict]:
 
 
 def ejecutar(orden: str) -> str:
-    """
-    Planifica y ejecuta. Devuelve lo que REALMENTE paso.
-
-    Lento a proposito: es una llamada al modelo para planificar mas una por
-    cada paso. Va en segundo plano.
-    """
+    """Planifica y ejecuta. Devuelve lo que REALMENTE paso."""
     orden = (orden or "").strip()
     if not orden:
         return "¿Qué quieres que haga?"
@@ -207,9 +175,6 @@ def ejecutar(orden: str) -> str:
             salida = f"falló: {e}"
             fallos += 1
 
-        # Un paso que devuelve "no encontre nada" NO es un exito, aunque no
-        # haya lanzado excepcion. Contarlo como bueno seria mentir en el
-        # resumen final, que es lo unico que vas a oir.
         texto = str(salida)
         if re.search(r"^\s*(no (encontr|tengo|pude|hay)|me falta)", texto, re.I):
             fallos += 1

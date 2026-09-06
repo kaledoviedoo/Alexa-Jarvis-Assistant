@@ -1,19 +1,9 @@
-"""
-Verificación de peticiones de Alexa.
+"""Verificacion de que la peticion viene de verdad de Amazon.
 
-Tu túnel de ngrok es una URL pública que ejecuta comandos reales en tu PC.
-Sin esta verificación, cualquiera que descubra la URL puede crear archivos,
-cerrar programas y escribir con tu teclado. Amazon firma criptográficamente
-cada petición; aquí comprobamos esa firma.
-
-Implementa el procedimiento oficial de Amazon:
-  1. La URL del certificado debe apuntar a s3.amazonaws.com/echo.api/
-  2. El certificado debe estar vigente y contener echo-api.amazon.com en su SAN
-  3. La firma (SHA1withRSA) debe validar contra el cuerpo CRUDO de la petición
-  4. El timestamp no puede tener más de 150 segundos
-  5. El applicationId debe coincidir con tu skill
-
-Docs: https://developer.amazon.com/docs/custom-skills/host-a-custom-skill-as-a-web-service.html
+El servidor esta expuesto a internet para que Alexa pueda alcanzarlo, asi
+que cada peticion pasa por cuatro filtros: firma criptografica contra el
+certificado de Amazon, cadena de certificados valida, ventana de tiempo
+(contra reenvios de una peticion capturada) e identificador de la skill.
 """
 
 import base64
@@ -52,11 +42,6 @@ class ErrorVerificacion(Exception):
     """La petición no proviene de Amazon (o no es válida)."""
 
 
-# -------------------------------------------------------------------------
-# Caché de certificados
-# -------------------------------------------------------------------------
-# Amazon reutiliza el mismo certificado durante días. Descargarlo en cada
-# petición añadiría ~200 ms a cada orden de voz, que es tiempo que no tenemos.
 _cache_certificados: dict = {}
 _lock_cache = threading.Lock()
 
@@ -74,10 +59,6 @@ def _validar_url_certificado(url: str) -> None:
     if partes.port not in (None, 443):
         raise ErrorVerificacion(f"Puerto de certificado no autorizado: {partes.port}")
 
-    # Hay que NORMALIZAR la ruta antes de comprobarla. Sin esto, una URL como
-    #   https://s3.amazonaws.com/echo.api/../../malicioso/cert.pem
-    # pasaría el filtro (empieza por /echo.api/) pero en realidad apunta a
-    # /malicioso/cert.pem. posixpath.normpath resuelve los '..' primero.
     ruta_normalizada = posixpath.normpath(urllib.parse.unquote(partes.path))
     if not ruta_normalizada.startswith("/echo.api/"):
         raise ErrorVerificacion(f"Ruta de certificado no autorizada: {partes.path}")
@@ -202,12 +183,7 @@ def _verificar_skill_id(cuerpo: dict) -> None:
 
 
 def verificar_peticion(cuerpo_crudo: bytes, cuerpo: dict, cabeceras) -> None:
-    """
-    Punto de entrada. Lanza ErrorVerificacion si la petición no es legítima.
-
-    `cabeceras` debe permitir acceso tipo diccionario insensible a mayúsculas
-    (los headers de FastAPI/Starlette ya lo son).
-    """
+    """Punto de entrada. Lanza ErrorVerificacion si la petición no es legítima."""
     _verificar_skill_id(cuerpo)
 
     if not VERIFICAR_FIRMA:

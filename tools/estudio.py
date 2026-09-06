@@ -1,17 +1,9 @@
-"""
-Repasar para un examen con lo que ya tienes escrito.
+"""Preparar examenes y repasar desde las notas.
 
-"Tengo parcial el lunes de bases de datos" -> Jarvis busca en tu boveda de
-Obsidian todo lo relacionado, lo lee, y te devuelve un resumen y preguntas de
-repaso hechas con TUS apuntes. No con lo que el modelo crea saber del tema:
-con lo que tu escribiste, que es lo que van a preguntarte.
-
-Por que va en segundo plano, siempre
-------------------------------------
-Leer varias notas y razonar sobre ellas son miles de tokens. Un 3B en una RTX
-3050 tarda entre quince segundos y un minuto. Alexa concede ocho. No hay
-optimizacion que arregle eso, asi que ni se intenta en directo: se contesta al
-momento y el resultado se recoge con "como quedo lo ultimo".
+Cruza el tema con la memoria semantica de la boveda, saca lo que tienes
+sobre ello y genera preguntas de repaso o explicaciones. Todo esto lee
+varias notas y razona sobre ellas, o sea miles de tokens: corre siempre en
+segundo plano.
 """
 
 import logging
@@ -135,9 +127,6 @@ def _preguntar_al_modelo(instruccion: str, material: str) -> str:
         return f"No pude procesar los apuntes: {e}"
 
 
-# -------------------------------------------------------------------------
-# ORDENES
-# -------------------------------------------------------------------------
 def _sin_notas(tema: str) -> str:
     return (f"No encontré nada sobre {tema} en tu bóveda. "
             "Si lo tienes apuntado con otro nombre, dime cuál.")
@@ -201,32 +190,13 @@ def que_tengo_de(tema: str) -> str:
     return f"Sobre {tema} tienes {len(notas)} notas: {detalle}."
 
 
-# -------------------------------------------------------------------------
-# BUSCAR POR RELACION, NO POR NOMBRE
-# -------------------------------------------------------------------------
-# "Hay muchos datos de los que no conozco el nombre, solo la relacion".
-#
-# Ese es el caso normal en una boveda que lleva tiempo creciendo: recuerdas
-# que escribiste algo sobre normalizar tablas, pero no si la nota se llama
-# "Formas normales", "BD - diseño" o "Clase 7". Buscar por titulo no sirve.
-#
-# Lo que si sirve es puntuar CADA nota por cuanto tiene que ver con lo que
-# describes, mirando titulo, enlaces y cuerpo, y devolver las mejores aunque
-# ninguna se llame como dijiste.
-
 # Los enlaces [[asi]] de Obsidian son la relacion explicita entre notas. Una
 # nota que enlaza a otra que si encaja tambien viene al caso.
 _ENLACE = re.compile(r"\[\[([^\]|#]+)")
 
 
 def _raiz(palabra: str) -> str:
-    """
-    Recorta terminaciones para que 'normalizar' encuentre 'normalizacion'.
-
-    No es un lematizador de verdad, y no hace falta: en español, cortar por
-    la raiz de cinco o seis letras basta para emparentar las variantes de una
-    misma palabra sin traerse media boveda por delante.
-    """
+    """Recorta terminaciones para que 'normalizar' encuentre 'normalizacion'."""
     p = palabra.lower()
     for fin in ("aciones", "acion", "amientos", "amiento", "ciones", "cion",
                 "mente", "ando", "endo", "ados", "adas", "ado", "ada",
@@ -341,11 +311,7 @@ def abrir_nota_relacionada(descripcion: str) -> str:
 
 
 def relacionar(descripcion: str) -> str:
-    """
-    Lee las notas relacionadas y explica que tienen que ver entre si.
-
-    Lento: llama al modelo con varias notas. Va en segundo plano.
-    """
+    """Lee las notas relacionadas y explica que tienen que ver entre si."""
     notas = buscar_por_relacion(descripcion, cuantas=MAX_NOTAS)
     if not notas:
         return f"No encuentro nada relacionado con {descripcion}."

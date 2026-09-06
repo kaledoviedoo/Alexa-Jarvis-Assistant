@@ -1,8 +1,8 @@
-"""
-Prueba de extremo a extremo: simula peticiones reales de Alexa contra el servidor.
+"""Pruebas del servidor contra peticiones reales de Alexa.
 
-Levanta el servidor en memoria (sin puerto ni túnel) y le manda el mismo JSON
-que enviaría Amazon, para comprobar que el formato de respuesta es válido.
+Comprueba que el JSON de respuesta es valido, que el modelo de interaccion
+esta bien formado y que una orden lenta no bloquea a las demas (la
+regresion del bucle de eventos).
 
 Ejecutar:  py test_alexa.py
 """
@@ -114,10 +114,6 @@ def validar_respuesta(datos: dict) -> list[str]:
     if "shouldEndSession" not in respuesta:
         errores.append("falta 'shouldEndSession'")
 
-    # REGLA CRITICA: si la sesion queda abierta, TIENE que haber reprompt.
-    # Amazon cierra la sesion cuando shouldEndSession=false llega sin el, y el
-    # sintoma es desconcertante: Alexa contesta y se apaga, como si el servidor
-    # hubiera pedido cerrar. Esta comprobacion existe porque paso de verdad.
     if respuesta.get("shouldEndSession") is False and "reprompt" not in respuesta:
         errores.append(
             "sesion abierta SIN reprompt: Alexa la cerrara igualmente"
@@ -132,10 +128,6 @@ def validar_respuesta(datos: dict) -> list[str]:
 
         texto = voz.get("text", "") or voz.get("ssml", "")
 
-        # El SSML tiene que ser XML valido y estar envuelto en <speak>. Si se
-        # cuela un & sin escapar, Alexa rechaza la respuesta entera y el
-        # sintoma es el mismo "la skill no respondio correctamente" que nos
-        # costo dias localizar por otras causas.
         if voz.get("type") == "SSML":
             ssml = voz.get("ssml", "")
             if not ssml.startswith("<speak>") or not ssml.endswith("</speak>"):
@@ -186,16 +178,7 @@ def peticion_dictado(texto: str) -> dict:
 
 
 def probar_si_y_no() -> list[str]:
-    """
-    Un "si" tiene que llegar como intent, no como Fallback.
-
-    Capturado del registro: con un mensaje esperando confirmacion, dijiste
-    "si" y salieron CUATRO AMAZON.FallbackIntent seguidos hasta que te
-    rendiste con un "pausa". Una palabra de dos letras no se parece a nada
-    del slot personalizado, asi que Alexa no supo encaminarla.
-
-    Amazon tiene YesIntent y NoIntent justo para esto.
-    """
+    """Un "si" tiene que llegar como intent, no como Fallback."""
     import confirmaciones
     fallos = []
 
@@ -243,17 +226,7 @@ def probar_si_y_no() -> list[str]:
 
 
 def probar_modelo_de_interaccion() -> list[str]:
-    """
-    Valida el JSON del modelo ANTES de que lo rechace la consola de Amazon.
-
-    Existe porque escribi una muestra con corchetes -- "d[i]le que {texto}",
-    intentando marcar una letra opcional con una sintaxis que Alexa no tiene --
-    y el Build entero fallo. Amazon solo admite letras, espacios, puntos de
-    abreviatura, guiones bajos, apostrofes y guiones.
-
-    Ese viaje es caro: editar, pegar en la consola, Save, Build, leer el error.
-    Aqui cuesta un segundo.
-    """
+    """Valida el JSON del modelo ANTES de que lo rechace la consola de Amazon."""
     import json
     import re
     from pathlib import Path
@@ -318,14 +291,7 @@ def probar_modelo_de_interaccion() -> list[str]:
 
 
 def probar_dictado_libre() -> list[str]:
-    """
-    El texto de un mensaje llega por MensajeIntent, no por ComandoIntent.
-
-    Capturado del registro: se pregunto "¿que le digo?" y la respuesta se fue
-    a AMAZON.FallbackIntent. El Fallback NO TRAE EL TEXTO -- Amazon solo dice
-    que no entendio -- asi que el mensaje se perdia y la conversacion moria
-    ahi. De cara al usuario parecia que Jarvis se colgaba.
-    """
+    """El texto de un mensaje llega por MensajeIntent, no por ComandoIntent."""
     fallos = []
     print()
     print("DICTADO LIBRE")
@@ -368,23 +334,7 @@ def probar_dictado_libre() -> list[str]:
 
 
 def probar_que_no_se_bloquea() -> list[str]:
-    """
-    Una orden lenta NO puede dejar sordo al servidor.
-
-    Esta prueba existe por un fallo concreto y caro de encontrar. El endpoint
-    era `async def` pero por dentro llamaba a codigo que bloquea: subprocess,
-    psutil, la descarga del certificado de Amazon y, sobre todo, la espera al
-    modelo de hasta 6,5 segundos. En un servidor asincrono eso paraliza el
-    bucle de eventos entero: mientras una orden se cocina, uvicorn no puede
-    aceptar conexiones nuevas ni completar saludos TLS.
-
-    El sintoma era desconcertante. Todo iba bien y cada cierto comando Alexa
-    decia que la skill no respondia, sin que la peticion apareciera en el
-    registro. No aparecia porque nunca llegaba a entrar.
-
-    Aqui se lanzan dos ordenes a la vez, una lenta y una rapida. Si la rapida
-    tiene que esperar a la lenta, el bucle esta bloqueado otra vez.
-    """
+    """Una orden lenta NO puede dejar sordo al servidor."""
     import asyncio
     import httpx
 
@@ -405,15 +355,6 @@ def probar_que_no_se_bloquea() -> list[str]:
     async def correr():
         transporte = httpx.ASGITransport(app=server.app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://x") as cli:
-            # create_task, no solo llamar: una corrutina sin agendar no
-            # empieza a correr, y la prueba pasaria sin haber probado nada.
-            # (Me paso: daba OK con el fallo reintroducido a proposito.)
-            # El cronometro arranca ANTES de lanzar la lenta, no despues.
-            # Si se mide solo la duracion de la rapida, el bloqueo no se ve:
-            # con el bucle parado, ni el `await asyncio.sleep` de abajo avanza,
-            # asi que la rapida "empieza" cuando la lenta ya termino y sale un
-            # tiempo estupendo. Me paso: la prueba daba OK con el fallo puesto
-            # a proposito. Lo que importa es el reloj de pared total.
             inicio = time.perf_counter()
 
             # create_task, no solo llamar: una corrutina sin agendar no

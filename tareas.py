@@ -1,10 +1,8 @@
-"""
-Buffer de tareas en segundo plano.
+"""Registro de los trabajos que corren en segundo plano.
 
-Alexa corta la skill a los ~8 segundos. Cuando una orden necesita más tiempo
-(razonamiento con el modelo grande, por ejemplo), Jarvis responde de inmediato
-"lo estoy procesando", pero la tarea SIGUE ejecutándose aquí. El resultado
-queda guardado y el usuario lo pide después con "¿cómo quedó?".
+Lo que no cabe en los ocho segundos de Alexa no se pierde: sigue en un hilo
+y su resultado queda aqui, para recogerlo despues con "como quedo lo
+ultimo".
 """
 
 import logging
@@ -81,15 +79,7 @@ def consultar_pendiente() -> str:
 
 
 def lanzar_en_segundo_plano(descripcion: str, funcion) -> str:
-    """
-    Ejecuta algo lento sin hacer esperar a Alexa.
-
-    Existe para las ordenes que se sabe de antemano que no caben en los ocho
-    segundos: mirar la pantalla con el modelo de vision, por ejemplo, que en
-    una RTX 3050 tarda entre diez y treinta. En vez de intentarlo y agotar el
-    plazo, se contesta al momento y el resultado queda guardado para cuando
-    preguntes "como quedo lo ultimo".
-    """
+    """Ejecuta algo lento sin hacer esperar a Alexa."""
     import threading
     import uuid
 

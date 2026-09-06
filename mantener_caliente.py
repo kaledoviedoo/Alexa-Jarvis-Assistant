@@ -1,31 +1,11 @@
-"""
-Mantiene caliente el camino REAL que usa Amazon hasta este equipo.
+"""Mantiene vivo el camino publico por el que entra Amazon.
 
-El problema que resuelve
-------------------------
-Sintoma: la primera orden despues de un rato falla ("la Skill solicitada no
-respondio correctamente"), y al repetirla funciona perfectamente. En el
-registro del servidor no aparece ningun LaunchRequest: la peticion no llego
-nunca. Solo llega despues el SessionEndedRequest con INVALID_RESPONSE que
-manda Alexa al rendirse.
+Un ping cada noventa segundos al tunel para que no se duerma. El ping se
+manda contra la IP publica resuelta por DNS-over-HTTPS y no contra el
+nombre, porque MagicDNS resuelve los nombres .ts.net a la IP interna del
+tailnet y el ping se quedaba dentro sin tocar el camino real.
 
-Causa: el camino de red se enfria. La primera conexion tiene que rehacerse
-(DNS, relay, TLS) y ese primer viaje se come los 8 segundos que Alexa concede.
-
-Por que la primera version de esto no servia de nada
-----------------------------------------------------
-Pedia la propia URL publica con urllib... desde este mismo equipo. Y con
-Tailscale corriendo, MagicDNS resuelve el nombre .ts.net a la IP interna del
-tailnet (100.x.x.x), no a la IP publica de la entrada de Tailscale. O sea que
-el ping salia del proceso, daba media vuelta y volvia a entrar por la puerta
-de al lado: nunca tocaba el Funnel. Las estadisticas decian "todo bien, 200 ms"
-mientras el camino de Amazon seguia igual de frio.
-
-Lo que hace ahora
------------------
-Resuelve el nombre por DNS publico (DNS sobre HTTPS, saltandose MagicDNS),
-abre la conexion TLS contra ESA IP indicando el nombre por SNI, y pide /jarvis
-a pelo. Ese es exactamente el camino que recorre Amazon, relay incluido.
+El modelo solo se mantiene en la VRAM si has usado el asistente hace poco.
 """
 
 import json
@@ -59,9 +39,6 @@ estadisticas = {
 }
 
 
-# Cache de las IPs publicas. Cambian poco; resolverlas en cada ping seria
-# gastar una peticion HTTPS extra cada dos minutos para nada.
-# Contador mutable: el bucle vive en un hilo y no queremos globals sueltas.
 fallos_externos = [0]
 
 _ips_publicas: list[str] = []
@@ -69,13 +46,7 @@ _ips_caducan: float = 0.0
 
 
 def _resolver_por_dns_publico(host: str) -> list[str]:
-    """
-    Resuelve un nombre saltandose el DNS del equipo.
-
-    Existe por MagicDNS: mientras Tailscale corre, el resolutor local devuelve
-    la IP interna del tailnet para los nombres .ts.net. Si preguntamos por ahi,
-    el ping se queda dentro de casa y no calienta el camino de Amazon.
-    """
+    """Resuelve un nombre saltandose el DNS del equipo."""
     url = f"https://dns.google/resolve?name={urllib.parse.quote(host)}&type=A"
     try:
         peticion = urllib.request.Request(url, headers={"accept": "application/dns-json"})
@@ -100,9 +71,6 @@ def _ips_del_tunel(host: str) -> list[str]:
         _ips_publicas = encontradas
         _ips_caducan = time.monotonic() + 3600
 
-        # Comparamos con lo que dice el DNS del equipo. Si difieren, es
-        # MagicDNS haciendo lo suyo, y merece quedar escrito: es la razon de
-        # que la version anterior de este archivo no sirviera para nada.
         try:
             local = socket.gethostbyname(host)
             if local not in encontradas:
@@ -161,9 +129,6 @@ def _ping_publico() -> None:
         try:
             transcurrido = _ping_por_ip(host, ip)
         except Exception as e:
-            # A nivel debug esto era invisible, y es justo el sintoma que
-            # explica que Alexa no llegue: si el camino publico esta caido,
-            # da igual que el servidor conteste de maravilla en localhost.
             fallos_externos[0] += 1
             if fallos_externos[0] in (1, 3) or fallos_externos[0] % 10 == 0:
                 log.warning("El camino público por %s no responde: %s", ip, str(e)[:90])
@@ -190,9 +155,6 @@ def _ping_publico() -> None:
             log.debug("Ping externo (%s): %d ms", ip, transcurrido)
         return
 
-    # --- Reserva: el ping de siempre, por si no hay DNS publico ---
-    # Calienta menos (puede quedarse dentro del tailnet), pero al menos
-    # comprueba que el servidor sigue en pie.
     url = f"{TUNEL_URL.rstrip('/')}/jarvis"
     inicio = time.perf_counter()
     try:
@@ -242,23 +204,7 @@ def hay_actividad_reciente() -> bool:
 
 
 def _tocar_modelo() -> None:
-    """
-    Renueva el keep_alive del modelo, pero SOLO si lo estas usando.
-
-    Antes esto corria cada 90 segundos las 24 horas. No gastaba calculo (el
-    prompt va vacio, solo resetea el contador), pero dejaba los 2 GB del
-    modelo clavados en la VRAM todo el dia y a la grafica sin poder bajar a
-    reposo. Con la 3050 de 6 GB eso se nota cuando quieres jugar.
-
-    Ahora se toca solo dentro de la ventana de gracia. Fuera de ella el
-    modelo se descarga solo y la grafica queda libre.
-
-    Lo que evita que eso se pague al volver: el LaunchRequest. Cuando dices
-    "abre mi asistente", el servidor manda cargar el modelo mientras suena el
-    saludo. El saludo dura mas de lo que tarda un 3B en entrar en VRAM, asi
-    que para cuando terminas de oirlo ya esta listo. Y aunque no lo estuviera,
-    nueve de cada diez ordenes las resuelve el router sin tocar el modelo.
-    """
+    """Renueva el keep_alive del modelo, pero SOLO si lo estas usando."""
     if not hay_actividad_reciente():
         return
 
@@ -276,9 +222,6 @@ def _bucle() -> None:
     if _parar.wait(3):
         return
 
-    # Los primeros segundos tras arrancar son los peligrosos: el tunel sigue
-    # apuntando al proceso que acabamos de matar. Golpeamos rapido y seguido
-    # hasta que el camino este rehecho, antes de pasar al ritmo tranquilo.
     for _ in range(6):
         _ping_publico()
         if estadisticas["ultimo_error"] is None and estadisticas["pings"]:

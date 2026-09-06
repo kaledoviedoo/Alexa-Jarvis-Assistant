@@ -1,19 +1,9 @@
-"""
-Detalles de como suena Jarvis.
+"""Como suena Jarvis.
 
-Dos cosas: como te llama, y como pronuncia lo que esta en ingles.
-
-Como te llama tiene truco. Decirlo en cada respuesta suena a teleoperador
-leyendo una ficha; no decirlo nunca suena a maquina. Uno de cada cuatro, y en
-los momentos que importan (el saludo, las confirmaciones, cuando algo falla).
-
-Y va SIEMPRE al principio. "Kaled, ya lo abri" es alguien hablandote;
-"Ya lo abri, Kaled" es una notificacion con tu nombre pegado detras. La
-diferencia se nota mucho mas por un altavoz que leida.
-
-Alterna entre tu nombre y dos tratamientos de confianza, parce y bro. No al
-azar puro: el nombre pesa mas, y el mismo tratamiento no se repite dos veces
-seguidas, que es justo lo que delata a una maquina eligiendo de una lista.
+Dos cosas. Como te llama (alterna entre tu nombre, parce y bro, siempre al
+principio de la frase y solo una de cada cuatro veces) y como pronuncia lo
+que esta en ingles (marca esas palabras con SSML para que el motor cambie de
+fonetica y no lea "GitHub" como "guitub").
 """
 
 import logging
@@ -24,18 +14,12 @@ from config import FRECUENCIA_NOMBRE, NOMBRE_USUARIO
 
 log = logging.getLogger("jarvis.voz")
 
-# Como te llama. El nombre pesa el doble que los tratamientos: "parce" en
-# cada respuesta cansa, y el nombre propio sigue siendo lo que suena a que
-# alguien te esta hablando a ti.
 TRATAMIENTOS = [t for t in (NOMBRE_USUARIO, NOMBRE_USUARIO, "parce", "bro") if t]
 
 # El ultimo que se uso, para no repetirlo seguido. Dos "bro" en dos frases
 # cantan mucho mas que un "bro" suelto.
 _ultimo_tratamiento = ""
 
-# Formas de abrir la frase. Varias, porque siempre la misma canta.
-# La coma no es cosmetica: en español el vocativo va separado. "Listo Kaled"
-# suena a error de transcripcion; "Kaled, listo" suena a que te habla alguien.
 _PLANTILLAS_INICIO = ["{n}, {t}.", "{n}, {t}.", "Mira {n}, {t}.", "{n}: {t}."]
 
 
@@ -61,17 +45,7 @@ def _ya_te_nombra(texto: str) -> bool:
 
 
 def con_nombre(texto: str, siempre: bool = False) -> str:
-    """
-    Te llama por tu nombre, o parce, o bro. A veces.
-
-    `siempre=True` para los momentos en que si toca: el saludo, una
-    confirmacion de algo serio, un aviso de que algo fallo.
-
-    El vocativo va SIEMPRE delante. Antes iba detras en las frases cortas
-    ("Abriendo Spotify, Kaled") y delante solo en las largas; por el altavoz
-    la version de detras suena a etiqueta pegada al final, no a que alguien
-    te hable. Una sola regla y siempre la misma.
-    """
+    """Te llama por tu nombre, o parce, o bro. A veces."""
     if not texto:
         return texto
 
@@ -89,9 +63,6 @@ def con_nombre(texto: str, siempre: bool = False) -> str:
     if not limpio:
         return texto
 
-    # Se elige DESPUES de decidir que si toca nombrarte. Si se eligiera antes,
-    # cada respuesta que no lleva vocativo gastaria un turno de la rotacion y
-    # "parce" y "bro" saldrian mucho menos de lo que parece.
     tratamiento = _elegir_tratamiento()
 
     # Las preguntas y exclamaciones no admiten plantilla: el vocativo tiene
@@ -124,17 +95,6 @@ def saludo_inicial(modo_hablado: str, continua: bool) -> str:
     return f"Hola {NOMBRE_USUARIO}. Jarvis en línea en modo {modo_hablado}. ¿Qué necesitas?"
 
 
-# =========================================================================
-# PRONUNCIACION
-# =========================================================================
-# Alexa habla en español, asi que lee "GitHub" como "guitub" y "Downloads"
-# como "dowloads". La solucion oficial es SSML: se marca el trozo ingles con
-# <lang xml:lang="en-US"> y el motor cambia de fonetica solo para eso.
-#
-# La lista es a mano y corta a proposito. Un detector automatico de idioma se
-# equivoca justo donde mas duele: "normal", "final", "total" o "video" se
-# escriben igual en los dos idiomas, y marcarlas como inglesas suena peor que
-# no hacer nada. Mejor pocas y seguras.
 PALABRAS_INGLESAS = {
     # Programas y servicios
     "github", "gmail", "google", "chrome", "outlook", "teams", "onedrive",
@@ -174,11 +134,7 @@ def _es_inglesa(palabra: str) -> bool:
 
 
 def a_ssml(texto: str) -> str:
-    """
-    Envuelve el texto en SSML marcando las palabras inglesas.
-
-    Devuelve el documento entero, listo para mandarselo a Alexa.
-    """
+    """Envuelve el texto en SSML marcando las palabras inglesas."""
     if not texto:
         return "<speak></speak>"
 

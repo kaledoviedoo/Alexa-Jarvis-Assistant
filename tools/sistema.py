@@ -1,8 +1,13 @@
-"""
-Herramientas de sistema: métricas, procesos, aplicaciones y energía.
+"""Metricas del equipo, procesos y aplicaciones.
 
-Incluye lectura de la GPU vía nvidia-smi, que es lo que permite a Jarvis saber
-cuánta VRAM queda libre en la RTX 3050 antes de cargar un modelo grande.
+Lee CPU, memoria, disco y GPU (esta ultima con nvidia-smi, que es lo que
+permite saber cuanta VRAM queda antes de cargar un modelo), y abre o cierra
+programas.
+
+Abrir una aplicacion tiene seis intentos, de lo seguro a lo razonado: ruta
+fijada a mano, catalogo de lo instalado, protocolos conocidos, lo mas
+parecido del catalogo, el buscador de Windows, y rendirse proponiendo
+alternativas.
 """
 
 import logging
@@ -41,9 +46,6 @@ def _ejecutar(comando: list[str], timeout: int = 5) -> tuple[bool, str]:
         return False, str(e)
 
 
-# -------------------------------------------------------------------------
-# MÉTRICAS
-# -------------------------------------------------------------------------
 def uso_cpu() -> str:
     porcentaje = psutil.cpu_percent(interval=0.4)
     nucleos = psutil.cpu_count(logical=True)
@@ -75,12 +77,7 @@ def uso_disco() -> str:
 
 
 def info_gpu() -> dict:
-    """
-    Lee el estado de la GPU con nvidia-smi.
-
-    Devuelve un dict con: disponible, nombre, vram_usada_mb, vram_total_mb,
-    vram_libre_mb, uso_pct, temperatura.
-    """
+    """Lee el estado de la GPU con nvidia-smi."""
     vacio = {"disponible": False}
 
     if not shutil.which("nvidia-smi"):
@@ -175,13 +172,6 @@ def bateria() -> str:
     return f"La batería está al {bat.percent:.0f} por ciento y {estado}."
 
 
-
-# -------------------------------------------------------------------------
-# NOMBRES QUE EL RECONOCIMIENTO DE VOZ DESTROZA
-# -------------------------------------------------------------------------
-# Alexa transcribe "Comet" como "cometa", "comer", "covid", "comed"... Sin
-# esta tabla, "cierra comet" busca un proceso llamado "cometa.exe" y contesta
-# alegremente que no estaba abierto, que es peor que fallar: miente.
 ALIAS_VOZ = {
     "comet": ["cometa", "comer", "covid", "comed", "comett", "komet", "cornet",
               "comete", "comer.exe", "cometa.exe",
@@ -234,12 +224,7 @@ def _procesos_por_nombre() -> dict:
 
 
 def _buscar_proceso_parecido(objetivo: str, vivos: dict) -> str | None:
-    """
-    Busca el proceso vivo cuyo nombre mas se parezca al pedido.
-
-    Sirve para cuando la transcripcion no es exacta pero el proceso si existe:
-    'cometa' no esta, pero 'comet' si.
-    """
+    """Busca el proceso vivo cuyo nombre mas se parezca al pedido."""
     if objetivo in vivos:
         return objetivo
 
@@ -264,10 +249,6 @@ PALABRAS_GENERICAS = {
 }
 
 
-# -------------------------------------------------------------------------
-# APLICACIONES
-# -------------------------------------------------------------------------
-# Aplicaciones conocidas: alias hablado -> comando de arranque.
 APPS_CONOCIDAS = {
     "spotify": "start spotify:",
     "chrome": "start chrome",
@@ -291,10 +272,6 @@ APPS_CONOCIDAS = {
     "codigo": "code",
     "word": "start winword",
     "excel": "start excel",
-    # WhatsApp NO va por protocolo: si la app de escritorio no esta
-    # instalada, Windows abre la Microsoft Store ofreciendola. Se abre
-    # por web, que es donde esta la sesion iniciada. Lo gestiona
-    # tools/whatsapp.py; aqui solo queda la ruta web como respaldo.
     "whatsapp": "start https://web.whatsapp.com/",
     "telegram": "start telegram:",
     "obs": "start obs",
@@ -306,12 +283,6 @@ APPS_CONOCIDAS = {
 }
 
 
-# Juegos: alias hablado -> como se lanza.
-#
-# Un juego no se abre como un programa normal. Valorant necesita el cliente de
-# Riot, y los de Epic se lanzan con una URL del lanzador que lleva dentro el
-# identificador del juego. Llamar al .exe directamente falla o abre el
-# antitrampas suelto, que es peor.
 JUEGOS = {
     "valorant": "start riotclient://rnet-lcu/launch?gameName=valorant",
     "league of legends": "start riotclient://rnet-lcu/launch?gameName=league_of_legends",
@@ -327,12 +298,7 @@ JUEGOS = {
 
 
 def abrir_juego(nombre: str) -> str:
-    """
-    Lanza un juego y avisa de lo que conviene hacer antes.
-
-    No cambia de modo por su cuenta: decidir por ti que se cierra media
-    partida antes de empezar seria pasarse. Lo propone y ya.
-    """
+    """Lanza un juego y avisa de lo que conviene hacer antes."""
     crudo = (nombre or "").strip().lower()
     if not crudo:
         return "¿Qué juego quieres que abra?"
@@ -367,11 +333,6 @@ def abrir_juego(nombre: str) -> str:
     return f"Abriendo {crudo}. ¿Paso a modo gaming?"
 
 
-# Nombre real del ejecutable de cada app. Se usa para LOCALIZARLO en el disco
-# en vez de confiar en `start`, que solo funciona con lo que esta en el PATH o
-# registrado como protocolo. Los navegadores modernos no cumplen ninguna de las
-# dos cosas: se instalan en la carpeta del usuario y `start comet` responde con
-# el sonido de error de Windows... mientras Jarvis decia "Abriendo comet".
 EXE_POR_ALIAS = {
     "comet": "Comet.exe",
     "chrome": "chrome.exe",
@@ -397,9 +358,6 @@ _cache_exe: dict = {}
 
 def _ruta_del_exe(clave: str) -> str:
     """Ruta real del ejecutable de una app conocida, o cadena vacia."""
-    # Escotilla de escape: si alguna vez Jarvis no encuentra un programa,
-    # se fija su ruta en el .env y se acabo la discusion. Vale para cualquier
-    # app de la tabla:  JARVIS_COMET_EXE, JARVIS_OBSIDIAN_EXE, JARVIS_STEAM_EXE...
     variable = "JARVIS_" + clave.upper().replace(" ", "_") + "_EXE"
     forzado = os.environ.get(variable, "").strip().strip('"')
     if forzado and os.path.isfile(forzado):
@@ -434,16 +392,7 @@ def _proceso_aparecio(clave: str, antes: int, segundos: float = 1.8) -> bool:
 
 
 def _abrir_por_buscador_windows(nombre: str) -> bool:
-    """
-    Ultimo recurso: hacer lo que harias tu.
-
-    Tecla Windows, escribir el nombre, Enter. El buscador del sistema conoce
-    TODO lo que hay instalado, incluso lo que no dejo acceso directo ni entrada
-    en el registro, asi que llega donde el catalogo no llega.
-
-    Se comprueba que de verdad se abrio algo: si el buscador no aparece o no
-    encuentra nada, el Enter no hace nada y no podemos cantar victoria.
-    """
+    """Ultimo recurso: hacer lo que harias tu."""
     try:
         import pyautogui
     except ImportError:
@@ -456,9 +405,6 @@ def _abrir_por_buscador_windows(nombre: str) -> bool:
         time.sleep(0.7)          # al menu Inicio le cuesta pintarse
 
         pyautogui.write(nombre, interval=0.02)
-        # El buscador tarda en resolver: si pulsamos Enter antes de que haya
-        # resultados, abre una busqueda web en el navegador, que es justo lo
-        # que no queremos.
         time.sleep(1.3)
 
         pyautogui.press("enter")
@@ -496,26 +442,7 @@ def _ventana_al_frente() -> str:
 
 
 def abrir_aplicacion(nombre_app: str) -> str:
-    """
-    Abre una aplicacion por su nombre hablado.
-
-    El orden va de lo seguro a lo razonado:
-
-      1. Ruta fijada a mano en el .env, si la hay.
-      2. Catalogo de lo que hay instalado de verdad (tools/catalogo.py), que
-         se construye rastreando el menu Inicio, el registro y la Store.
-      3. Tabla de protocolos conocidos, para lo que no es un .exe.
-      4. Si nada encaja del todo, se RAZONA: lo mas parecido del catalogo,
-         y segun lo seguro que sea se abre o se propone.
-      5. Y si aun asi no hay nada, el BUSCADOR DE WINDOWS: tecla Windows,
-         escribir el nombre, Enter. Es lo que harias tu, y el sistema conoce
-         cosas que ni el menu Inicio ni el registro exponen.
-
-    Antes, "abre epic games" contestaba "no conozco ninguna aplicacion llamada
-    epic games" aunque el lanzador estuviera instalado, solo porque nadie
-    habia escrito su ruta a mano. Ahora hay cinco formas de llegar antes de
-    darse por vencido.
-    """
+    """Abre una aplicacion por su nombre hablado."""
     from tools import catalogo
 
     crudo = (nombre_app or "").strip().lower()
@@ -567,10 +494,6 @@ def abrir_aplicacion(nombre_app: str) -> str:
         except Exception as e:
             log.warning("Falló el comando conocido de %s: %s", clave, e)
 
-    # --- 4. Razonar ---
-    # Ni ruta fija, ni coincidencia clara, ni comando conocido. Pero eso NO
-    # significa que no este instalada: puede que se llame de otra forma o que
-    # Alexa la transcribiera torcida. Miramos lo mas parecido.
     if candidatos:
         mejor = candidatos[0]
 
@@ -580,10 +503,6 @@ def abrir_aplicacion(nombre_app: str) -> str:
             if catalogo.lanzar(mejor):
                 return f"No encontré {crudo} exactamente, pero abrí {mejor['nombre']}."
 
-    # --- 5. El buscador de Windows ---
-    # Si el catalogo no lo tiene o no estamos seguros, se lo preguntamos al
-    # sistema: tecla Windows, escribir, Enter. Conoce cosas que ni el menu
-    # Inicio ni el registro exponen.
     if os.name == "nt" and _abrir_por_buscador_windows(crudo):
         return f"Abriendo {crudo}."
 
@@ -674,10 +593,6 @@ def cerrar_varias(nombres: list[str]) -> int:
     return total
 
 
-# -------------------------------------------------------------------------
-# ENERGÍA Y APAGADO
-# -------------------------------------------------------------------------
-# GUIDs de los planes de energía de Windows.
 PLANES_ENERGIA = {
     "alto": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",       # Alto rendimiento
     "equilibrado": "381b4222-f694-41f0-9685-ff5bb260df2e",  # Equilibrado
@@ -734,16 +649,6 @@ def reiniciar_equipo(minutos: int = 1) -> str:
     return f"Reiniciando en {segundos // 60} minuto(s). Di 'cancela el apagado' para detenerlo."
 
 
-# =========================================================================
-# BUSCAR DENTRO DE UNA APLICACION
-# =========================================================================
-# "abre spotify y busca tame impala" acababa buscando "tame impala" en la web.
-# Se entendia el "busca" y se perdia el "en spotify". Cada programa tiene su
-# propio buscador y su propio atajo; aqui estan los que valen la pena.
-#
-# La clave es que el atajo se manda a la ventana YA ENFOCADA. Si la app no
-# esta abierta hay que abrirla y esperar; si ya lo estaba, solo traerla al
-# frente, porque relanzarla la pondria a cargar otra vez desde cero.
 ATAJOS_BUSQUEDA = {
     "spotify":   ["ctrl", "l"],          # va directo a la caja de busqueda
     "obsidian":  ["ctrl", "o"],          # busqueda rapida de notas
@@ -765,17 +670,7 @@ APPS_CON_BUSCADOR = set(ATAJOS_BUSQUEDA)
 
 
 def app_tiene_buscador(nombre_app: str) -> str:
-    """
-    Devuelve la clave canonica si esa app se puede buscar por dentro, o "".
-
-    Dos formas de que valga: que este en la tabla de atajos, o que sea una
-    app instalada de verdad. Lo segundo es lo que permite "busca X en epic":
-    Epic no tiene atajo conocido, pero si esta instalada la orden tiene
-    sentido y el plan B mira la pantalla.
-
-    Lo que NO vale es un nombre que no sea ninguna app: ahi devuelve "" y el
-    router lo manda a la web, que es lo correcto para "busca vuelos a bogota".
-    """
+    """Devuelve la clave canonica si esa app se puede buscar por dentro, o ""."""
     clave = _canonizar_app(nombre_app or "")
     if clave in APPS_CON_BUSCADOR:
         return clave
@@ -825,12 +720,7 @@ def _enfocar_si_esta_abierta(clave: str) -> bool:
 
 
 def buscar_en_app(consulta: str, nombre_app: str) -> str:
-    """
-    Busca algo DENTRO de una aplicacion, no en internet.
-
-    Devuelve None si la app no tiene buscador conocido, para que quien llame
-    pueda caer a la busqueda web sin haber roto nada por el camino.
-    """
+    """Busca algo DENTRO de una aplicacion, no en internet."""
     consulta = (consulta or "").strip()
     if not consulta:
         return "¿Qué quieres que busque?"
@@ -846,9 +736,6 @@ def buscar_en_app(consulta: str, nombre_app: str) -> str:
         respuesta_apertura = abrir_aplicacion(clave)
         if "no " in respuesta_apertura.lower()[:12]:
             return respuesta_apertura
-        # Una app recien lanzada no acepta atajos hasta que pinta su ventana.
-        # Spotify y Teams tardan lo suyo; esperamos a ver la ventana en vez de
-        # dormir a ciegas una cantidad fija.
         limite = time.monotonic() + 6
         while time.monotonic() < limite:
             time.sleep(0.5)
@@ -876,10 +763,6 @@ def buscar_en_app(consulta: str, nombre_app: str) -> str:
         log.info("Busqueda dentro de %s: %r", clave, consulta)
         return f"Buscando {consulta} en {clave}."
 
-    # Sin atajo conocido: se mira la pantalla y se busca algo que sirva para
-    # buscar. Es lo que harias tu al abrir una app que no conoces: localizas
-    # la lupa. Cada app pone una palabra distinta, asi que se busca por lo
-    # que HACE y no por como se llama.
     try:
         from tools import pantalla
         respuesta = pantalla.buscar_dentro_de_lo_que_veo(consulta)
@@ -894,17 +777,8 @@ def buscar_en_app(consulta: str, nombre_app: str) -> str:
             f"Dime dónde está y le doy clic.")
 
 
-# =========================================================================
-# QUE ARCHIVO OCUPA MAS
-# =========================================================================
 def archivos_mas_grandes(cantidad: int = 5, carpeta: str = "") -> str:
-    """
-    Los archivos que mas espacio ocupan.
-
-    "qué archivo tiene más memoria" contestaba con el uso de RAM. Se
-    entendia "memoria" como el modulo de memoria y no como el disco, que es
-    lo que quiere saber cualquiera que pregunte eso.
-    """
+    """Los archivos que mas espacio ocupan."""
     from config import DESCARGAS, DOCUMENTOS, ESCRITORIO
 
     if carpeta:
@@ -962,18 +836,7 @@ def archivos_mas_grandes(cantidad: int = 5, carpeta: str = "") -> str:
 
 
 def arrancar_partida(nombre: str = "") -> str:
-    """
-    Abre el lanzador y ADEMAS le da a jugar.
-
-    "abre valorant" abria Riot Client y ahi se quedaba, esperando a que
-    alguien pinchara JUGAR. Un lanzador no es el juego: es una tienda con un
-    boton. Como cada lanzador pone una palabra distinta en ese boton (JUGAR,
-    PLAY, INICIAR, y Epic a veces solo un icono), no se busca la palabra sino
-    lo que hace, y de eso se encarga el OCR.
-
-    Se espera a que el lanzador termine de pintar: pulsar antes de que la
-    ficha del juego este en pantalla es pinchar en el vacio.
-    """
+    """Abre el lanzador y ADEMAS le da a jugar."""
     crudo = (nombre or "").strip()
     if crudo:
         apertura = abrir_juego(crudo)
@@ -987,9 +850,6 @@ def arrancar_partida(nombre: str = "") -> str:
     except ImportError:
         return apertura or "No tengo el OCR disponible para darle a jugar."
 
-    # Los lanzadores tardan lo suyo en pintar la ficha. Se mira varias veces
-    # en vez de dormir a ciegas una cantidad fija: con el disco frio Epic
-    # tarda ocho segundos y con el caliente dos.
     limite = time.monotonic() + 12
     while time.monotonic() < limite:
         time.sleep(1.5)

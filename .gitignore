@@ -32,6 +32,10 @@ papelera/
 # plantilla; el de verdad se queda en tu equipo.
 contexto.md
 
+# Paquetes que uso para mover cambios al equipo, no son del proyecto.
+*.zip
+_to_delete*
+
 # Python
 __pycache__/
 *.py[cod]
