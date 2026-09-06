@@ -1,23 +1,9 @@
-"""
-Gestión de los tres modos de Jarvis y control de la VRAM de la RTX 3050.
+"""Tres perfiles de modelo segun lo que este haciendo la grafica.
 
-  MODO NORMAL    modelo ligero (3B) residente en GPU. Respuestas en 1-2 s.
-  MODO DEDICADO  modelo grande (7B) en GPU. Razona mejor, ocupa ~4.7 GB.
-  MODO GAMING    num_gpu=0 y descarga total de VRAM. La 3050 queda para el juego.
-
-Cómo se libera la VRAM de verdad
---------------------------------
-Ollama mantiene el modelo cargado según `keep_alive`. Enviarle una petición
-con keep_alive=0 lo descarga de inmediato. Eso es lo que hace `descargar_modelos`
-al entrar en modo gaming: no es un truco, es la forma documentada de liberar
-la memoria de video sin matar el proceso de Ollama.
-
-Sobre los "gráficos integrados"
--------------------------------
-Windows asigna la GPU por aplicación (Configuración > Pantalla > Gráficos).
-Ningún proceso puede reasignar por la fuerza la GPU de otro programa. Lo que
-Jarvis controla es su propio consumo: en modo gaming se quita por completo de
-la RTX 3050 y corre en CPU, dejando los 6 GB enteros para el juego.
+Normal usa un modelo pequeño siempre cargado, dedicado uno grande que razona
+mejor, y gaming mueve el trabajo a la CPU para dejar la VRAM libre. Con una
+RTX 3050 de 6 GB no caben un modelo grande y un juego a la vez, y esta es la
+forma de decidirlo sin adivinar.
 """
 
 import json
@@ -43,9 +29,6 @@ _lock = threading.Lock()
 _modo_actual = MODO_INICIAL if MODO_INICIAL in PERFILES else MODO_NORMAL
 
 
-# -------------------------------------------------------------------------
-# Estado persistente
-# -------------------------------------------------------------------------
 def _guardar_estado() -> None:
     try:
         ARCHIVO_ESTADO.write_text(
@@ -74,9 +57,6 @@ def _cargar_estado() -> None:
         log.warning("No pude leer el estado previo: %s", e)
 
 
-# -------------------------------------------------------------------------
-# Consulta
-# -------------------------------------------------------------------------
 def modo_actual() -> str:
     return _modo_actual
 
@@ -97,15 +77,8 @@ def describir_modo() -> str:
     return f"Estoy en modo {perfil['nombre_hablado']} con el modelo {perfil['modelo']}.{detalle}"
 
 
-# -------------------------------------------------------------------------
-# Control de VRAM vía Ollama
-# -------------------------------------------------------------------------
 def descargar_modelos() -> int:
-    """
-    Descarga de la VRAM todos los modelos de Jarvis.
-
-    Devuelve cuántos se descargaron. Se usa al entrar en modo gaming.
-    """
+    """Descarga de la VRAM todos los modelos de Jarvis."""
     try:
         import ollama
     except ImportError:
@@ -128,12 +101,7 @@ def descargar_modelos() -> int:
 
 
 def precalentar_modelo(modelo: str | None = None) -> bool:
-    """
-    Carga el modelo en memoria por adelantado.
-
-    Esto es lo que evita que la PRIMERA orden del día tarde 30 segundos y Alexa
-    corte la sesión con 'hubo un problema con la respuesta de la skill'.
-    """
+    """Carga el modelo en memoria por adelantado."""
     try:
         import ollama
     except ImportError:
@@ -162,9 +130,6 @@ def precalentar_en_segundo_plano() -> None:
     hilo.start()
 
 
-# -------------------------------------------------------------------------
-# Cambio de modo
-# -------------------------------------------------------------------------
 def cambiar_modo(nuevo_modo: str) -> str:
     """Cambia de modo y devuelve la frase que dirá Alexa."""
     global _modo_actual
@@ -202,16 +167,9 @@ def cambiar_modo(nuevo_modo: str) -> str:
 
     # ---------------- MODO DEDICADO ----------------
     if nuevo_modo == MODO_DEDICADO:
-        # Si ya estabamos aqui, no se recarga nada: repetir la orden hacia que
-        # el aviso saliera cada vez peor, porque medía la VRAM que el propio
-        # modelo acababa de ocupar.
         if anterior == MODO_DEDICADO:
             return f"Ya estabas en modo dedicado con {perfil['modelo']}."
 
-        # Soltamos NUESTRO modelo anterior antes de medir. Sin esto, el 3B del
-        # modo normal seguia ocupando su par de gigas y contaban como "no
-        # disponibles", asi que Jarvis te pedia cerrar programas para hacer
-        # sitio a un espacio que se estaba ocupando el solo.
         descargar_modelos()
         time.sleep(0.6)          # a Ollama le cuesta un instante soltarla
 
@@ -224,10 +182,6 @@ def cambiar_modo(nuevo_modo: str) -> str:
 
         libre_gb = datos["vram_libre_mb"] / 1024
 
-        # Cuanto necesita de verdad el 7B cuantizado a 4 bits: unos 4,4 GB de
-        # pesos mas el contexto. El umbral anterior era 5,0 GB, inalcanzable en
-        # una tarjeta de 6 GB donde Windows y el escritorio ya se quedan medio
-        # giga largo. Por eso te decia que cerraras cosas con todo cerrado.
         NECESITA_ENTERO = 4.4
         MINIMO_UTIL = 3.0
 
@@ -257,14 +211,7 @@ def cambiar_modo(nuevo_modo: str) -> str:
 
 
 def opciones_ollama(tokens_maximos: int = 140) -> dict:
-    """
-    Opciones de inferencia que corresponden al modo actual.
-
-    num_predict y stop existen por el limite de Alexa. Una respuesta hablada
-    nunca deberia pasar de dos frases; sin tope, el modelo se enrolla, tarda
-    varios segundos de mas en generar texto que Alexa iba a recortar igual, y
-    el presupuesto se agota generando algo que nadie va a oir entero.
-    """
+    """Opciones de inferencia que corresponden al modo actual."""
     perfil = perfil_actual()
     return {
         "num_gpu": perfil["num_gpu"],

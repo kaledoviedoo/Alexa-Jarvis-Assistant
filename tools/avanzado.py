@@ -1,17 +1,8 @@
-"""
-Capacidades avanzadas: contexto personal, informes completos y busqueda profunda.
+"""Contexto del usuario, informe del equipo y busquedas profundas.
 
-El contexto personal
---------------------
-Un modelo de 3B no sabe nada de ti ni de tu equipo. Sin eso, "crea un script
-para ordenar mis descargas" produce codigo generico que no encaja con nada.
-
-contexto.md resuelve eso: es un archivo que TU escribes, en la carpeta de
-Jarvis, con quien eres, en que trabajas, que herramientas usas y como quieres
-que se comporte. Jarvis lo lee y lo inyecta en el prompt del modelo antes de
-cada peticion, junto con datos reales del equipo leidos en ese momento.
-
-El resultado es que el modelo deja de improvisar sobre un usuario imaginario.
+Mantiene contexto.md (lo que Jarvis sabe de ti y de tu equipo, que se le
+pasa al modelo en cada peticion), genera el informe de hardware y busca
+dentro del contenido de los archivos, no solo en sus nombres.
 """
 
 import logging
@@ -33,9 +24,6 @@ from config import (
 
 log = logging.getLogger("jarvis.avanzado")
 
-# El contexto vive en la carpeta del PROYECTO, junto a los .py, porque es un
-# archivo que tu editas a mano y tiene que estar a la vista. Si por lo que sea
-# esa carpeta no admite escritura, cae a la carpeta de datos.
 _CARPETA_PROYECTO = Path(__file__).resolve().parent.parent
 
 
@@ -92,9 +80,6 @@ cuanto mejor te describa, mejores seran las respuestas y el codigo que genere.
 """
 
 
-# -------------------------------------------------------------------------
-# CONTEXTO PERSONAL
-# -------------------------------------------------------------------------
 def asegurar_contexto() -> Path:
     """Crea contexto.md con una plantilla si aun no existe."""
     if ARCHIVO_CONTEXTO.exists():
@@ -152,9 +137,6 @@ def donde_esta_contexto() -> str:
     return f"Mi contexto está en {ARCHIVO_CONTEXTO}. Edítalo para que te conozca mejor."
 
 
-# -------------------------------------------------------------------------
-# CONOCIMIENTO DEL EQUIPO
-# -------------------------------------------------------------------------
 def info_equipo_dict() -> dict:
     """Datos reales del equipo, leidos en el momento."""
     from tools import sistema as _sistema
@@ -218,16 +200,8 @@ def resumen_equipo_para_modelo() -> str:
     )
 
 
-# -------------------------------------------------------------------------
-# INFORME COMPLETO
-# -------------------------------------------------------------------------
 def informe_completo(guardar: bool = False) -> str:
-    """
-    Informe detallado del equipo.
-
-    Hablado devuelve un resumen; con guardar=True escribe el informe entero
-    como archivo, porque leer veinte cifras en voz alta no sirve de nada.
-    """
+    """Informe detallado del equipo."""
     from tools import sistema as _sistema
 
     d = info_equipo_dict()
@@ -345,9 +319,6 @@ def informe_completo(guardar: bool = False) -> str:
     return ", ".join(partes) + ". Di 'guarda el informe' si lo quieres completo en un archivo."
 
 
-# -------------------------------------------------------------------------
-# BUSQUEDA PROFUNDA
-# -------------------------------------------------------------------------
 _EXTENSIONES_TEXTO = {
     ".txt", ".md", ".py", ".js", ".ts", ".json", ".csv", ".html", ".css",
     ".yml", ".yaml", ".ini", ".cfg", ".log", ".xml", ".sql", ".sh", ".ps1",
@@ -360,11 +331,7 @@ _CARPETAS_IGNORADAS = {
 
 
 def buscar_en_contenido(texto: str, carpeta: str = "", limite: int = 10) -> str:
-    """
-    Busca una frase DENTRO de los archivos, no solo en sus nombres.
-
-    Es la diferencia entre "no sé dónde guardé eso" y encontrarlo.
-    """
+    """Busca una frase DENTRO de los archivos, no solo en sus nombres."""
     texto = (texto or "").strip()
     if not texto:
         return "¿Qué texto quieres que busque dentro de los archivos?"
@@ -417,11 +384,7 @@ def buscar_en_contenido(texto: str, carpeta: str = "", limite: int = 10) -> str:
 
 
 def explorar_carpeta(carpeta: str = "escritorio", profundidad: int = 2) -> str:
-    """
-    Recorre una carpeta y sus subcarpetas, y resume que hay dentro.
-
-    Pensado para orientarse: cuantos archivos, de que tipo y que subcarpetas.
-    """
+    """Recorre una carpeta y sus subcarpetas, y resume que hay dentro."""
     from tools.archivos import _base_desde_alias
 
     base = _base_desde_alias(carpeta)
@@ -499,21 +462,9 @@ def archivos_recientes(dias: int = 7, carpeta: str = "", limite: int = 10) -> st
     )
 
 
-# -------------------------------------------------------------------------
-# ARCHIVOS OLVIDADOS
-# -------------------------------------------------------------------------
 def archivos_olvidados(dias: int = 120, minimo_mb: float = 40.0,
                        cuantos: int = 8) -> str:
-    """
-    Archivos grandes que llevan mucho sin abrirse.
-
-    Dos condiciones a la vez, y las dos importan. Solo por tamaño saldrian
-    programas y archivos de trabajo en uso; solo por antiguedad saldrian mil
-    ficheros de cien kilobytes que no liberan nada. Grande Y olvidado es lo
-    que de verdad ocupa espacio sin dar nada a cambio.
-
-    No borra nada. Solo mira y cuenta.
-    """
+    """Archivos grandes que llevan mucho sin abrirse."""
     import time
     from config import CARPETAS_PERMITIDAS
 
@@ -534,9 +485,6 @@ def archivos_olvidados(dias: int = 120, minimo_mb: float = 40.0,
                     if mb < minimo_mb:
                         continue
 
-                    # st_atime en Windows es poco de fiar (muchos sistemas lo
-                    # tienen desactivado por rendimiento), asi que nos quedamos
-                    # con la fecha mas reciente entre acceso y modificacion.
                     ultimo = max(datos.st_atime, datos.st_mtime)
                     if ahora - ultimo < limite:
                         continue

@@ -1,22 +1,11 @@
-"""
-Ver la pantalla y actuar sobre ella.
+"""Ver la pantalla y actuar sobre lo que hay en ella.
 
-Dos caminos, y la eleccion no es de gusto: es de reloj
-------------------------------------------------------
-Alexa corta a los ocho segundos.
+Captura con mss, lee el texto con Tesseract y devuelve cada palabra con su
+posicion. Con eso puede leer lo que hay, hacer clic sobre un texto concreto,
+o hacer clic sobre lo que CUMPLE una funcion aunque no sepa como se llama en
+esa aplicacion (el boton de jugar pone JUGAR en Epic, PLAY en Steam).
 
-1. OCR (Tesseract). Lee el TEXTO de la pantalla en menos de un segundo, y
-   sabe en que coordenadas esta cada palabra, asi que ademas puede hacer clic
-   sobre lo que le digas. Cabe de sobra en el plazo. No entiende iconos ni
-   imagenes: solo texto.
-
-2. Modelo de vision (llava en Ollama). Describe la pantalla entera, iconos
-   incluidos, pero en una RTX 3050 de 6 GB tarda entre diez y treinta
-   segundos. NO cabe. Por eso siempre va en segundo plano y el resultado se
-   recoge despues con "como quedo lo ultimo".
-
-Por eso las ordenes rapidas ("que pone en la pantalla", "haz clic en Guardar")
-usan OCR, y solo "describe la pantalla" pasa por el modelo.
+Si no lee nada, no hace clic: prefiere no hacer nada a pulsar a ciegas.
 """
 
 import base64
@@ -35,14 +24,7 @@ _BASURA = re.compile(r"^[\W_]+$")
 
 
 def _captura(zona: tuple[float, float, float, float] | None = None):
-    """
-    Imagen de la pantalla principal, o None.
-
-    `zona` recorta en proporciones (izquierda, arriba, derecha, abajo) de 0 a 1.
-    Sirve para dejar fuera lo que estorba: en Teams, por ejemplo, la barra
-    lateral y la de titulo aportan solo nombres de menu sueltos que luego se
-    mezclan con los mensajes y hacen que la lectura suene a galimatias.
-    """
+    """Imagen de la pantalla principal, o None."""
     try:
         import mss
         from PIL import Image
@@ -82,19 +64,7 @@ def _tesseract():
 
 
 def _idioma(pytesseract) -> str:
-    """
-    Devuelve el idioma que Tesseract puede usar de verdad.
-
-    Existe porque winget instala Tesseract SOLO con el ingles: el instalador
-    grafico deja marcar idiomas, pero winget lo lanza en silencio con las
-    opciones por defecto y esa pantalla nunca aparece. Pedirle entonces
-    "spa+eng" no degrada la calidad: falla entero con un error de que no
-    encuentra el idioma, y "leer la pantalla" deja de funcionar sin que se
-    entienda por que.
-
-    Asi que preguntamos que tiene y nos quedamos con lo que haya. Con el
-    ingles se leen bien las palabras; solo las tildes salen regular.
-    """
+    """Devuelve el idioma que Tesseract puede usar de verdad."""
     global _idioma_real
     if _idioma_real is not None:
         return _idioma_real
@@ -127,14 +97,7 @@ def _idioma(pytesseract) -> str:
 
 
 def _es_basura(palabra: str) -> bool:
-    """
-    Descarta lo que el OCR se inventa.
-
-    En una interfaz densa como la de Teams, Tesseract escupe restos de bordes
-    y de iconos: barras sueltas, letras huerfanas, cadenas sin vocales. Leidos
-    en voz alta suenan a averia. Esto es lo que separa "En Teams veo: Fija
-    proyectos paramanter |. HistoriacompletadeEnror" de algo escuchable.
-    """
+    """Descarta lo que el OCR se inventa."""
     if len(palabra) < 2:
         return True
     if _BASURA.match(palabra):
@@ -176,10 +139,6 @@ def _palabras(zona=None, confianza_minima: float = 55.0) -> list[dict]:
             confianza = float(datos["conf"][i])
         except (ValueError, TypeError, KeyError):
             confianza = -1.0
-        # Por debajo del umbral el OCR se esta inventando letras. Para hablar
-        # subimos el liston mas que para hacer clic: una palabra dudosa leida
-        # en voz alta molesta, pero para localizar un boton vale la pena
-        # arriesgarse un poco mas.
         if confianza < confianza_minima:
             continue
         salida.append({
@@ -208,9 +167,6 @@ def _lineas(palabras: list[dict]) -> list[str]:
     return lineas
 
 
-# -------------------------------------------------------------------------
-# ORDENES RAPIDAS (OCR)
-# -------------------------------------------------------------------------
 def leer_pantalla(maximo_lineas: int = 12, zona=None) -> str:
     """Lee en voz alta lo que pone en la pantalla."""
     palabras = _palabras(zona)
@@ -232,18 +188,7 @@ def leer_pantalla(maximo_lineas: int = 12, zona=None) -> str:
 
 
 def leer_primera_linea(zona=None) -> str:
-    """
-    La linea de MAS ARRIBA de una zona, no la mas larga.
-
-    leer_pantalla ordena por longitud porque para escuchar interesa el
-    contenido. Para una cabecera es justo al reves: lo que importa es lo
-    primero, y lo de debajo es el subtitulo.
-
-    Sin esto, en WhatsApp Web salio "here for group info" como si fuera el
-    nombre del chat. Es el texto del subtitulo ("click here for group info"),
-    no un contacto. Y el aviso de "el chat abierto no es el que pediste"
-    salto por el motivo equivocado.
-    """
+    """La linea de MAS ARRIBA de una zona, no la mas larga."""
     palabras = _palabras(zona, confianza_minima=45.0)
     if not palabras:
         return ""
@@ -303,14 +248,7 @@ def _localizar(objetivo: str, palabras: list[dict]) -> dict | None:
 
 
 def clic_en(texto: str) -> str:
-    """
-    Hace clic sobre un texto de la pantalla.
-
-    Esto es lo que convierte "ver la pantalla" en "usar la pantalla". Y es
-    seguro de una forma que un clic a ciegas no lo es: solo pincha donde hay
-    un texto que se ha leido de verdad. Si no lo encuentra, no pincha nada
-    en vez de pinchar en cualquier sitio.
-    """
+    """Hace clic sobre un texto de la pantalla."""
     objetivo = (texto or "").strip()
     if not objetivo:
         return "¿Dónde quieres que haga clic?"
@@ -335,16 +273,8 @@ def clic_en(texto: str) -> str:
     return f"Hecho, hice clic en {encontrado['texto']}."
 
 
-# -------------------------------------------------------------------------
-# CAMINO LENTO (modelo de vision)
-# -------------------------------------------------------------------------
 def describir_pantalla(pregunta: str = "") -> str:
-    """
-    Describe la pantalla con un modelo de vision.
-
-    Tarda mucho mas de lo que Alexa aguanta. Quien llama a esto tiene que
-    hacerlo en segundo plano; aqui no se disimula el coste.
-    """
+    """Describe la pantalla con un modelo de vision."""
     imagen = _captura()
     if imagen is None:
         return "No pude capturar la pantalla."
@@ -384,15 +314,6 @@ def describir_pantalla(pregunta: str = "") -> str:
                 f"¿Tienes el modelo {MODELO_VISION}? Instálalo con ollama pull {MODELO_VISION}")
 
 
-# -------------------------------------------------------------------------
-# CLIC CON REFERENCIA ESPACIAL
-# -------------------------------------------------------------------------
-# "haz clic en el archivo debajo del mensaje del profe Andres".
-#
-# Aqui no hay nada que un modelo tenga que razonar: es geometria. El OCR ya
-# sabe en que coordenadas esta cada palabra, asi que localizar la referencia
-# y mirar que hay justo debajo es una resta. Y sale en milisegundos, mientras
-# que preguntarselo a un modelo se comeria el plazo de Alexa entero.
 DIRECCIONES = {
     "debajo": (0, 1), "abajo": (0, 1), "bajo": (0, 1), "siguiente": (0, 1),
     "encima": (0, -1), "arriba": (0, -1), "sobre": (0, -1), "anterior": (0, -1),
@@ -434,9 +355,6 @@ def _linea_de_referencia(referencia: str, lineas: list[dict]) -> dict | None:
         if objetivo in l["texto"].lower():
             return l
 
-    # Si no, la linea que mas palabras comparta. Alexa transcribe los nombres
-    # propios de formas creativas ("profe Andres" puede llegar como "profe
-    # andrés" o "profeandres"), asi que exigir la frase exacta seria fragil.
     piezas = [p for p in re.split(r"\W+", objetivo) if len(p) > 2]
     if not piezas:
         return None
@@ -454,11 +372,7 @@ def _linea_de_referencia(referencia: str, lineas: list[dict]) -> dict | None:
 
 
 def clic_relativo(referencia: str, direccion: str) -> str:
-    """
-    Hace clic en el elemento que esta en cierta direccion respecto a otro.
-
-    Ejemplo: clic_relativo("el mensaje del profe Andres", "debajo").
-    """
+    """Hace clic en el elemento que esta en cierta direccion respecto a otro."""
     dir_clave = (direccion or "").strip().lower()
     vector = None
     for nombre, v in DIRECCIONES.items():
@@ -521,26 +435,12 @@ def clic_relativo(referencia: str, direccion: str) -> str:
     return f"Hice clic en {elegido['texto'][:60]}."
 
 
-# -------------------------------------------------------------------------
-# RAZONAR SOBRE LO QUE SE VE
-# -------------------------------------------------------------------------
-# Hasta aqui todo era "busca ESTE texto". Lo de abajo es distinto: buscar
-# algo por su FUNCION, sin saber como se llama en esta app concreta.
-#
-# El buscador de Spotify pone "Buscar", el de Teams "Buscar" arriba del todo,
-# el de Epic no pone nada y es una lupa, y Valorant no tiene. La palabra
-# cambia, la intencion no. Aqui van las palabras que suele llevar cada cosa,
-# ordenadas de la mas fiable a la mas dudosa: se pincha la primera que
-# aparezca de verdad en la pantalla.
 INTENCIONES = {
     "buscar": [
         "buscar", "búsqueda", "busqueda", "search", "buscar en", "explorar",
         "encontrar", "find", "filtrar",
     ],
     "jugar": [
-        # "jugar" antes que "iniciar": en Epic el boton de la ficha del juego
-        # pone JUGAR, y "iniciar" tambien aparece en textos de la interfaz
-        # que no son ese boton.
         "jugar", "play", "iniciar", "launch", "continuar", "reanudar",
         "instalar", "install",
     ],
@@ -562,13 +462,7 @@ INTENCIONES = {
 
 
 def encontrar_por_intencion(intencion: str, palabras=None) -> dict | None:
-    """
-    Localiza en pantalla el elemento que CUMPLE esa funcion.
-
-    Devuelve el mismo dict que `_localizar` (texto, x, y) o None. Se separa
-    del clic a proposito: hay sitios donde interesa saber si existe antes de
-    decidir que hacer.
-    """
+    """Localiza en pantalla el elemento que CUMPLE esa funcion."""
     candidatas = INTENCIONES.get((intencion or "").strip().lower())
     if not candidatas:
         return None
@@ -612,13 +506,7 @@ def clic_por_intencion(intencion: str) -> str:
 
 
 def buscar_dentro_de_lo_que_veo(consulta: str) -> str:
-    """
-    Encuentra el buscador de la app que tengas delante y escribe ahi.
-
-    Es el plan B de `sistema.buscar_en_app`: cuando la app no esta en la
-    tabla de atajos, en vez de rendirse se mira la pantalla, se busca algo
-    que sirva para buscar, se pincha y se escribe. Es lo que harias tu.
-    """
+    """Encuentra el buscador de la app que tengas delante y escribe ahi."""
     consulta = (consulta or "").strip()
     if not consulta:
         return "¿Qué quieres que busque?"
@@ -638,9 +526,6 @@ def buscar_dentro_de_lo_que_veo(consulta: str) -> str:
         pyautogui.click(caja["x"], caja["y"])
         time.sleep(0.4)
 
-        # Puede haber texto de una busqueda anterior. Seleccionar todo y
-        # escribir encima lo reemplaza; escribir sin mas lo concatena y
-        # buscarias "tame impalabad bunny".
         pyautogui.hotkey("ctrl", "a")
         entrada.escribir_texto(consulta, pulsar_enter=True)
     except ImportError:

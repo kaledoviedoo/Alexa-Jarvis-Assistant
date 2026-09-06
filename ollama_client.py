@@ -1,19 +1,13 @@
-"""
-Cliente de Ollama con function calling y presupuesto de tiempo.
+"""Cliente de Ollama con function calling y presupuesto de tiempo.
 
-Aquí caen las órdenes que el router determinista (nlu.py) no supo resolver:
-razonar, redactar, decidir entre varias herramientas, encadenar pasos.
+Aqui caen las ordenes que el router no supo resolver: razonar, redactar,
+encadenar pasos. Como Alexa corta a los ocho segundos y el modelo puede
+tardar mas, la respuesta y la ejecucion van separadas: si no termina a
+tiempo, Alexa contesta que esta en ello y el trabajo sigue en un hilo, con
+el resultado guardado en tareas.py.
 
-El problema del tiempo
-----------------------
-Alexa corta a los ~8 s. El modelo de 7B puede tardar más. La solución no es
-rendirse, sino separar la RESPUESTA de la EJECUCIÓN:
-
-  - Si el modelo termina dentro del presupuesto, Alexa dice el resultado real.
-  - Si no, Alexa dice "lo estoy procesando" y la tarea SIGUE corriendo en un
-    hilo. El resultado queda en tareas.py y se consulta con "¿cómo quedó?".
-
-Así ninguna orden se pierde por un timeout.
+Incluye el freno de mano: las herramientas que tocan el equipo solo se
+ejecutan si la frase original de verdad las pedia.
 """
 
 import inspect
@@ -27,27 +21,13 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as TimeoutFuturo
 
 import modes
 import tareas
-from config import MAX_PASOS_TOOLS, PRESUPUESTO_SEGUNDOS
+from config import MAX_PASOS_TOOLS, NOMBRE_USUARIO, PRESUPUESTO_SEGUNDOS
 from tools import archivos, avanzado, entrada, navegador, obsidian, sistema
 
 log = logging.getLogger("jarvis.ollama")
 
 _ejecutor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="jarvis-llm")
 
-
-
-# =========================================================================
-# SANEADO DE LA RESPUESTA DEL MODELO
-# =========================================================================
-# Los modelos pequenos fallan de una forma concreta y muy fea: en vez de
-# INVOCAR la herramienta, escriben la llamada como texto y la devuelven.
-# Alexa entonces lee en voz alta algo como:
-#
-#   {"name":"eliminar_archivo","parameters":{"nombre_archivo":"captura1.png"}}
-#
-# Detectamos ese caso, ejecutamos de verdad lo que el modelo queria hacer, y
-# devolvemos una frase humana. Si no se puede rescatar, al menos no leemos
-# JSON en voz alta.
 
 _PATRON_LLAMADA_TEXTO = re.compile(
     r'\{\s*"(?:name|function|tool)"\s*:\s*"(?P<nombre>\w+)"\s*,\s*'
@@ -57,11 +37,7 @@ _PATRON_LLAMADA_TEXTO = re.compile(
 
 
 def _rescatar_llamadas_en_texto(texto: str) -> str | None:
-    """
-    Si el modelo escribio llamadas a herramientas como texto plano, las ejecuta.
-
-    Devuelve la frase resultante, o None si el texto no contenia ninguna.
-    """
+    """Si el modelo escribio llamadas a herramientas como texto plano, las ejecuta."""
     coincidencias = list(_PATRON_LLAMADA_TEXTO.finditer(texto or ""))
     if not coincidencias:
         return None
@@ -100,9 +76,6 @@ def _parece_json(texto: str) -> bool:
     return señales >= 2
 
 
-# Los modelos pequenos copian trozos del prompt en su respuesta. Suena
-# ridiculo por el altavoz: "Alexa lee en voz alta: comilla El procesador...".
-# Los quitamos aqui en vez de confiar en que el modelo obedezca la regla 9.
 _PREFIJOS_PARASITOS = re.compile(
     r'^\s*(?:alexa\s+(?:lee|leera|dice|dira)\s+en\s+voz\s+alta|'
     r'respuesta\s+final|respuesta|jarvis\s+responde|tu\s+respuesta|'
@@ -111,10 +84,6 @@ _PREFIJOS_PARASITOS = re.compile(
 )
 
 
-# El modelo a veces escupe el nombre de la herramienta antes del resultado:
-#   "listar_archivos \nEn Desktop hay 108 archivos."
-# Por el altavoz suena a fallo ("listar guion bajo archivos"). No es JSON ni
-# una llamada rescatable: ya se ejecuto, esto es solo ruido delante.
 _NOMBRE_SUELTO = re.compile(
     r'^\s*(?:llamada\s*[:\-]?\s*)?'
     r'(?P<nombre>[a-z][a-z0-9]*(?:_[a-z0-9]+)+)'      # tiene que llevar guion bajo
@@ -124,14 +93,7 @@ _NOMBRE_SUELTO = re.compile(
 
 
 def _quitar_nombre_de_herramienta(texto: str) -> str:
-    """
-    Si la respuesta empieza por el nombre de una herramienta y despues hay
-    texto de verdad, se queda solo con el texto.
-
-    Comprobamos contra DESPACHADOR y no contra cualquier palabra con guion
-    bajo: asi una frase que empiece por un nombre de archivo real
-    (`notas_clase.md esta en Documentos`) no se queda mutilada.
-    """
+    """Quita el nombre de herramienta que el modelo a veces pega delante."""
     limpio = (texto or "").strip()
     for _ in range(2):
         m = _NOMBRE_SUELTO.match(limpio)
@@ -164,12 +126,7 @@ def _quitar_prefijos(texto: str) -> str:
 
 
 def limpiar_respuesta_modelo(texto: str) -> str:
-    """
-    Deja la respuesta del modelo lista para pronunciarse.
-
-    Primero intenta rescatar llamadas escritas como texto; si lo que queda
-    sigue pareciendo estructura de datos, no lo lee: avisa.
-    """
+    """Deja la respuesta del modelo lista para pronunciarse."""
     texto = (texto or "").strip()
 
     texto = _quitar_prefijos(texto)
@@ -200,9 +157,6 @@ def limpiar_respuesta_modelo(texto: str) -> str:
     return texto or "No supe qué hacer con esa orden."
 
 
-# =========================================================================
-# ESQUEMAS DE HERRAMIENTAS
-# =========================================================================
 def _herramienta(nombre: str, descripcion: str, propiedades: dict, requeridos: list[str]) -> dict:
     return {
         "type": "function",
@@ -434,7 +388,6 @@ HERRAMIENTAS = [
 ]
 
 
-
 # Mapa nombre-de-herramienta -> función real.
 DESPACHADOR = {
     "crear_archivo": archivos.crear_archivo,
@@ -487,7 +440,7 @@ REGLAS:
 9. Responde solo con lo que hay que decir. No narres lo que vas a hacer, no repitas la orden y no escribas prefijos como "Alexa lee en voz alta:" ni "Respuesta:". Esas palabras acabarian sonando por el altavoz.
 
 COMO HABLAS:
-Hablas con Kaled, que es quien te construyo. Tuteale.
+Hablas con {NOMBRE_USUARIO}, que es quien te construyo. Tuteale.
 
 Suena a persona, no a manual. Un asistente que contesta "Operacion completada satisfactoriamente" a cada cosa cansa en dos dias. Di "listo", "hecho", "ya esta", "ahi lo tienes", y varia: repetir siempre la misma formula suena tan robotico como la formula mas formal.
 
@@ -501,14 +454,8 @@ Nada de emojis ni de simbolos: esto se lee en voz alta."""
 
 
 def construir_prompt_sistema() -> str:
-    """
-    Monta el prompt con el contexto real del usuario y del equipo.
-
-    Un modelo de 3B no sabe nada de quien le habla. Sin esto responde sobre un
-    usuario imaginario y con rutas inventadas. Con esto sabe donde esta, que
-    hardware tiene y como quiere trabajar la persona.
-    """
-    partes = [PROMPT_BASE]
+    """Monta el prompt con el contexto real del usuario y del equipo."""
+    partes = [PROMPT_BASE.replace("{NOMBRE_USUARIO}", NOMBRE_USUARIO or "el usuario")]
 
     try:
         partes.append("\n--- ESTE EQUIPO ---\n" + avanzado.resumen_equipo_para_modelo())
@@ -539,15 +486,6 @@ def construir_prompt_sistema() -> str:
 SYSTEM_PROMPT = PROMPT_BASE
 
 
-
-# =========================================================================
-# EJECUCIÓN DE HERRAMIENTAS
-# =========================================================================
-# Claves con las que los modelos pequenos envuelven los argumentos. En vez de
-# mandar {"texto": "oferta y demanda"} devuelven el sobre entero:
-#   {"type": "function", "function": "obsidian_buscar",
-#    "parameters": {"texto": "oferta y demanda"}}
-# ...y la llamada reventaba con "unexpected keyword argument 'type'".
 _ENVOLTORIOS = ("parameters", "arguments", "args", "params", "input", "kwargs")
 
 
@@ -582,26 +520,6 @@ def _desenvolver_argumentos(argumentos) -> dict:
             if k not in ("type", "function", "name", "tool", "tool_name", "recipient_name")}
 
 
-# =========================================================================
-# EL FRENO DE MANO
-# =========================================================================
-# Un modelo de 3B, cuando no entiende, no se calla: llama a la herramienta
-# que le suene. Del registro real, hablando yo solo sin darle ninguna orden:
-#
-#   "estoy en la cama y no tengo ganas de levantarme..."  -> escribio texto
-#                                                            en la ventana
-#                                                            que hubiera al
-#                                                            frente
-#   "que no le puedo hablar aca porque no me ha..."       -> cerrar Alexa
-#   (varias)                                              -> cerrar 'nada',
-#                                                            cerrar
-#                                                            'estado_sistema',
-#                                                            borrar 'prueba'
-#
-# Contestar mal se nota y se repite. Escribir en una ventana que no mirabas o
-# cerrar un programa con trabajo sin guardar, no: te enteras tarde. Asi que
-# las herramientas que TOCAN el equipo llevan freno, y las que solo miran
-# (leer, listar, estado) pasan sin nada: equivocarse ahi no cuesta nada.
 HERRAMIENTAS_QUE_TOCAN = {
     "escribir_texto":    ("escrib", "teclea", "redacta", "pon ", "ponme",
                           "dile", "manda", "mensaje", "responde", "contesta"),
@@ -620,10 +538,6 @@ HERRAMIENTAS_QUE_TOCAN = {
     "cambiar_modo":      ("modo", "gaming", "dedicado", "normal", "juego"),
 }
 
-# Longitud a partir de la cual una frase deja de parecer una orden. Las
-# ordenes de verdad son cortas y empiezan por el verbo: "cierra spotify",
-# "escribe hola", "elimina prueba punto txt". Las dos frases que dispararon
-# acciones sin querer tenian 73 y 139 caracteres.
 LARGO_MAXIMO_DE_UNA_ORDEN = 70
 
 # Argumentos que no son un valor: son el hueco sin rellenar. Si el modelo
@@ -659,13 +573,7 @@ def _valor_principal(argumentos: dict) -> str:
 
 
 def _por_que_no(nombre: str, argumentos: dict) -> str:
-    """
-    Motivo por el que NO se ejecuta esta llamada, o cadena vacia si pasa.
-
-    Devuelve texto y no un booleano a proposito: ese texto vuelve al modelo
-    como resultado de la herramienta, asi que en vez de reintentar lo mismo
-    lee por que se le paro y suele contestar con palabras.
-    """
+    """Motivo por el que NO se ejecuta esta llamada, o cadena vacia si pasa."""
     valor = _valor_principal(argumentos)
 
     # 1. El hueco del ejemplo sin rellenar.
@@ -696,9 +604,6 @@ def _por_que_no(nombre: str, argumentos: dict) -> str:
         return (f"No ejecuto {nombre}: en lo que dijo no hay nada que lo pida. "
                 "Contesta con palabras a lo que te esta contando.")
 
-    # 5. Demasiado larga para ser una orden. Aqui es donde se cortan las dos
-    #    del registro: la frase lleva la palabra suelta ("pon", "digo") pero
-    #    dentro de un parrafo que era conversacion, no una orden.
     if len(frase) > LARGO_MAXIMO_DE_UNA_ORDEN:
         return (f"No ejecuto {nombre}: eso parece conversacion, no una orden. "
                 "Si de verdad la quiere, que la diga corta y directa.")
@@ -726,9 +631,6 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
 
     log.info("Ejecutando herramienta %s con %s", nombre, argumentos)
 
-    # Segunda red: descartamos las claves que la funcion no acepta. Un modelo
-    # de 3B se inventa parametros con facilidad, y perder una llamada entera
-    # por un campo de mas es un desperdicio: mejor ejecutar con lo que sirve.
     try:
         validas = set(inspect.signature(funcion).parameters)
         sobran = [k for k in argumentos if k not in validas]
@@ -756,10 +658,6 @@ def _conversar(comando: str) -> str:
     except ImportError:
         return "No tengo Ollama instalado, así que no puedo razonar esa orden."
 
-    # El freno necesita la frase tal cual la dijo, para poder contrastar lo
-    # que el modelo quiere ejecutar con lo que de verdad se pidio. Se guarda
-    # aqui y no en el servidor porque esto ya corre en el hilo del trabajo, y
-    # el almacen es por hilo.
     recordar_peticion(comando)
 
     perfil = modes.perfil_actual()
@@ -815,13 +713,6 @@ def _conversar(comando: str) -> str:
     return "Di demasiadas vueltas con esa orden y preferí parar."
 
 
-# =========================================================================
-# ENTRADA PÚBLICA CON PRESUPUESTO
-# =========================================================================
-# Reloj del presupuesto de la peticion en curso.
-#
-# Alexa concede unos 8 segundos DESDE QUE MANDA LA PETICION, no desde que
-# llamamos al modelo. Todo lo que consuma el router antes hay que restarlo.
 _inicio_peticion = threading.local()
 
 
@@ -848,19 +739,10 @@ def _terminar_en_segundo_plano(identificador: str, resumen: str, comando: str) -
 
 
 def procesar(comando: str) -> str:
-    """
-    Procesa un comando con el LLM respetando el límite de tiempo de Alexa.
-
-    Si el modelo no termina a tiempo, devuelve un acuse y deja la tarea
-    corriendo en segundo plano.
-    """
+    """Procesa un comando con el LLM respetando el límite de tiempo de Alexa."""
     identificador = uuid.uuid4().hex[:8]
     resumen = comando[:60]
 
-    # El presupuesto es de la PETICION entera, no de esta llamada. Si el router
-    # ya gasto 400 ms probando patrones, al modelo le quedan 6.1 s, no 6.5.
-    # Usar el numero fijo aqui era la forma silenciosa de pasarse del limite de
-    # Alexa justo en las ordenes mas lentas, que son las que ya iban apuradas.
     restante = restante_del_presupuesto()
 
     if restante < 1.0:
@@ -924,17 +806,7 @@ def _nombre_de_modelo(modelo) -> str:
 
 
 def modelos_instalados() -> list[str]:
-    """
-    Lo que tienes descargado en Ollama.
-
-    Acepta las dos formas de respuesta a proposito. La biblioteca de Ollama
-    devolvia un diccionario y ahora devuelve un objeto con atributos; el
-    codigo viejo solo entendia el diccionario y, con la version nueva, se
-    quedaba en una lista vacia SIN dar error. Y una lista vacia aqui no se
-    lee como "no pude preguntar", se lee como "no tienes nada instalado":
-    por eso el arranque insistia en que faltaba nomic-embed-text con el
-    modelo ya descargado.
-    """
+    """Lo que tienes descargado en Ollama."""
     try:
         import ollama
         datos = ollama.list()
@@ -947,9 +819,6 @@ def modelos_instalados() -> list[str]:
         crudos = getattr(datos, "models", None)
 
     if not crudos:
-        # Llego respuesta pero sin modelos dentro. O de verdad no hay
-        # ninguno, o la forma cambio otra vez; dejamos rastro para no
-        # volver a perseguir esto a ciegas.
         log.debug("Ollama respondio sin modelos (tipo %s)", type(datos).__name__)
         return []
 

@@ -1,16 +1,11 @@
-"""
-Control de teclado y mouse en modo ACOTADO.
+"""Control de teclado y raton.
 
-Decisión de diseño deliberada: no existe ninguna función que haga clic en una
-coordenada arbitraria. Un reconocimiento de voz equivocado no puede hacer clic
-en "Eliminar cuenta" porque Jarvis simplemente no sabe hacer clics ciegos.
+Escribe texto, ejecuta atajos de una lista blanca y toma capturas. Los
+atajos son lista blanca cerrada y no hay clics a coordenadas ciegas: eso es
+lo que impide que un modelo confundido pulse algo destructivo.
 
-Lo que sí puede hacer:
-  - escribir texto en la ventana activa
-  - ejecutar atajos de una lista blanca (config.ATAJOS_PERMITIDOS)
-  - tomar capturas de pantalla
-  - desplazar la rueda del mouse
-  - pulsar teclas simples (enter, escape, tab, flechas)
+El texto con acentos va por el portapapeles, porque `write` no los maneja
+bien en todos los teclados.
 """
 
 import logging
@@ -242,9 +237,6 @@ def captura_pantalla(nombre: str = "") -> str:
         return "No puedo tomar capturas. Falta instalar pyautogui y Pillow."
 
     if not nombre:
-        # Numeracion correlativa en vez de marca de tiempo: "captura1.png" es
-        # mucho mas facil de nombrar por voz despues ("abre la captura 3")
-        # que "captura_20260821_143052.png".
         nombre = _siguiente_nombre_captura()
     if not nombre.lower().endswith(".png"):
         nombre += ".png"
@@ -263,10 +255,7 @@ def captura_pantalla(nombre: str = "") -> str:
 
 
 def escribir_y_buscar(texto: str) -> str:
-    """
-    Combo útil: enfoca la barra de direcciones del navegador (Ctrl+L),
-    escribe la consulta y pulsa Enter.
-    """
+    """Enfoca la barra de direcciones, escribe la consulta y pulsa enter."""
     pyautogui = _obtener_pyautogui()
     if pyautogui is None:
         return "No tengo control del teclado."

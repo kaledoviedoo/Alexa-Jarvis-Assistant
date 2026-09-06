@@ -1,20 +1,12 @@
-"""
-Router determinista de comandos: el corazón de la velocidad de Jarvis.
+"""Router determinista de comandos de voz.
 
-Por qué existe
---------------
-Alexa corta la skill si el endpoint tarda más de ~8 segundos. Un modelo de 7B
-en una RTX 3050 arrancando en frío tarda 20-40 s. Si CADA orden pasara por el
-LLM, la mayoría fallaría con "hubo un problema con la respuesta de la skill".
+Convierte lo que dijiste en una llamada a una herramienta sin pasar por el
+modelo. Es una lista ordenada de (expresion regular, funcion): se recorre de
+arriba abajo y gana la primera que encaja, asi que los patrones especificos
+van antes que los genericos.
 
-Este módulo reconoce las órdenes frecuentes con expresiones regulares y las
-ejecuta en milisegundos, sin tocar el modelo. Solo lo verdaderamente abierto
-("resume esto", "explícame aquello") cae al LLM.
-
-Cómo añadir un comando nuevo
------------------------------
-Escribe una función manejadora y añade una tupla (regex, manejadora) a INTENTS.
-El orden importa: lo más específico va primero.
+Resuelve alrededor del 90% de las ordenes en menos de un milisegundo. Lo que
+no encaja con nada devuelve None y sigue su camino hacia el modelo.
 """
 
 import logging
@@ -34,13 +26,6 @@ from tools import (aprendizaje, archivar, archivos, avanzado, catalogo,
 log = logging.getLogger("jarvis.nlu")
 
 
-# =========================================================================
-# NORMALIZACIÓN
-# =========================================================================
-# Tabla de acentos que PRESERVA la longitud del texto. Esto es importante:
-# gracias a ello, las posiciones que devuelve el regex sobre el texto sin
-# acentos siguen siendo válidas sobre el texto original, y podemos extraer
-# el contenido con sus tildes intactas.
 _ACENTOS_ORIGEN = "áéíóúüàèìòùâêîôûÁÉÍÓÚÜÑñ"
 _ACENTOS_DESTINO = "aeiouuaeiouaeiouAEIOUUNn"
 TABLA_ACENTOS = str.maketrans(_ACENTOS_ORIGEN, _ACENTOS_DESTINO)
@@ -69,13 +54,7 @@ MULETILLAS = [
 
 
 # ---- Nombre de invocación -------------------------------------------------
-# Alexa a veces deja el nombre de la skill dentro del slot ("jarvis local crea
-# un archivo..."). Como el nombre lo eliges tú en la consola y Amazon exige dos
-# palabras o más, no podemos codificarlo aquí: lo leemos de la configuración.
 
-# Palabras que NUNCA se recortan sueltas, aunque formen parte del nombre de
-# invocación: son verbos con los que empiezan órdenes reales, y quitarlos
-# rompería el comando.
 _VERBOS_INTOCABLES = {
     "abre", "abrir", "crea", "crear", "lee", "leer", "busca", "buscar",
     "cierra", "cerrar", "mueve", "mover", "copia", "copiar", "borra", "borrar",
@@ -107,9 +86,6 @@ def _variantes_invocacion() -> list[str]:
 
 MULETILLAS_INVOCACION = _variantes_invocacion()
 
-# "que" solo es muletilla cuando VIENE DESPUÉS de otra ("por favor que crees...").
-# Al inicio de la frase casi siempre es un "qué" interrogativo legítimo
-# ("qué archivos hay en el escritorio"), y quitarlo rompía esas órdenes.
 MULETILLA_ENCADENADA = "que "
 
 
@@ -143,10 +119,6 @@ def limpiar_comando(texto: str) -> str:
 
 
 # ---- Numeros que Alexa convierte a digitos --------------------------------
-# El reconocimiento de voz normaliza "un" a "1", asi que "crea un archivo"
-# llega como "crea 1 archivo". Lo revertimos SOLO delante de sustantivos donde
-# un 1 no puede ser una cantidad real, para no estropear ordenes legitimas
-# como "apaga el equipo en 5 minutos".
 _SUSTANTIVOS_CONTABLES = (
     r"archivos?|documentos?|scripts?|ficheros?|notas?|carpetas?|directorios?|"
     r"folders?|capturas?|l[ií]neas?|textos?|p[aá]ginas?|im[aá]genes?|"
@@ -166,8 +138,6 @@ def restaurar_articulo(texto: str) -> str:
 
 
 # ---- Puntuación dictada ---------------------------------------------------
-# OJO: esto se aplica SOLO a nombres de archivo, nunca al texto completo.
-# Si se aplicara a todo, "el punto de vista" se convertiría en "el.de vista".
 _DICTADO_ARCHIVO = [
     (r"\s+punto\s+", "."),
     (r"\s+guion\s+bajo\s+", "_"),
@@ -203,13 +173,7 @@ _EXTENSIONES_HABLADAS = {
 
 
 def normalizar_nombre_archivo(nombre: str, tipo_hablado: str = "") -> str:
-    """
-    Convierte un nombre dictado en un nombre de archivo real.
-
-        'prueba punto py'          -> 'prueba.py'
-        'mis notas punto txt'      -> 'mis_notas.txt'
-        'informe'   (tipo: word)   -> 'informe.docx'
-    """
+    """Convierte un nombre dictado en un nombre de archivo real."""
     nombre = (nombre or "").strip().strip('"').strip("'")
 
     for patron, reemplazo in _DICTADO_ARCHIVO:
@@ -227,9 +191,6 @@ def normalizar_nombre_archivo(nombre: str, tipo_hablado: str = "") -> str:
                 break
         nombre += extension or ".txt"
 
-    # La gente dicta "punto python" o "punto texto" en vez de la extension real.
-    # Sin esto se crean archivos llamados "prueba.python", que Windows no asocia
-    # con nada.
     raiz_tmp, punto_tmp, ext_tmp = nombre.rpartition(".")
     if punto_tmp:
         equivalente = _EXTENSIONES_HABLADAS.get(sin_acentos(ext_tmp.strip().lower()))
@@ -249,12 +210,7 @@ def normalizar_nombre_archivo(nombre: str, tipo_hablado: str = "") -> str:
 
 
 def interpretar_contenido(nombre_archivo: str, contenido: str) -> str:
-    """
-    Convierte instrucciones habladas en contenido utilizable.
-
-    Dictar código por voz es incómodo, así que traducimos los casos más
-    comunes: 'print hola' en un .py se convierte en print("hola").
-    """
+    """Convierte instrucciones habladas en contenido utilizable."""
     contenido = (contenido or "").strip()
     if not contenido:
         return ""
@@ -298,11 +254,6 @@ def interpretar_contenido(nombre_archivo: str, contenido: str) -> str:
 
     return contenido
 
-
-# =========================================================================
-# MANEJADORAS
-# =========================================================================
-# Cada una recibe el objeto `match` y devuelve la frase que dirá Alexa.
 
 # ---- Modos ----
 def _modo_normal(m) -> str:
@@ -580,13 +531,7 @@ def _codigo_indexar(m) -> str:
 
 
 def _codigo_buscar(m) -> str:
-    """
-    Buscar por significado DENTRO del propio proyecto.
-
-    Distinto de la busqueda en la boveda aunque compartan indice: aqui se
-    filtra a los fragmentos que vienen del repo, porque preguntar "donde esta
-    el freno de mano" y que conteste con una nota de clase no sirve de nada.
-    """
+    """Buscar por significado DENTRO del propio proyecto."""
     g = m.groupdict()
     consulta = (g.get("q") or g.get("q2") or g.get("q3") or "").strip()
     if not consulta:
@@ -690,8 +635,6 @@ def _catalogo_tengo(m) -> str:
 
 
 # ---- Estudio ----
-# Todo esto lee varias notas y razona sobre ellas: son miles de tokens y
-# decenas de segundos. Ni se intenta en directo, va al fondo.
 def _al_fondo(descripcion: str, funcion, aviso: str) -> str:
     tareas.lanzar_en_segundo_plano(descripcion, funcion)
     return aviso
@@ -796,11 +739,6 @@ def _wa_enviar(m) -> str:
     destino = (g.get("quien") or g.get("quien2") or "").strip()
     texto = (g.get("texto") or g.get("texto2") or "").strip()
 
-    # Mismo cuidado que en el dialogo de dos turnos: si WhatsApp Web no esta
-    # abierto, guardamos la orden entera antes de contestar. Si no, decir
-    # "repitemelo" obliga a soltar toda la frase otra vez, y con un
-    # reconocimiento de voz que ya se equivoca con los nombres, cada
-    # repeticion es otra oportunidad de que salga mal.
     if not whatsapp.esta_abierto():
         foco.recordar("envio", destino, lista=[texto])
         whatsapp.lanzar_en_segundo_plano()
@@ -811,21 +749,11 @@ def _wa_enviar(m) -> str:
 
 
 def _wa_texto_pendiente(m) -> str:
-    """
-    El texto del mensaje, dicho en el turno siguiente al "¿Que le digo?".
-
-    Este patron es MUY amplio a proposito (casi cualquier frase), asi que solo
-    puede actuar si de verdad hay un destinatario esperando. Si no, devuelve
-    None y el router sigue probando el resto de patrones como si nada.
-    """
+    """El texto del mensaje, dicho en el turno siguiente al "¿Que le digo?"."""
     datos = foco.actual("destinatario")
     if not datos:
         return None
 
-    # SOLO el turno inmediatamente siguiente a la pregunta. El foco vive tres
-    # turnos, y eso aqui seria peligroso: si preguntamos "que le digo a X" y
-    # tu te pones a hablar de otra cosa, la segunda frase acabaria escrita en
-    # el chat de X. Contestas o no contestas; a la tercera ya no vale.
     if datos.get("turnos", 0) > 1:
         foco.olvidar()
         return None
@@ -833,13 +761,6 @@ def _wa_texto_pendiente(m) -> str:
     destinatario = datos["valor"]
     texto = m.group("texto").strip()
 
-    # Si WhatsApp Web no esta abierto, NO se puede borrar el foco todavia.
-    # Aqui estaba el fallo: se olvidaba el destinatario, se contestaba "estoy
-    # abriendo, repitemelo", y al repetir solo el TEXTO ya no habia a quien
-    # mandarselo. La orden se perdia y el modelo contestaba "ya esta" sin
-    # haber hecho nada.
-    #
-    # Guardamos los dos datos y se reanuda con un "sigue".
     if not whatsapp.esta_abierto():
         foco.recordar("envio", destinatario, lista=[texto])
         whatsapp.lanzar_en_segundo_plano()
@@ -855,21 +776,11 @@ def _wa_falta_texto(m) -> str:
     quien = m.group("quien").strip()
     foco.recordar("destinatario", quien)
 
-    # NO repetimos el nombre transcrito. Alexa entendio "familia biogli" donde
-    # dijiste "familia Oviedo Gil", y devolverte esa cadena rota solo suena a
-    # que Jarvis no se entera. El nombre BUENO llega en la confirmacion, leido
-    # de la cabecera del chat que WhatsApp abre de verdad, que es el unico que
-    # importa. Aqui basta con pedir el texto.
     return "Vale. ¿Qué le digo? Te confirmo con quién antes de enviar."
 
 
 def _wa_reanudar(m) -> str:
-    """
-    Retoma un envio que quedo esperando a que cargara WhatsApp Web.
-
-    Devuelve None si no hay nada pendiente, para que "sigue" o "dale" sigan
-    valiendo como lo que sean en cualquier otro contexto.
-    """
+    """Retoma un envio que quedo esperando a que cargara WhatsApp Web."""
     datos = foco.actual("envio")
     if not datos or not datos.get("lista"):
         return None
@@ -1008,10 +919,7 @@ def _pantalla_clic(m) -> str:
 
 
 def _pantalla_describir(m) -> str:
-    """
-    El modelo de vision tarda mas de lo que Alexa aguanta, asi que ni se
-    intenta en directo: va al fondo y se recoge con "como quedo lo ultimo".
-    """
+    """Describe la pantalla con el modelo de vision. Siempre en segundo plano."""
     pregunta = (m.groupdict().get("pregunta") or "").strip()
     tareas.lanzar_en_segundo_plano(
         "describir la pantalla",
@@ -1062,9 +970,6 @@ def _clic_intencion(m) -> str:
     g = m.groupdict()
     crudo = (g.get("que") or "").strip().lower()
 
-    # Se traduce lo que dijiste a una de las intenciones que el OCR conoce.
-    # No es un diccionario de sinonimos: es que "dale a play" y "dale a
-    # iniciar" quieren la misma cosa y la app decide como se llama.
     equivalencias = {
         "jugar": "jugar", "play": "jugar", "iniciar": "jugar",
         "empezar": "jugar", "comenzar": "jugar", "arrancar": "jugar",
@@ -1106,9 +1011,6 @@ def _sel_coger(m) -> str:
     cantidad = _numero(g.get("cantidad"), 0)
     criterio = (g.get("criterio") or g.get("criterio2") or "").strip()
 
-    # "los 3 mas recientes" y "los 3 primeros" no son lo mismo, y la
-    # diferencia importa: en Descargas el orden alfabetico y el de fecha no
-    # se parecen en nada.
     recientes = bool(g.get("recientes"))
 
     return seleccion.seleccionar(criterio, cantidad, recientes)
@@ -1149,14 +1051,7 @@ def _pide_concrecion(m) -> str:
 
 # ---- Ordenes que se entendian al reves (registro del 22 de agosto) ----
 def _buscar_en_app(m):
-    """
-    "busca tame impala en spotify" -> dentro de Spotify, no en Google.
-
-    Devuelve None a proposito cuando la app no tiene buscador propio. Ese
-    None hace que enrutar() siga probando patrones, y el siguiente que
-    encaja es el de busqueda web, que es lo correcto para "busca vuelos en
-    diciembre".
-    """
+    """"busca tame impala en spotify" -> dentro de Spotify, no en Google."""
     g = m.groupdict()
     consulta = (g.get("consulta") or "").strip()
     app = (g.get("app") or "").strip()
@@ -1170,34 +1065,18 @@ def _buscar_en_app(m):
 
 
 def _archivos_grandes(m) -> str:
-    """
-    "qué archivo tiene más memoria" contestaba con el porcentaje de RAM.
-
-    "Memoria" en boca de alguien que pregunta por un ARCHIVO es espacio en
-    disco. El bloque de metricas se lo quedaba por la palabra suelta.
-    """
+    """"qué archivo tiene más memoria" contestaba con el porcentaje de RAM."""
     cantidad = _numero((m.groupdict().get("cantidad") or ""), 3)
     return sistema.archivos_mas_grandes(cantidad)
 
 
 def _pestana_y_sitio(m) -> str:
-    """
-    "abre una pestaña y entra a claude" -> abre claude.
-
-    Antes se tragaba la frase entera como si fuera el nombre de un programa
-    y contestaba "Abriendo un pestaña y entra a cloud", que ademas de no
-    hacer nada era mentira.
-    """
+    """"abre una pestaña y entra a claude" -> abre claude."""
     return navegador.abrir_sitio(m.group("sitio").strip())
 
 
 def _modo_desconocido(m) -> str:
-    """
-    "apaga el modo voz baja" intentaba cerrar un programa llamado asi.
-
-    Cualquier "modo X" que no reconozcamos se contesta diciendo cuales hay,
-    en vez de tratarlo como una aplicacion.
-    """
+    """"apaga el modo voz baja" intentaba cerrar un programa llamado asi."""
     return modes.describir_modo()
 
 
@@ -1209,56 +1088,14 @@ def _ayuda(m) -> str:
     )
 
 
-
 # ---- Avanzado ----
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---- Obsidian ----
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-# =========================================================================
-# TABLA DE INTENTS
-# =========================================================================
-# El orden importa muchísimo: lo más específico va primero. Por ejemplo,
-# "busca el archivo X" tiene que ir ANTES que "busca X", o toda búsqueda de
-# archivo terminaría abriendo el navegador.
-
 _F = re.IGNORECASE
 
-
-# -------------------------------------------------------------------------
-# PIEZAS REUTILIZABLES
-# -------------------------------------------------------------------------
-# Una misma orden se dice de muchas formas. En vez de escribir a mano cada
-# variante dentro de cada patron, definimos aqui los grupos de sinonimos y
-# los insertamos donde hagan falta. Anadir una forma nueva es tocar una linea.
-#
-# Incluimos imperativo (crea), subjuntivo (cree) e infinitivo (crear) porque
-# la invocacion "dile a X que ..." induce subjuntivo y "puedes ..." infinitivo.
 
 def _alt(*formas: str) -> str:
     """Construye un grupo no capturador con todas las formas dadas."""
@@ -1347,9 +1184,6 @@ NOMBRADO = r"(?:llamad[oa]s?\s+|nombrad[oa]\s+|de\s+nombre\s+|con\s+(?:el\s+)?no
 # Al CREAR, "nota" es un sustantivo generico valido ("crea una nota").
 SUST_ARCHIVO = r"(?:archivos?|documentos?|scripts?|ficheros?|notas?)"
 
-# Al REFERIRSE a un archivo existente NO incluimos "nota": chocaria con
-# nombres de archivo reales como "notas.txt", y el patron se comeria el
-# nombre creyendo que era el sustantivo.
 SUST_REF = r"(?:archivos?|documentos?|scripts?|ficheros?)"
 CARPETA_DEST = r"(?:escritorio|descargas|documentos)"
 EN_CARPETA = rf"(?:\s+(?:en|dentro\s+de|a|hacia)\s+(?:el\s+|la\s+|las\s+|los\s+)?(?:carpeta\s+)?(?P<carpeta>{CARPETA_DEST}))?"
@@ -1361,7 +1195,6 @@ CONTENIDO = (
 COLA = r"(?:\s+(?:escrit[oa]s?\s+|puesto\s+|metido\s+)?a?dentro)?$"
 TIPO = r"(?:(?P<tipo>documento\s+word|hoja\s+de\s+c[aá]lculo|python|texto|word|excel|markdown|json|csv|html|javascript)\s+)?"
 TIPO2 = r"(?:(?:de\s+)?(?P<tipo2>python|texto|word|excel|markdown|json|csv|html|javascript)\s+)?"
-
 
 
 # ---- Avanzado ----
@@ -1433,23 +1266,9 @@ def _cerrar_todo(m) -> str:
     return confirmaciones.pedir("cerrar todos los programas", sistema.cerrar_todo)
 
 
-# =========================================================================
-# TABLA DE INTENTS
-# =========================================================================
-# El orden importa muchisimo: lo mas especifico va primero. Por ejemplo,
-# "busca el archivo X" tiene que ir ANTES que "busca X", o toda busqueda de
-# archivo terminaria abriendo el navegador.
-
-# Formas de introducir el CONTENIDO de un mensaje. La lista es larga porque
-# aqui cada variante que falte no degrada la orden: la manda entera al bloque
-# de archivos, que interpreta "manda un mensaje a familia" como mover un
-# fichero llamado "un mensaje" a una carpeta llamada "familia".
 CONECTOR_TEXTO = r"(?:que|qu[eé]\s+diga|dici[eé]ndole(?:\s+que)?|diciendo(?:\s+que)?|escribiendo(?:\s+que)?|escr[ií]bele(?:\s+que)?|con\s+el\s+texto|con\s+el\s+mensaje|el\s+texto|para\s+decirle(?:\s+que)?|av[ií]sale(?:\s+que)?|:)"
 
 
-# Prefijo para los informes del equipo. Sin el, hablar de un producto por su
-# nombre disparaba el informe del componente propio: "compara rtx 3050 y rtx
-# 4060" contestaba con la temperatura de TU grafica.
 SOBRE_MI_EQUIPO = (
     r"^(?!.*\b(?:compara|comparativa|comparar|precios?|cu[aá]nto\s+cuesta|"
     r"cu[aá]l\s+es\s+mejor|mejor\s+opci[oó]n|recomiendas|investiga|"
@@ -1458,25 +1277,12 @@ SOBRE_MI_EQUIPO = (
 
 
 INTENTS: list[tuple[re.Pattern, callable]] = [
-    # ------------------------------------------------------------------
-    # ORDENES VACIAS  (lo primero de todo)
-    # ------------------------------------------------------------------
-    # Un "no" suelto no es una orden. Antes iba al modelo, y el modelo de 3B
-    # se sentia obligado a llamar a alguna herramienta: contesto un "no" con
-    # cambiar_modo("normal"). Cortarlo aqui cuesta un microsegundo y evita
-    # que Jarvis toque el equipo por un monosilabo.
     (
         re.compile(r"^\s*(?:no|s[ií]|ok|okay|vale|bueno|claro|eso|ese|esa|"
                    r"aja|ah[aá]|mmm|este|pues|ya|nada|que|c[oó]mo|eh)\s*$", _F),
         _pide_concrecion,
     ),
 
-    # ------------------------------------------------------------------
-    # FOCO DE SESION  (pronombres: dependen del turno anterior)
-    # ------------------------------------------------------------------
-    # Van pronto a proposito. "cierralo" no encaja en ningun patron de app
-    # porque no nombra ninguna, asi que sin esto acababa en el modelo: seis
-    # segundos y medio para resolver algo que esta en una variable.
     (
         re.compile(r"^\s*(?:ci[eé]rr(?:a|e)(?:lo|la|los|las|melo)?|"
                    r"c[eé]rrame\s+(?:eso|ese|esa)|"
@@ -1499,14 +1305,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
                    r"quint[oa]|[uú]ltim[oa]|[1-5])\s*$", _F),
         _foco_ordinal,
     ),
-
-    # ------------------------------------------------------------------
-    # SELECCION DE ARCHIVOS
-    # ------------------------------------------------------------------
-    # Va ANTES del bloque de archivos: comparte los verbos "mueve", "entra"
-    # y "selecciona", pero aqui operan sobre un conjunto ya elegido, no sobre
-    # un archivo con nombre. Si fuera despues, "muevelos a documentos"
-    # buscaria un archivo llamado "los".
 
     # "entra a descargas", "metete en la carpeta parciales"
     (
@@ -1551,9 +1349,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
     (
         re.compile(r"\bqu[eé]\s+(?:tengo|hay|tienes)\s+(?:seleccionad[oa]s?|cogid[oa]s?|marcad[oa]s?)\b|"
                    r"\bcu[aá]ntos\s+(?:tengo\s+)?seleccionad[oa]s?\b|"
-                   # Solo "la seleccion" a secas. Antes bastaba con que la
-                   # frase TERMINARA asi, y se llevaba por delante "en que
-                   # archivo esta la seleccion", que pregunta por el codigo.
                    r"^\s*(?:la\s+)?selecci[oó]n\s*$", _F),
         _sel_que_hay,
     ),
@@ -1611,17 +1406,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _clic_intencion,
     ),
 
-    # ------------------------------------------------------------------
-    # ORDENES QUE SE ENTENDIAN AL REVES
-    # ------------------------------------------------------------------
-    # Todas estas salieron del registro del 22 de agosto. En los ocho casos
-    # el patron que se las quedaba era demasiado generico y hacia algo
-    # distinto de lo pedido, que es peor que no entender: no entender se
-    # nota y se repite; hacer otra cosa parece que funciono.
-    #
-    # Van aqui arriba porque compiten contra bloques muy golosos: "busca",
-    # "memoria", "apaga" y "abre" estan cada uno en tres sitios.
-
     # "apaga el modo voz baja" intentaba cerrar un programa con ese nombre.
     # Cualquier "modo X" desconocido se contesta enumerando los que hay.
     (
@@ -1648,10 +1432,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _archivos_grandes,
     ),
 
-    # "busca tame impala en spotify" buscaba en Google. Y "abre spotify y
-    # busca tame impala" abria Spotify y buscaba en Google, que es peor.
-    # El manejador devuelve None si la app no tiene buscador propio, y
-    # entonces esto cae solo a la busqueda web de mas abajo.
     (
         re.compile(rf"\b{V_BUSCAR}(?:me)?\s+(?P<consulta>.+?)\s+en\s+"
                    r"(?:el\s+|la\s+|mi\s+)?(?P<app>spotify|spoti|espotifai|obsidian|"
@@ -1668,9 +1448,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _buscar_en_app,
     ),
 
-    # "abre 1 pestaña y entra a claude" -> Alexa lo oye "cloud". Antes se
-    # tragaba la frase entera como nombre de programa y contestaba
-    # "Abriendo un pestaña y entra a cloud" sin abrir nada.
     (
         re.compile(rf"\b{V_ABRIR}\s+(?:una?\s+|1\s+)?(?:pesta[nñ]a|ventana|tab|p[aá]gina)"
                    r"(?:\s+nueva)?\s*(?:en\s+(?:el\s+)?"
@@ -1689,9 +1466,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _pide_concrecion,
     ),
 
-    # ------------------------------------------------------------------
-    # MEMORIA SEMANTICA, ARCHIVAR Y PLANIFICAR
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:indexa|reindexa|actualiza|rehaz)\s+"
                    r"(?:(?:la|el|mi|mis|toda\s+la|todo\s+el)\s+)?"
@@ -1700,19 +1474,12 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _memoria_indexar,
     ),
 
-    # El codigo del propio proyecto. Va antes que la busqueda en la boveda
-    # porque comparte los verbos "busca" y "donde esta", y aqui la palabra
-    # que decide es "codigo" o "proyecto".
     (
         re.compile(r"\b(?:indexa|indexe|relee|actualiza|rastrea)\s+"
                    r"(?:el\s+|tu\s+|mi\s+)?(?:c[oó]digo|proyecto|repositorio|repo)\b", _F),
         _codigo_indexar,
     ),
     (
-        # "donde esta X" a secas se queda FUERA a proposito: es demasiado
-        # ambiguo y se llevaba por delante "donde esta el contexto", que
-        # pregunta por un archivo de configuracion, no por el codigo. Tiene
-        # que haber una señal explicita de que hablas del proyecto.
         re.compile(r"\b(?:en\s+)?qu[eé]\s+archivo\s+(?:est[aá]|tiene|hace|maneja|vive)\s+"
                    r"(?P<q>.+?)\s*$|"
                    r"\b(?:busca|buscame)\s+en\s+(?:el\s+|tu\s+|mi\s+)?"
@@ -1761,18 +1528,12 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _aprendizaje_resumen,
     ),
 
-    # ------------------------------------------------------------------
-    # MODOS  (frases cortas y muy usadas: van primero de todo)
-    # ------------------------------------------------------------------
     (re.compile(r"\b(?:sal(?:ir|te|ga)?|quita|quite|desactiva|desactive|termina|termine)\s+(?:de(?:l)?\s+)?(?:el\s+)?(?:modo\s+)?(?:juego|gaming|dedicado)\b", _F), _modo_normal),
     (re.compile(rf"\bmodo\s+(?:de\s+)?gaming\b|\bmodo\s+juego\b|\b{V_ACTIVAR}\s+(?:el\s+)?juego\b|\bme\s+voy\s+a\s+jugar\b|\bvoy\s+a\s+jugar\b", _F), _modo_gaming),
     (re.compile(r"\bmodo\s+dedicado\b|\bmodo\s+(?:avanzado|potente|pro|inteligente)\b|\bmodelo\s+grande\b|\busa\s+la\s+gr[aá]fica\b|\bmodo\s+razonamiento\b", _F), _modo_dedicado),
     (re.compile(r"\bmodo\s+normal\b|\bmodo\s+(?:b[aá]sico|ligero|est[aá]ndar|r[aá]pido)\b|\bvuelve\s+a\s+la\s+normalidad\b", _F), _modo_normal),
     (re.compile(r"\b(?:en\s+)?qu[eé]\s+modo\s+est[aá]s\b|\bcu[aá]l\s+es\s+tu\s+modo\b|\bmodo\s+actual\b|\bqu[eé]\s+modo\s+tienes\b", _F), _que_modo),
 
-    # ------------------------------------------------------------------
-    # METRICAS DEL SISTEMA
-    # ------------------------------------------------------------------
     (re.compile(r"\b(?:estado|resumen|c[oó]mo\s+est[aá]|c[oó]mo\s+va)\s+(?:general\s+)?(?:del?\s+)?(?:equipo|sistema|pc|computador(?:a)?|m[aá]quina|todo)\b", _F), _estado),
     (re.compile(SOBRE_MI_EQUIPO + r"\b(?:cpu|procesador|micro)\b", _F), _cpu),
     (re.compile(SOBRE_MI_EQUIPO + r"\b(?:ram|memoria)\b", _F), _ram),
@@ -1781,9 +1542,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
     (re.compile(r"\bqu[eé]\s+(?:programa|app|aplicaci[oó]n|proceso)s?\s+(?:est[aá]n?\s+)?(?:consum|gast|us|ocup)\w*|\bprocesos\s+pesados\b|\bqu[eé]\s+est[aá]\s+consumiendo\b|\bqu[eé]\s+consume\s+m[aá]s\b|\best[aá]\s+consumiendo\b|\bconsumiendo\s+m[aá]s\b|\bconsume\s+m[aá]s\s+(?:recursos|memoria|cpu)\b|\bque\s+hay\s+abierto\b", _F), _procesos),
     (re.compile(r"\bbater[ií]a\b", _F), _bateria),
 
-    # ------------------------------------------------------------------
-    # OBSIDIAN  (antes que archivos: "apunta" y "nota" son suyos)
-    # ------------------------------------------------------------------
     (
         re.compile(
             r"\b(?:apunta|apunte|anota|anote|apuntame|guarda)\s+(?:en\s+(?:el\s+)?(?:diario|obsidian)\s+)?"
@@ -1812,9 +1570,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
     ),
     (re.compile(r"\b(?:mi\s+)?(?:vault|b[oó]veda)\b|\bestado\s+de\s+obsidian\b|\bcu[aá]ntas\s+notas\s+tengo\b", _F), _obs_estado),
 
-    # ------------------------------------------------------------------
-    # BUSQUEDA PROFUNDA Y EXPLORACION
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:busca|busque|encuentra|encuentre)\s+(?P<texto>.+?)\s+(?:dentro\s+de|en\s+el\s+contenido\s+de)\s+(?:los\s+)?archivos\b|\bqu[eé]\s+archivo\s+(?:contiene|tiene|menciona)\s+(?P<texto2>.+)$", _F),
         lambda m: avanzado.buscar_en_contenido((m.groupdict().get("texto") or m.groupdict().get("texto2") or "").strip()),
@@ -1832,9 +1587,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _recientes,
     ),
 
-    # ------------------------------------------------------------------
-    # EQUIPO E INFORME
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:informe|reporte)\s+(?:completo|detallado|avanzado|del\s+equipo|del\s+sistema)\b|\b(?:guarda|guarde|genera|genere)\s+(?:un\s+)?(?:informe|reporte)\b", _F),
         _informe,
@@ -1844,9 +1596,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _info_equipo,
     ),
 
-    # ------------------------------------------------------------------
-    # CONTEXTO PERSONAL
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:recuerda|recuerde|ten\s+en\s+cuenta|apunta\s+en\s+tu\s+contexto)\s+(?:que\s+)?(?P<dato>.+)$", _F),
         _recordar,
@@ -1862,17 +1611,11 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
     ),
     (re.compile(r"\bd[oó]nde\s+est[aá]\s+(?:tu\s+|el\s+|mi\s+)?(?:archivo\s+de\s+)?contexto\b|\b(?:tu|el|mi)\s+contexto\b|\bqu[eé]\s+sabes\s+de\s+m[ií]\b|\barchivo\s+de\s+contexto\b", _F), _donde_contexto),
 
-    # ------------------------------------------------------------------
-    # CERRAR TODO  (antes de las apps, o "todo" se toma por un programa)
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:cierra|cierre|cerrar)\s+(?:todo|todos|todas)(?:\s+(?:las\s+ventanas|los\s+programas|las\s+aplicaciones|las\s+apps))?\s*$", _F),
         _cerrar_todo,
     ),
 
-    # ------------------------------------------------------------------
-    # ELIMINAR VARIOS
-    # ------------------------------------------------------------------
     (
         re.compile(
             r"\b(?:elimina|elimine|borra|borre|quita|quite)\s+(?:tod[ao]s\s+)?(?:l[ao]s\s+)?(?:\d+\s+)?"
@@ -1896,9 +1639,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _wa_texto_pendiente,
     ),
 
-    # ------------------------------------------------------------------
-    # CATALOGO DE APLICACIONES
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:actualiza|refresca|rehaz|vuelve\s+a\s+buscar|escanea)\s+"
                    r"(?:la\s+lista\s+de\s+|el\s+cat[aá]logo\s+de\s+)?"
@@ -1919,12 +1659,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _catalogo_tengo,
     ),
 
-    # ------------------------------------------------------------------
-    # ESTUDIO E INVESTIGACION
-    # ------------------------------------------------------------------
-    # Van pronto porque usan "busca", "explica" y "dime", que otros bloques
-    # tambien reclaman. Aqui se distinguen por lo que las acompaña: un examen,
-    # una comparacion, o las notas propias.
     (
         re.compile(r"\btengo\s+(?:un\s+)?(?:parcial|examen|prueba|quiz|final)\s+"
                    r"(?:el\s+|este\s+|la\s+)?(?P<cuando>lunes|martes|mi[eé]rcoles|"
@@ -1996,12 +1730,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _investigar,
     ),
 
-    # ------------------------------------------------------------------
-    # MENSAJES  (whatsapp y correo saliente)
-    # ------------------------------------------------------------------
-    # Van muy arriba porque llevan "manda", "escribe" y "dile", verbos que
-    # otros bloques tambien usan. Y porque son las unicas ordenes que salen
-    # del equipo: mas vale que las reclame quien las entiende del todo.
     (
         re.compile(r"\b(?:manda|mandale|env[ií]a|env[ií]ale|escr[ií]bele|dile|"
                    r"m[aá]ndale)\s+(?:un\s+)?(?:mensaje|whats?app|wasap|whatsapp)?\s*"
@@ -2053,10 +1781,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _correo_responder,
     ),
 
-    # ------------------------------------------------------------------
-    # ARCHIVOS - CREAR
-    # ------------------------------------------------------------------
-    # Sin nombre: Alexa fusiona el sustantivo con la extension ("archivo.py").
     (
         re.compile(
             rf"\b{V_CREAR}\s+{ART}(?P<nombre>[\w\-]+\.[a-zA-Z0-9]{{1,5}}){EN_CARPETA}{CONTENIDO}{COLA}",
@@ -2093,9 +1817,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _crear_carpeta,
     ),
 
-    # ------------------------------------------------------------------
-    # ARCHIVOS - EDITAR
-    # ------------------------------------------------------------------
     (
         re.compile(
             rf"\b{V_REEMPLAZAR}\s+(?P<buscar>.+?)\s+(?:por|con)\s+(?P<reemplazar>.+?)\s+"
@@ -2121,9 +1842,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _editar_agregar,
     ),
 
-    # ------------------------------------------------------------------
-    # ARCHIVOS - LEER, MOVER, COPIAR, ELIMINAR, LISTAR, BUSCAR
-    # ------------------------------------------------------------------
     (
         re.compile(rf"\b{V_LEER}\s+(?:el\s+)?(?:contenido\s+del?\s+)?{SUST_ARCHIVO}\s+(?P<nombre>.+)$", _F),
         _leer_archivo,
@@ -2165,9 +1883,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _buscar_archivo,
     ),
 
-    # ------------------------------------------------------------------
-    # CLIC ESPACIAL  (antes que el clic normal: es mas especifico)
-    # ------------------------------------------------------------------
     (
         # "haz clic en el archivo debajo del mensaje del profe Andres"
         re.compile(r"(?:clic|click|clik|pincha|pulsa|presiona)\s+"
@@ -2178,9 +1893,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _clic_relativo,
     ),
 
-    # ------------------------------------------------------------------
-    # VENTANAS
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:cambia|cambiar|ve|vete|pasa|salta|mu[eé]strame|tr[aá]eme)\s+"
                    r"(?:a\s+|al\s+|a\s+la\s+)?(?:ventana\s+(?:de\s+)?)?"
@@ -2204,9 +1916,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _ventana_maximizar,
     ),
 
-    # ------------------------------------------------------------------
-    # RENDIMIENTO Y JUEGOS
-    # ------------------------------------------------------------------
     (
         re.compile(r"\bpor\s+qu[eé]\s+(?:tengo\s+)?(?:lag|lagea|va\s+lento|"
                    r"se\s+traba|tironea|baja\s+(?:el\s+)?fps)\b|"
@@ -2238,9 +1947,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _abrir_juego,
     ),
 
-    # ------------------------------------------------------------------
-    # ALMACENAMIENTO
-    # ------------------------------------------------------------------
     (
         re.compile(r"\bqu[eé]\s+(?:archivos?\s+)?puedo\s+(?:borrar|eliminar)\b|"
                    r"\barchivos?\s+(?:que\s+no\s+(?:uso|he\s+usado)|olvidados?|"
@@ -2250,9 +1956,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _archivos_olvidados,
     ),
 
-    # ------------------------------------------------------------------
-    # CORREO  (Outlook en local)
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:tengo|hay)\s+(?:correos?|mails?|emails?|mensajes)\s+"
                    r"(?:sin\s+leer|nuevos?|pendientes)\b|"
@@ -2285,9 +1988,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _correo_uno,
     ),
 
-    # ------------------------------------------------------------------
-    # PANTALLA
-    # ------------------------------------------------------------------
     (
         # Va antes que "leer": si no, "lee la pantalla" acabaria buscando un
         # archivo llamado "la pantalla".
@@ -2300,10 +2000,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
     (
         re.compile(r"\b(?:haz|hazme|hazle|da|dale|le|dar)?\s*(?:un\s+)?"
                    r"(?:clic|click|clik|cliquea)\s+"
-                   # "le click DONDE DICE equipos" no encajaba: el conector no
-                   # estaba en la lista y la frase acababa en el modelo, que
-                   # se puso a explorar carpetas. Es la forma mas natural de
-                   # senalar algo que se ve en pantalla, asi que entra aqui.
                    r"(?:en|sobre|a|al|a\s+la|encima\s+de|"
                    r"donde\s+(?:dice|pone|est[aá]|aparece|sale|se\s+lee)|"
                    r"en\s+donde\s+dice|"
@@ -2328,9 +2024,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _pantalla_describir,
     ),
 
-    # ------------------------------------------------------------------
-    # TEAMS
-    # ------------------------------------------------------------------
     (
         re.compile(r"\b(?:actividad|notificaciones)\s+(?:de\s+|en\s+)?teams\b|"
                    r"\bteams\s+(?:actividad|notificaciones)\b|"
@@ -2357,9 +2050,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _teams_abrir,
     ),
 
-    # ------------------------------------------------------------------
-    # NAVEGADOR  (despues de los archivos, para no robarles "busca")
-    # ------------------------------------------------------------------
     (
         re.compile(rf"\b(?:reproduce|reproduzca|pon|ponga|p[oó]nme|{V_BUSCAR})\s+(?P<consulta>.+?)\s+en\s+(?:you\s*tube|yutub|yutu)\b", _F),
         _youtube,
@@ -2377,10 +2067,6 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         re.compile(rf"\b{V_ABRIR}\s+(?:la\s+)?(?:p[aá]gina|web|sitio|url)\s+(?:de\s+)?(?P<sitio>.+)$", _F),
         _abrir_sitio,
     ),
-    # "abre una pestana en comet y busca oferta y demanda".
-    # Antes esto caia en "abrir aplicacion" con el nombre "un pestana en comet
-    # y busco oferta y demanda": abria Comet en blanco y se comia la busqueda
-    # sin decir nada. Alexa ademas transcribe "y busca" como "y busco".
     (
         re.compile(
             rf"\b{V_ABRIR}\s+(?:una?\s+|1\s+)?(?:pesta[nñ]a|ventana|tab|p[aá]gina)\s+(?:nueva\s+)?"
@@ -2402,18 +2088,12 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
     ),
     (re.compile(rf"\b{V_ABRIR}\s+(?:el\s+)?(?:navegador|comet)\b\s*$", _F), _abrir_navegador),
 
-    # ------------------------------------------------------------------
-    # ENERGIA  (antes que las apps: "apaga" esta en ambos bloques)
-    # ------------------------------------------------------------------
     (re.compile(r"\bcancel(?:a|e)(?:r)?\s+el\s+(?:apagado|reinicio)\b|\bno\s+apagues\b|\bd[eé]jalo\s+encendido\b", _F), _cancelar_apagado),
     (re.compile(r"\bbloque(?:a|e)(?:r)?\s+(?:el\s+|la\s+)?(?:equipo|pc|computador(?:a)?|sesi[oó]n|pantalla)\b", _F), _bloquear),
     (re.compile(r"\bsuspend[ae](?:r)?\s+(?:el\s+)?(?:equipo|pc)\b|\bmodo\s+suspensi[oó]n\b|\bhiberna(?:r)?\b", _F), _suspender),
     (re.compile(r"\breinici(?:a|e)(?:r)?\s+(?:el\s+)?(?:equipo|pc|computador(?:a)?|sistema)\b", _F), _reiniciar),
     (re.compile(r"\bapag(?:a|ue)(?:r)?\s+(?:el\s+)?(?:equipo|pc|computador(?:a)?|sistema)(?:\s+en\s+(?P<minutos>\d+)\s+minutos?)?\b", _F), _apagar),
 
-    # ------------------------------------------------------------------
-    # TECLADO Y RATON  (antes que las apps: "pon"/"haz" se solapan)
-    # ------------------------------------------------------------------
     (
         re.compile(
             rf"\b{V_CAPTURAR}\s+{ART}captura(?:\s+de\s+(?:la\s+)?pantalla)?\b"
@@ -2469,27 +2149,14 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _escribir,
     ),
 
-    # ------------------------------------------------------------------
-    # APLICACIONES
-    # ------------------------------------------------------------------
     (re.compile(rf"\b{V_ABRIR}\s+(?:el\s+|la\s+|mi\s+)?(?:programa\s+|aplicaci[oó]n\s+|app\s+)?(?P<app>.+)$", _F), _abrir_app),
     (re.compile(rf"\b{V_CERRAR}\s+(?:el\s+|la\s+|mi\s+)?(?:programa\s+|aplicaci[oó]n\s+|app\s+)?(?P<app>.+)$", _F), _cerrar_app),
 
-    # ------------------------------------------------------------------
-    # META
-    # ------------------------------------------------------------------
     (re.compile(r"\b(?:c[oó]mo\s+(?:va|qued[oó]|vas)|qu[eé]\s+pas[oó]|resultado|ya\s+terminaste|est[aá]\s+listo|c[oó]mo\s+sali[oó])\b|^\s*(?:qued[oó]|termin[oó]|listo\s+ya|y\s+eso)\s*$", _F), _pendiente),
     (re.compile(r"\b(?:ayuda|ay[uú]dame|qu[eé]\s+puedes\s+hacer|qu[eé]\s+sabes\s+hacer|opciones|qu[eé]\s+comandos)\b", _F), _ayuda),
 ]
 
 
-# =========================================================================
-# FIN DE SESIÓN
-# =========================================================================
-# Con la sesión continua activada, Alexa deja el micrófono abierto tras cada
-# orden. Estas frases son la forma de devolvérselo: mientras la sesión de la
-# skill está abierta, Alexa NO atiende sus propios servicios ("pon música",
-# "qué tiempo hace"), así que hace falta una salida explícita y natural.
 _PATRON_DESPEDIDA = re.compile(
     r"^\s*(?:"
     r"pausa|pausate|para|parate|detente|det[eé]nte|descansa|desc[aá]nsate|"
@@ -2512,21 +2179,10 @@ def es_despedida(texto: str) -> bool:
     return bool(_PATRON_DESPEDIDA.match(sin_acentos(limpio)))
 
 
-# =========================================================================
-# ROUTER
-# =========================================================================
 def enrutar(texto: str):
-    """
-    Intenta resolver el comando sin usar el LLM.
-
-    Devuelve la respuesta hablada, o None si ningún patrón coincide
-    (en cuyo caso el servidor lo delega a Ollama).
-    """
+    """Intenta resolver el comando sin usar el LLM."""
     foco.envejecer()
 
-    # Lo primero de todo: si hay algo esperando un si o un no, esta frase es
-    # la respuesta. Tiene que mirarse antes que cualquier patron, porque
-    # "vale" y "ok" tambien encajan en el patron de ordenes vacias.
     decision = confirmaciones.resolver(texto or "")
     if decision is not None:
         return decision
@@ -2569,13 +2225,7 @@ def enrutar(texto: str):
 
 
 class _Coincidencia:
-    """
-    Envoltorio del match que devuelve los grupos con sus acentos originales.
-
-    El regex corre sobre el texto sin acentos (para que 'código' y 'codigo'
-    coincidan igual), pero el contenido que se guarda en los archivos debe
-    conservar las tildes.
-    """
+    """Envoltorio del match que devuelve los grupos con sus acentos originales."""
 
     def __init__(self, coincidencia, grupos, texto_original):
         self._coincidencia = coincidencia

@@ -1,13 +1,7 @@
-"""
-Prueba de TOLERANCIA AL FRASEO.
+"""Pruebas de tolerancia al fraseo.
 
-test_router.py comprueba que cada frase acabe en el comando correcto.
-Este archivo comprueba algo distinto y complementario: que la MISMA orden se
-entienda dicha de muchas formas, para que no haya que memorizar una formula.
-
-Cada grupo son variantes que deben resolverse todas localmente, sin tocar el
-modelo. Si añades una forma nueva de decir algo, añádela aquí primero: la
-prueba fallará, y eso te dice exactamente qué patrón ampliar.
+La misma orden dicha de muchas formas distintas tiene que llegar al mismo
+sitio, porque Alexa transcribe regular y nadie habla siempre igual.
 
 Ejecutar:  py test_frases.py
 """
@@ -17,9 +11,6 @@ from types import SimpleNamespace
 
 import nlu
 
-# -------------------------------------------------------------------------
-# Dobles: solo nos interesa QUE se enrute, no lo que devuelva la herramienta.
-# -------------------------------------------------------------------------
 _llamadas: list[str] = []
 
 
@@ -53,9 +44,6 @@ for _mod, _nombres in {
     setattr(nlu, _mod, SimpleNamespace(**{n: _doble(n) for n in _nombres}))
 
 
-# -------------------------------------------------------------------------
-# Grupos de variantes. Todas las de un grupo significan lo mismo.
-# -------------------------------------------------------------------------
 GRUPOS: dict[str, list[str]] = {
     "Crear archivo": [
         "crea un archivo llamado prueba punto py con el codigo print hola",

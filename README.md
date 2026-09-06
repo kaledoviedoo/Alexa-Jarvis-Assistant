@@ -1,164 +1,141 @@
 # Jarvis
 
-Un asistente de voz que corre entero en mi PC y se maneja hablándole a un Echo.
+![estado](https://img.shields.io/badge/estado-en%20uso%20diario-success)
+![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![fastapi](https://img.shields.io/badge/FastAPI-0.110-009688)
+![ollama](https://img.shields.io/badge/Ollama-local-black)
+![alexa](https://img.shields.io/badge/Alexa-Custom%20Skill-00CAFF)
+![licencia](https://img.shields.io/badge/uso-personal-lightgrey)
 
-Alexa pone el micrófono y el altavoz. Todo lo demás —entender la orden,
-decidir qué hacer, abrir programas, leer la pantalla, escribir en WhatsApp,
-buscar en mis notas— pasa en una RTX 3050 de 6 GB dentro de mi casa. Ninguna
-frase que digo sale hacia un modelo en la nube.
+Asistente de voz que corre entero en mi PC y se maneja hablándole a un Echo. Alexa
+pone el micrófono; entender la orden, decidir y ejecutar pasa en una RTX 3050 dentro
+de mi casa, sin que ninguna frase salga hacia un modelo en la nube.
+
+## Demo
 
 ```
-Echo  ──▶  Amazon  ──▶  túnel  ──▶  FastAPI  ──▶  router  ──▶  herramientas
-                                        │            │              (43)
-                                        │            └── ¿no encaja?
-                                        │                    ▼
-                                        └────────────── Ollama (local)
+Echo ──▶ Amazon ──▶ túnel ──▶ FastAPI ──▶ router regex ──▶ herramientas (29)
+                                  │            │
+                                  │            ├── ¿no encaja? ──▶ capa semántica
+                                  │            │                        │
+                                  │            └────────────────────────┴──▶ Ollama
+                                  │                                          (local)
+                                  └── > 6.5 s ──▶ hilo de fondo + "lo estoy procesando"
 ```
 
-## El problema que manda sobre todo lo demás
-
-**Alexa corta a los ocho segundos.** No es una recomendación: si el servidor
-no ha contestado, la sesión se cae con un error genérico y el usuario oye
-"la skill solicitada no respondió correctamente".
-
-Ocho segundos no dan para que un modelo de 7B lea la orden, decida, ejecute y
-redacte. Así que el sistema está construido alrededor de esa restricción:
-
-**1. Un router determinista se come el 90% de las órdenes.**
-`nlu.py` son ~2.400 líneas de expresiones regulares ordenadas por
-especificidad. "cierra spotify" no necesita un modelo de lenguaje: necesita
-una regex y una llamada a `psutil`. Resuelve en **menos de 1 ms** y el modelo
-ni se entera. El orden de los bloques importa enormemente y está documentado
-patrón a patrón, porque un patrón genérico colocado demasiado arriba se come
-las órdenes de tres bloques que van debajo.
-
-**2. Lo que sí llega al modelo tiene presupuesto.**
-`PRESUPUESTO_SEGUNDOS = 6.5`, y lo que gastó el router se resta del que le
-queda al modelo. Se propaga por `threading.local()`.
-
-**3. Lo que no cabe en el presupuesto no se pierde: se muda al fondo.**
-Si el modelo no termina a tiempo, Alexa dice "lo estoy procesando" y el
-trabajo sigue en un hilo. El resultado queda guardado y se recoge después con
-"¿cómo quedó lo último?". Ninguna orden se cae por un *timeout*.
-
-## Lo que se aprendió a base de romperlo
-
-Cada uno de estos salió de leer registros de uso real, no de imaginar casos.
-
-**El `async def` que congelaba el servidor.** Los endpoints eran `async` y
-dentro llamaban a código bloqueante. Eso no bloquea "esa petición": bloquea el
-bucle de eventos entero de uvicorn, así que una orden lenta congelaba todas
-las demás. Una de cada tres peticiones moría. Con `asyncio.to_thread` bajó a
-una de cada trece. La prueba de regresión mide **reloj de pared** —no la
-duración de la petición rápida, que es justo el error que cometí las dos
-primeras veces que intenté escribirla.
-
-**MagicDNS haciendo inútil el "mantener caliente".** Había un ping cada 90
-segundos para que el túnel no se durmiera. Nunca sirvió: MagicDNS resolvía el
-nombre `.ts.net` a la IP interna del tailnet, así que el ping iba por dentro y
-el camino público seguía frío. Ahora se resuelve por DNS-over-HTTPS y se
-calienta con TLS crudo contra la IP pública, con SNI, que es exactamente el
-camino que recorre Amazon.
-
-**Un modelo de 3B llamando a herramientas por no callarse.** Del registro,
-hablando yo solo sin dar ninguna orden: escribió texto en la ventana que
-tuviera al frente, e intentó cerrar Alexa. Un modelo pequeño, cuando no
-entiende, no se calla: llama a la que le suene. La respuesta es
-`_por_que_no()` en `ollama_client.py`: las herramientas que **tocan** el
-equipo exigen que la frase original contenga algo que de verdad las pida, y
-que sea corta —las órdenes reales son cortas e imperativas; las dos frases que
-dispararon acciones sin querer tenían 73 y 139 caracteres. Las que solo miran
-(leer, listar, estado) pasan sin nada: equivocarse ahí no cuesta nada.
-
-**Catorce funciones duplicadas en el router.** Python se queda con la última
-definición sin decir nada. Dos de ellas tenían cuerpos distintos, así que la
-versión que yo creía estar ejecutando llevaba tiempo muerta.
-
-**PowerShell 5.1 y el UTF-8.** Los `.ps1` tienen que ir en UTF-8 **con BOM** y
-sin un solo carácter no-ASCII dentro. Y al leer el log hay que pasarle
-`-Encoding UTF8` explícito, o Python escribe en UTF-8, PowerShell lee en la
-página de códigos del sistema, y en pantalla sale `Camino al tÃºnel`.
-
-## De qué está hecho
-
-| Pieza | Qué hace |
+| Dices | Pasa |
 |---|---|
-| `server.py` | FastAPI. Verifica la firma de Amazon, mide tiempos reales, responde en SSML. |
-| `nlu.py` | El router determinista. Donde se resuelve casi todo. |
-| `ollama_client.py` | *Function calling* con presupuesto, saneado de respuestas y el freno de mano. |
-| `voz.py` | Cómo suena: vocativo al principio, y SSML para que "GitHub" no se lea "guitub". |
-| `security.py` | Firma de Amazon, ventana de tiempo, ID de skill. |
-| `modes.py` | Tres perfiles de modelo según lo que esté haciendo la GPU. |
-| `tools/` | 22 módulos: archivos, pantalla, WhatsApp, correo, memoria semántica, catálogo de apps… |
+| `abre spotify y busca tame impala` | Abre Spotify y escribe en SU buscador, no en Google |
+| `manda un mensaje a familia que llego en 10` | Escribe en WhatsApp Web y confirma el chat antes de enviar |
+| `selecciona todos los pdf` → `archívalos en la bóveda` | Los reparte por Obsidian razonando carpeta por carpeta |
+| `qué archivo tiene más memoria` | Los archivos que más ocupan (no el uso de RAM) |
+| `juega valorant` | Abre el lanzador y le da a JUGAR leyendo la pantalla |
 
-**43 herramientas** expuestas al modelo, **150 pruebas de enrutado** y **195
-de tolerancia al fraseo**, todas ejecutables sin tocar el equipo: las
-herramientas reales se sustituyen por dobles que solo registran qué se llamó.
+## Stack
 
-## Detalles que tienen su gracia
+| Capa | Herramienta |
+|---|---|
+| Voz | Alexa Custom Skill (SSML, es-MX) |
+| Backend | Python 3.10+, FastAPI, uvicorn |
+| Modelos | Ollama local: `llama3.2:3b`, `qwen2.5:7b`, `nomic-embed-text` |
+| Visión | Tesseract OCR + mss |
+| Automatización | pyautogui, pygetwindow, psutil, pywin32 |
+| Red | Tailscale Funnel (o ngrok) |
+| Datos | JSON en disco, sin base de datos |
 
-**Alexa transcribe fatal los nombres propios.** "Comet" llega como *cometa*,
-*comer*, *covid*, *comed*, *cornet* y *comic*. Hay una tabla de alias por eso.
-Sin ella, "cierra comet" buscaba un proceso llamado `cometa.exe` y contestaba
-alegremente que no estaba abierto: peor que fallar, porque miente.
+## Features
 
-**Abrir una aplicación tiene seis intentos.** Ruta fijada a mano → catálogo de
-lo instalado de verdad (rastreando menú Inicio, registro y Store) → protocolos
-conocidos → lo más parecido del catálogo, razonando → **el buscador de
-Windows** (tecla Windows, escribir, Enter, que es lo que harías tú) → y solo
-entonces se rinde, proponiendo alternativas.
+- **Router determinista** de ~2.200 líneas de regex que resuelve el 90% de las órdenes en menos de 1 ms, sin tocar el modelo.
+- **Capa semántica** entre el router y el modelo: si no dices la palabra exacta, traduce por significado (~30 ms) en vez de gastar segundos de LLM.
+- **Presupuesto de tiempo**: lo que no cabe en los 8 s de Alexa se muda a un hilo y se recoge después con "cómo quedó lo último".
+- **Memoria semántica** de la bóveda de Obsidian y del propio código (troceado por definiciones vía AST).
+- **Visión**: lee la pantalla y pulsa por función, no por nombre (JUGAR en Epic, PLAY en Steam).
+- **Integraciones**: WhatsApp Web, Outlook (COM local), Teams, Obsidian, Epic/Steam.
+- **Freno de acciones**: las herramientas que tocan el equipo exigen que la frase original de verdad las pidiera.
+- **Seguridad**: firma de Amazon verificada, escrituras confinadas a tres carpetas, nada se borra de verdad, confirmación en dos turnos para lo irreversible.
+- **175 pruebas de enrutado + 195 de fraseo**, ejecutables sin tocar el equipo.
 
-**Se pincha por función, no por nombre.** El botón de jugar pone JUGAR en
-Epic, PLAY en Steam e INICIAR en otros. `INTENCIONES` en `tools/pantalla.py`
-guarda las palabras candidatas de cada función ordenadas por fiabilidad, y se
-pincha la primera que el OCR encuentre de verdad en pantalla. Si no encuentra
-ninguna, no pincha: dice lo que sí está leyendo.
+## Getting Started
 
-**Nada se borra.** "Elimina" mueve a `~/.jarvis/papelera`. El teclado es lista
-blanca y no hay clics a coordenadas ciegas: solo se pincha donde el OCR ha
-leído un texto de verdad.
-
-## Montarlo
-
-Hace falta Windows, [Ollama](https://ollama.com) y una cuenta de desarrollador
-de Alexa (gratis).
+Requisitos: Windows 10/11, Python 3.10+, [Ollama](https://ollama.com) y una cuenta
+de desarrollador de Alexa (gratis).
 
 ```powershell
-git clone <este-repo> jarvis
+git clone https://github.com/kaledoviedoo/Alexa-Jarvis-Assistant.git jarvis
 cd jarvis
-Copy-Item .env.example .env        # y rellena ALEXA_SKILL_ID
-Copy-Item contexto.ejemplo.md contexto.md
+
 py -m pip install -r requirements.txt
 ollama pull llama3.2:3b
+ollama pull nomic-embed-text
 
-.\scripts\configurar_tailscale.ps1   # o configurar_ngrok.ps1
+Copy-Item .env.example .env
+Copy-Item contexto.ejemplo.md contexto.md
+```
+
+Rellena `ALEXA_SKILL_ID` en el `.env`, y luego:
+
+```powershell
+.\scripts\configurar_tailscale.ps1
 .\scripts\instalar_autoarranque.ps1
 .\reiniciar_jarvis.ps1
 ```
 
-En la consola de Alexa, pega `alexa/interaction_model.json` en el editor JSON
-y apunta el endpoint a tu túnel. Los detalles largos están en `LEEME.md`.
+En la consola de Alexa: pega `alexa/interaction_model.json` en el editor JSON, dale
+a *Build Model* y apunta el endpoint a tu túnel.
 
-## Seguridad
+## Uso
 
-Es un servidor con acceso a mis archivos, expuesto a internet para que Amazon
-pueda alcanzarlo. Lo que lo sostiene:
+```
+Alexa, abre mi asistente
+```
 
-- Verificación criptográfica de la firma de Amazon (`JARVIS_VERIFICAR_FIRMA=true`,
-  y el arranque avisa a gritos si está apagada).
-- Comprobación del ID de la skill: una petición bien firmada pero de otra
-  skill se rechaza igual.
-- Ventana de tiempo, contra reenvíos de una petición capturada.
-- Escrituras limitadas a Escritorio, Descargas y Documentos. `resolver_ruta`
-  rechaza `..`, letras de unidad y separadores codificados **antes** de tocar
-  el disco, y comprueba igual en Windows que en Linux.
-- Las órdenes sin vuelta atrás (apagar, borrar en lote) piden confirmación en
-  un segundo turno.
+La sesión se queda abierta: puedes encadenar órdenes sin repetir la invocación, y
+cerrarla con "pausa".
 
-`.env` nunca se sube: lleva el ID de la skill y el dominio del túnel, que
-juntos son las llaves de la casa.
+```
+cómo está el cpu
+entra a descargas
+selecciona los 3 primeros
+archívalos en la bóveda
+qué archivo maneja whatsapp
+```
 
----
+Y contra el servidor directamente:
 
-Proyecto personal. El asistente es local a propósito: el precio de que sea mío
-es que tengo que resolver yo los ocho segundos.
+```powershell
+curl http://localhost:8000/salud     # sello del código, modo, GPU, Ollama
+.\scripts\diagnostico.ps1            # revisa túnel, puertos y dependencias
+py test_router.py                    # 175 casos de enrutado
+```
+
+## Estructura
+
+```
+jarvis/
+├── server.py              FastAPI: firma, tiempos, SSML
+├── nlu.py                 Router determinista (el 90% de las órdenes)
+├── ollama_client.py       Function calling, presupuesto y freno de acciones
+├── security.py            Verificación de la firma de Amazon
+├── modes.py               Perfiles de modelo según la GPU
+├── voz.py                 Vocativo y pronunciación (SSML)
+├── config.py              .env, rutas y límites de seguridad
+├── tools/                 23 módulos de capacidades
+│   ├── archivos.py        Crear, leer, mover (sandbox de rutas)
+│   ├── seleccion.py       Coger varios archivos por voz
+│   ├── memoria.py         Vectores de la bóveda y del código
+│   ├── intencion.py       Capa semántica sobre el router
+│   ├── pantalla.py        OCR y clic por función
+│   ├── whatsapp.py        WhatsApp Web con confirmación
+│   ├── archivar.py        Archivado razonado en Obsidian
+│   └── ...
+├── alexa/                 Modelo de interacción de la skill
+├── scripts/               12 scripts de instalación y diagnóstico
+└── test_*.py              370 pruebas
+```
+
+## Contacto
+
+Kaled Oviedo — Ingeniería de Sistemas
+
+- Instagram: [@kaledoviedoo](https://instagram.com/kaledoviedoo)
+- GitHub: [kaledoviedoo](https://github.com/kaledoviedoo)

@@ -1,36 +1,13 @@
-"""
-Entender lo que quisiste decir cuando no dijiste la palabra exacta.
+"""Entender la orden cuando no dijiste la palabra exacta.
 
-El router de `nlu.py` es rapidisimo y resuelve nueve de cada diez ordenes en
-menos de un milisegundo, pero es literal: reconoce "cierra spotify" y no
-reconoce "quitame el spotify de encima". Cuando ninguna expresion encaja, la
-orden se iba entera al modelo, que tarda segundos y a veces se inventa cosas.
+Se mete entre el router y el modelo. Compara el significado de tu frase con
+el de unas frases de ejemplo y, si se parece lo suficiente, la traduce a la
+version que el router SI entiende y la vuelve a pasar por el.
 
-Esto se mete justo en ese hueco. Compara el SIGNIFICADO de lo que dijiste con
-el de un puñado de frases de ejemplo, y si se parece lo suficiente, traduce
-tu frase a la version que el router SI entiende y la vuelve a pasar por el.
-
-    "quitame el spotify de encima"  ~  "cierra spotify"    -> router
-    "que tal anda la maquina"       ~  "estado del equipo" -> router
-    "cuanto le queda a la grafica"  ~  "uso de gpu"        -> router
-
-Por que traducir en vez de llamar a la herramienta directamente
----------------------------------------------------------------
-Porque asi esto NO duplica nada. No hay una segunda tabla de manejadoras que
-mantener en paralelo, ni riesgo de que las dos se desincronicen. Los ejemplos
-solo apuntan a una frase canonica; toda la logica sigue viviendo en un unico
-sitio, que es `nlu.INTENTS`. Si mañana cambia el comportamiento de "cierra X",
-cambia para los dos caminos a la vez.
-
-Lo que cuesta
--------------
-Un vector de la frase (unos 30 ms con nomic-embed-text en local) y una
-comparacion contra un centenar de vectores ya calculados, que en numpy es
-tiempo despreciable. Los ejemplos se vectorizan UNA vez y se guardan en disco.
-
-Frente a los varios segundos que cuesta el modelo, sale a cuenta. Y frente al
-milisegundo del router no compite: esto solo corre cuando el router ya ha
-dicho que no.
+Traduce en vez de llamar a la herramienta para no duplicar logica: los
+ejemplos apuntan a una frase canonica, y toda la logica sigue viviendo en
+nlu.INTENTS. Si no se parece a nada, o si dos ordenes empatan, se calla y
+deja pasar la frase al modelo.
 """
 
 import hashlib
@@ -44,34 +21,10 @@ log = logging.getLogger("jarvis.intencion")
 
 ARCHIVO = CARPETA_DATOS / "intenciones.json"
 
-# A partir de que parecido se considera que quisiste decir eso.
-#
-# Con nomic-embed-text, dos formas de pedir lo mismo suelen quedar por encima
-# de 0,80, y dos frases que no tienen nada que ver, por debajo de 0,65. El
-# umbral va alto a proposito: equivocarse aqui significa EJECUTAR algo que no
-# pediste, y eso es mucho peor que mandar la frase al modelo, que es lo que
-# pasaba antes y como mucho tarda.
 UMBRAL = 0.80
 
-# Y ademas tiene que ganar por diferencia. Si "cierra spotify" y "abre
-# spotify" empatan a 0,82, no sabemos cual quisiste: mejor que lo decida el
-# modelo, que ve la frase entera, que jugarnosla a una centesima.
 VENTAJA_MINIMA = 0.04
 
-# -------------------------------------------------------------------------
-# LOS EJEMPLOS
-# -------------------------------------------------------------------------
-# Cada entrada es:  frase canonica que el router entiende  ->  formas de
-# decir lo mismo que el router NO entiende.
-#
-# No hace falta que esten todas las variantes imaginables: para eso esta el
-# significado. Con tres o cuatro por intencion, bien distintas entre si, el
-# vector ya cubre un espacio amplio. Poner veinte parecidas no añade nada y
-# hace mas lenta la comparacion.
-#
-# Lo que SI importa es que las canonicas esten en nlu.INTENTS de verdad. Hay
-# una prueba que lo comprueba, porque una canonica que el router no reconoce
-# convierte esta capa en un agujero silencioso.
 EJEMPLOS: dict[str, list[str]] = {
     # ---- Estado del equipo ----
     "estado del equipo": [
@@ -170,16 +123,9 @@ EJEMPLOS: dict[str, list[str]] = {
         "leeme lo que hay",
     ],
 
-    # Ojo: aqui NO van las despedidas. "pausa" no la resuelve el router sino
-    # `es_despedida`, antes de llegar a esto, y ademas cerrar la sesion por
-    # parecido semantico es justo el error que mas molesta: te callas a media
-    # frase porque algo sono parecido a "dejalo".
 }
 
 
-# -------------------------------------------------------------------------
-# EL INDICE
-# -------------------------------------------------------------------------
 _indice: dict | None = None
 
 
@@ -237,16 +183,8 @@ def preparar_en_segundo_plano() -> None:
     threading.Thread(target=cargar, daemon=True, name="intenciones").start()
 
 
-# -------------------------------------------------------------------------
-# TRADUCIR
-# -------------------------------------------------------------------------
 def traducir(texto: str) -> tuple[str, float]:
-    """
-    Devuelve (frase canonica, parecido) o ("", 0.0) si no se parece a nada.
-
-    Quien llama decide que hacer con eso. Aqui no se ejecuta nada: esta capa
-    solo opina sobre que quisiste decir.
-    """
+    """Devuelve (frase canonica, parecido) o ("", 0.0) si no se parece a nada."""
     texto = (texto or "").strip()
     if len(texto) < 4:
         return "", 0.0
@@ -270,9 +208,6 @@ def traducir(texto: str) -> tuple[str, float]:
     else:
         notas = [memoria._parecido(vector, e["v"]) for e in entradas]
 
-    # La mejor de cada canonica, no las mejores en bruto: si una intencion
-    # tiene cuatro ejemplos y otra uno, la primera copaba el podio y la
-    # comprobacion de ventaja se volvia inutil.
     mejor_por_canonica: dict[str, float] = {}
     for entrada, nota in zip(entradas, notas):
         canonica = entrada["canonica"]

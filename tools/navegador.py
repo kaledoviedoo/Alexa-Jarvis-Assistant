@@ -1,8 +1,7 @@
-"""
-Herramientas de navegador, orientadas a Comet (el navegador de Perplexity).
+"""Abrir sitios y buscar en internet.
 
-Si Comet no está instalado o no se detecta, cae automáticamente al navegador
-predeterminado del sistema, así que nada se rompe.
+Usa Comet si esta instalado y el navegador por defecto si no. Los buscadores
+se configuran en el .env con un {q} que se reemplaza por la consulta.
 """
 
 import logging
@@ -49,10 +48,6 @@ def _abrir_url(url: str) -> bool:
 
     if comet:
         try:
-            # Las mismas banderas que en WhatsApp: sin ellas, al abrir Comet
-            # en frio sale la barra de "¿restaurar paginas?", se queda encima
-            # y roba el foco. Aqui importa menos que al teclear un mensaje,
-            # pero tampoco hace ninguna falta.
             from tools.whatsapp import BANDERAS_COMET
 
             if os.name == "nt":

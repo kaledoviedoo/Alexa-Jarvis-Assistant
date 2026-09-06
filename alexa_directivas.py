@@ -1,30 +1,10 @@
-"""
-Respuestas progresivas de Alexa.
+"""Respuestas progresivas de Alexa.
 
-El problema
------------
-Alexa corta a los ocho segundos. Cuando una orden llega al modelo, Jarvis
-tarda entre dos y seis segundos, y durante todo ese rato el Echo se queda
-mudo: no sabes si te oyo, si esta pensando o si se colgo. La respuesta llega
-de golpe al final, o no llega.
+Cuando una orden va a tardar, esto hace que el Echo diga algo enseguida en
+vez de quedarse mudo. Se manda a la API de Amazon con el token de la propia
+peticion, en un hilo aparte para no gastar del presupuesto.
 
-La solucion
------------
-Amazon tiene un servicio de directivas que permite hacer hablar al Echo
-MIENTRAS la peticion sigue abierta. Se manda un POST a la direccion que viene
-en la propia peticion, con el token que viene en la propia peticion, y Alexa
-dice esa frase al momento. Luego, cuando terminamos, contestamos normal.
-
-Limites reales (documentacion de Amazon)
-----------------------------------------
-- Maximo cinco progresivas por peticion.
-- NO amplian el plazo: los ocho segundos siguen contando igual. Esto compra
-  paciencia, no tiempo.
-- Una progresiva que llegue despues de la respuesta final no suena.
-- Responde 204 sin cuerpo cuando va bien.
-
-Por eso solo se usan cuando la orden va al modelo. Las que resuelve el router
-en milisegundos no necesitan que nadie las entretenga.
+No amplia los ocho segundos: solo llena el silencio mientras tanto.
 """
 
 import json
@@ -48,12 +28,7 @@ FRASES_ESPERA = [
 
 
 def datos_de_peticion(cuerpo: dict) -> dict | None:
-    """
-    Saca de la peticion de Alexa lo necesario para responder progresivamente.
-
-    Devuelve None si falta algo: en las pruebas locales y en el simulador no
-    siempre viene, y eso no debe romper nada.
-    """
+    """Saca de la peticion de Alexa lo necesario para responder progresivamente."""
     try:
         sistema = cuerpo["context"]["System"]
         destino = sistema["apiEndpoint"]
@@ -92,13 +67,7 @@ def _enviar(datos: dict, texto: str) -> None:
 
 
 def avisar_que_estamos_en_ello(datos: dict | None, texto: str | None = None) -> None:
-    """
-    Hace que Alexa diga una frase de espera sin bloquear nada.
-
-    Va en su propio hilo a proposito: si el servicio de directivas tarda o
-    falla, no puede comerse ni un milisegundo del presupuesto de la orden.
-    Un fallo aqui es cosmetico; perder la respuesta de verdad no lo es.
-    """
+    """Hace que Alexa diga una frase de espera sin bloquear nada."""
     if not datos:
         return
 

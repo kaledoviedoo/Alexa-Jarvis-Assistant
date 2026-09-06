@@ -1,22 +1,12 @@
-"""
-Jarvis — servidor FastAPI para la skill de Alexa.
+"""Servidor HTTP de la skill de Alexa.
 
-Arranque:
-    py -m uvicorn server:app --host 0.0.0.0 --port 8000
+Recibe las peticiones de Amazon, verifica que vengan firmadas, resuelve la
+orden y devuelve la respuesta en SSML. Todo lo que bloquea corre en un hilo
+aparte, porque un `async def` que llama a codigo sincrono congela el bucle
+de eventos entero y tumba tambien a las peticiones que iban bien.
 
-Endpoints:
-    GET  /jarvis      estado del servicio (para comprobar que está vivo)
-    POST /jarvis      endpoint de Alexa (verificado criptográficamente)
-    GET  /salud       diagnóstico completo: Ollama, modelos, GPU, modo
-    POST /probar      pruebas locales sin Alexa:  {"comando": "..."}
-
-Flujo de una orden
-------------------
-    Alexa -> ngrok -> POST /jarvis
-        1. Verificación de firma de Amazon           (security.py)
-        2. Router determinista, milisegundos         (nlu.py)
-        3. Si no coincide -> Ollama con presupuesto  (ollama_client.py)
-        4. Respuesta en formato Alexa
+El orden al resolver una orden es: router determinista, capa semantica, y
+solo entonces el modelo.
 """
 
 import asyncio
@@ -49,9 +39,6 @@ from config import (
 from security import ErrorVerificacion, verificar_peticion
 from tools import sistema
 
-# -------------------------------------------------------------------------
-# LOGGING
-# -------------------------------------------------------------------------
 formato = logging.Formatter(
     "%(asctime)s | %(levelname)-7s | %(name)-18s | %(message)s",
     datefmt="%H:%M:%S",
@@ -73,34 +60,11 @@ app = FastAPI(title="Jarvis", version="2.0")
 
 @app.middleware("http")
 async def medir_y_registrar(request, call_next):
-    """
-    Registra cada peticion cuando la respuesta ya esta lista para salir.
-
-    Hace falta por un motivo muy concreto. El log "Respondemos: ..." se escribe
-    cuando CONSTRUIMOS el diccionario, no cuando los bytes salen por el cable.
-    Si la respuesta se construye en 4 ms pero tarda en llegar (o no llega),
-    el registro dice que todo fue bien mientras Amazon nos da por muertos a los
-    8 segundos y manda INVALID_RESPONSE.
-    Con esto queda escrito el tiempo real de extremo a extremo, el estado HTTP
-    y de que IP vino. Si el tiempo es de milisegundos y Amazon sigue diciendo
-    que no respondimos, el problema no esta en este equipo.
-    """
+    """Registra cada peticion cuando la respuesta ya esta lista para salir."""
     inicio = time.perf_counter()
     try:
         respuesta = await call_next(request)
     except asyncio.CancelledError:
-        # ESTE es el caso que estuvo invisible mucho tiempo, y el que explica
-        # los INVALID_RESPONSE.
-        #
-        # Cuando Amazon deja de esperar, uvicorn cancela la tarea. Eso llega
-        # como CancelledError, que desde Python 3.8 hereda de BaseException y
-        # NO de Exception: el `except Exception` de abajo no la veia. Asi que
-        # en el registro quedaba el "Respondemos: ..." de la respuesta ya
-        # construida y despues nada, como si hubiera salido bien.
-        #
-        # De 218 respuestas, 37 terminaron asi. En los LaunchRequest, una de
-        # cada cinco: exactamente el "la skill solicitada no respondio
-        # correctamente" al abrir.
         ms = (time.perf_counter() - inicio) * 1000
         log.error(
             "RESPUESTA CANCELADA tras %.0f ms | %s %s | el cliente dejo de esperar. "
@@ -130,16 +94,9 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-# Sello del codigo. Sirve para una sola cosa, pero es la que mas falta hace:
-# comprobar desde fuera QUE VERSION esta corriendo de verdad. Si el proceso
-# viejo sigue vivo y agarrado al puerto, el nuevo no arranca y tu crees que si.
-# Sube este numero cada vez que cambie algo que se note desde Alexa.
 SELLO_CODIGO = "2026-08-22-semantico-30"
 
 
-# -------------------------------------------------------------------------
-# ARRANQUE
-# -------------------------------------------------------------------------
 @app.on_event("startup")
 def al_arrancar():
     log.info("=" * 62)
@@ -206,17 +163,6 @@ def al_arrancar():
     log.info("Jarvis listo y escuchando.")
 
 
-# Cuanto esperamos antes de ponernos a rastrear el equipo.
-#
-# El catalogo de aplicaciones es Python puro recorriendo el menu Inicio, el
-# registro y la Store: 1,4 segundos de CPU sostenida. Y en CPython un hilo
-# ocupado en Python no deja correr al bucle de eventos, porque no suelta el
-# GIL. Arrancandolo a la vez que el servidor, la PRIMERA peticion (que es
-# justo el "abre mi asistente") competia con eso.
-#
-# En el registro se ve el precio: de 38 LaunchRequest, 8 nunca llegaron a
-# entregarse. Uno de cada cinco. Esperar un poco no cuesta nada porque el
-# catalogo se lee de disco mientras tanto; lo que se rehace es la copia.
 SEGUNDOS_ANTES_DE_RASTREAR = 20
 
 
@@ -229,14 +175,7 @@ REINTENTO_MINUTOS = 10
 
 
 def _hay_sitio_para_trabajar() -> tuple[bool, str]:
-    """
-    ¿Se puede rastrear el equipo ahora sin estorbar?
-
-    La regla de contexto.md dice que primero va el PC. Pero escrita en un
-    archivo que lee el modelo no obliga a nada: el rastreo del catalogo y la
-    indexacion de la boveda no pasan por el modelo, los lanza el servidor.
-    Asi que la regla se comprueba aqui, que es donde de verdad se decide.
-    """
+    """¿Se puede rastrear el equipo ahora sin estorbar?"""
     try:
         if modes.modo_actual() == MODO_GAMING:
             return False, "estás en modo gaming"
@@ -257,16 +196,7 @@ def _hay_sitio_para_trabajar() -> tuple[bool, str]:
 
 
 def _programar_trabajo_de_fondo() -> None:
-    """
-    Deja el rastreo del equipo para dentro de un rato, y en un solo hilo.
-
-    Dos cosas a la vez, las dos importantes:
-
-    1. ESPERA. Los primeros segundos son para contestar, no para indexar.
-    2. UN SOLO HILO, uno detras de otro. Antes eran dos hilos compitiendo
-       entre ellos y con el servidor; en serie tardan lo mismo en total y
-       molestan la mitad.
-    """
+    """Deja el rastreo del equipo para dentro de un rato, y en un solo hilo."""
     def trabajar():
         time.sleep(SEGUNDOS_ANTES_DE_RASTREAR)
 
@@ -291,14 +221,8 @@ def _programar_trabajo_de_fondo() -> None:
             if memoria.modelo_disponible():
                 log.info("Memoria vault    : %s", memoria.indexar())
 
-                # El codigo del propio proyecto, para poder preguntarle por
-                # sus propios archivos. Incremental: si no has tocado nada,
-                # esto termina en un suspiro.
                 log.info("Memoria código   : %s", memoria.indexar_proyecto())
 
-                # Los ejemplos de intencion, para entenderte cuando no dices
-                # la palabra exacta. Se vectorizan una vez y se guardan; solo
-                # se rehace cuando cambia la lista.
                 from tools import intencion
                 indice = intencion.cargar()
                 log.info("Intenciones      : %d ejemplos listos",
@@ -315,23 +239,8 @@ def _programar_trabajo_de_fondo() -> None:
              SEGUNDOS_ANTES_DE_RASTREAR)
 
 
-# -------------------------------------------------------------------------
-# NÚCLEO: procesar un comando
-# -------------------------------------------------------------------------
 def _segunda_oportunidad(texto: str) -> tuple[str | None, str]:
-    """
-    Traduce lo que dijiste a una orden que el router SI entiende.
-
-    Devuelve (respuesta, origen) o (None, "") si no se parece a nada.
-
-    El caso que resuelve: "quitame el spotify de encima". El router no lo
-    reconoce porque busca el verbo "cierra", y la frase se iba al modelo, que
-    tarda segundos para algo que se resuelve en uno.
-
-    La traduccion vuelve a pasar por el MISMO router. Eso es lo que evita
-    tener dos tablas de ordenes que mantener en paralelo: aqui no hay logica
-    nueva, solo una frase distinta entrando por la misma puerta.
-    """
+    """Traduce lo que dijiste a una orden que el router SI entiende."""
     try:
         from tools import intencion
     except Exception:
@@ -353,9 +262,6 @@ def _segunda_oportunidad(texto: str) -> tuple[str | None, str]:
 
     respuesta = nlu.enrutar(canonica)
     if respuesta is None:
-        # La canonica ya no la reconoce el router. Pasa si alguien cambia un
-        # patron y se olvida de los ejemplos; hay una prueba que lo vigila,
-        # pero si se cuela, que no se lleve la orden por delante.
         log.warning("La canónica %r ya no la reconoce el router. Al modelo.", canonica)
         return None, ""
 
@@ -364,16 +270,7 @@ def _segunda_oportunidad(texto: str) -> tuple[str | None, str]:
 
 
 def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
-    """
-    Resuelve un comando. Primero el router rápido, luego el LLM.
-
-    Esta separación es lo que mantiene a Jarvis dentro del límite de tiempo
-    de Alexa en la gran mayoría de las órdenes.
-
-    `datos_alexa` sirve para las respuestas progresivas: permite que el Echo
-    diga "dame un segundo" mientras el modelo trabaja, en vez de quedarse mudo
-    durante seis segundos sin que sepas si te oyó.
-    """
+    """Resuelve un comando. Primero el router rápido, luego el LLM."""
     inicio = time.perf_counter()
     log.info("Comando recibido: %r", texto)
 
@@ -383,23 +280,12 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
     respuesta = nlu.enrutar(texto)
     origen = "router"
 
-    # Segunda oportunidad ANTES del modelo: puede que sea una orden conocida
-    # dicha con otras palabras. Cuesta unos 30 ms (un vector) frente a los
-    # varios segundos del modelo, asi que si acierta, sale muy a cuenta.
-    #
-    # No adivina: si no se parece lo suficiente, o si empata entre dos
-    # ordenes distintas, se calla y deja pasar la frase al modelo. Ejecutar
-    # lo que no era es peor que tardar.
     if respuesta is None:
         respuesta, origen = _segunda_oportunidad(texto)
 
     if respuesta is None:
         log.info("Sin coincidencia local, delegando al modelo.")
 
-        # Solo entretenemos cuando de verdad vamos a tardar. Las órdenes que
-        # el router resuelve en milisegundos no necesitan que nadie las
-        # distraiga: un "dame un segundo" antes de una respuesta instantánea
-        # queda peor que el silencio.
         alexa_directivas.avisar_que_estamos_en_ello(datos_alexa)
 
         respuesta = ollama_client.procesar(texto)
@@ -408,9 +294,6 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
     transcurrido = (time.perf_counter() - inicio) * 1000
     log.info("Resuelto por %s en %.0f ms: %r", origen, transcurrido, respuesta[:100])
 
-    # Telemetria para que Jarvis aprenda que se le atraganta. Va aqui porque es
-    # el unico punto por el que pasan TODAS las ordenes, y nunca puede romper
-    # una: si falla el registro, la respuesta sale igual.
     try:
         from tools import aprendizaje
         aprendizaje.registrar(texto, origen, transcurrido)
@@ -446,38 +329,16 @@ def limpiar_para_voz(texto: str) -> str:
     return texto or "Listo."
 
 
-# -------------------------------------------------------------------------
-# RESPUESTAS DE ALEXA
-# -------------------------------------------------------------------------
 def respuesta_alexa(
     texto_voz: str,
     mantener_sesion: bool = False,
     reprompt: str | None = None,
 ) -> dict:
-    """
-    Construye la respuesta en el formato que exige Alexa.
-
-    Sobre `reprompt`: es OBLIGATORIO siempre que se deje la sesión abierta.
-
-    Amazon lo documenta y cuesta creerlo hasta que se ve: si devuelves
-    shouldEndSession=false SIN reprompt, Alexa cierra la sesión igualmente.
-    El reprompt es precisamente lo que sostiene el micrófono abierto durante
-    el silencio. Sin él, el dispositivo dice tu respuesta y se apaga.
-
-    Lo dejamos muy corto ("Te escucho") porque solo suena cuando te quedas
-    callado unos segundos; si encadenas órdenes seguidas no lo oirás nunca.
-    """
+    """Construye la respuesta en el formato que exige Alexa."""
     texto_voz = limpiar_para_voz(texto_voz)
 
-    # Un solo sitio para esto: aqui pasa TODA respuesta hablada, venga del
-    # router, del modelo o de un error. Meterlo en cada handler seria
-    # repetirlo cuarenta veces y olvidarlo en la mitad.
     texto_voz = voz.con_nombre(texto_voz)
 
-    # SSML en vez de texto plano: es la unica forma de que Alexa cambie de
-    # fonetica para las palabras inglesas. Con PlainText leia "github" como
-    # "guitub" y "Downloads" como "dowloads", porque el motor es español y
-    # aplica sus reglas a todo lo que le llega.
     cuerpo = {
         "version": "1.0",
         "response": {
@@ -493,9 +354,6 @@ def respuesta_alexa(
                              "ssml": voz.a_ssml(reprompt or "Te escucho.")}
         }
 
-    # Dejamos constancia de lo que SALE, no solo de lo que entra. Sin esto no
-    # se puede distinguir "el servidor pidió cerrar" de "Alexa cerró por su
-    # cuenta", que son problemas totalmente distintos.
     log.info(
         "Respondemos: shouldEndSession=%s reprompt=%s",
         cuerpo["response"]["shouldEndSession"],
@@ -505,9 +363,6 @@ def respuesta_alexa(
     return cuerpo
 
 
-# -------------------------------------------------------------------------
-# ENDPOINTS
-# -------------------------------------------------------------------------
 @app.get("/jarvis")
 def estado():
     return {
@@ -518,17 +373,11 @@ def estado():
     }
 
 
-# La raíz responde igual que /jarvis. Es una red de seguridad: si en la consola
-# de Alexa se guarda el endpoint sin la ruta /jarvis, Amazon golpearía aquí y
-# recibiría un 404 sin ninguna pista de por qué. Así funciona igual.
 @app.get("/")
 def estado_raiz():
     return estado()
 
 
-# Este endpoint es público, así que conviene servir un robots.txt en condiciones.
-# Además, varias herramientas de comprobación externas lo piden antes de mirar
-# nada más y se niegan a seguir si reciben un 404.
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots():
     return "User-agent: *\nDisallow:\n"
@@ -543,9 +392,6 @@ def salud():
     return {
         "servidor": "ok",
         "sello": SELLO_CODIGO,
-        # Como se lanzo el proceso. Sirve para comprobar desde fuera que
-        # uvicorn lleva --timeout-keep-alive: sin ese argumento, Amazon pierde
-        # las ordenes que llegan mas de 5 segundos despues de la anterior.
         "arranque": " ".join(sys.argv),
         "sesion_continua": SESION_CONTINUA,
         "modo": modes.modo_actual(),
@@ -575,14 +421,7 @@ def salud():
 
 @app.post("/probar")
 async def probar(cuerpo: dict):
-    """
-    Prueba local sin pasar por Alexa.
-
-    Ejemplo:
-      curl -X POST http://localhost:8000/probar ^
-           -H "Content-Type: application/json" ^
-           -d "{\\"comando\\": \\"crea un archivo llamado prueba punto py con el codigo print hola\\"}"
-    """
+    """Prueba local sin pasar por Alexa."""
     comando = (cuerpo or {}).get("comando", "")
     if not comando:
         return {"error": "Falta el campo 'comando'."}
@@ -602,16 +441,8 @@ async def probar(cuerpo: dict):
 @app.post("/")
 @app.post("/jarvis")
 async def endpoint_alexa(request: Request):
-    """
-    Endpoint principal de la skill de Alexa.
-
-    Atiende tanto /jarvis como la raíz, para que un endpoint mal copiado en la
-    consola de Amazon no se traduzca en un 404 silencioso.
-    """
+    """Endpoint principal de la skill de Alexa."""
     log.info("POST recibido en la ruta: %s", request.url.path)
-    # El cuerpo CRUDO es imprescindible: la firma se calcula sobre los bytes
-    # exactos que envió Amazon. Si dejamos que FastAPI parsee el JSON primero,
-    # perdemos el formato original y la firma nunca validaría.
     cuerpo_crudo = await request.body()
 
     try:
@@ -643,11 +474,6 @@ async def endpoint_alexa(request: Request):
     # el modelo en la VRAM o dejarlo caer y liberar la grafica.
     mantener_caliente.marcar_actividad()
 
-    # El estado de la sesión es el dato que zanja el diagnóstico de la sesión
-    # continua. Si dos órdenes seguidas llegan con el MISMO sessionId y
-    # nueva=False, la sesión se está manteniendo y Alexa nos escucha. Si cada
-    # orden trae un sessionId distinto y nueva=True, no se mantiene nada:
-    # el dispositivo abre una sesión nueva cada vez.
     sesion = cuerpo.get("session", {}) or {}
     id_sesion = (sesion.get("sessionId") or "")[-12:]
     nueva = sesion.get("new")
@@ -661,14 +487,6 @@ async def endpoint_alexa(request: Request):
         perfil = modes.perfil_actual()
         saludo = voz.saludo_inicial(perfil["nombre_hablado"], SESION_CONTINUA)
 
-        # Abrir la skill es el aviso de que vas a usarla. Se manda cargar el
-        # modelo AHORA, en segundo plano, mientras suena el saludo. El saludo
-        # dura unos cuatro segundos y un 3B entra en VRAM en menos que eso,
-        # asi que la primera orden ya lo encuentra caliente.
-        #
-        # Esto es lo que permite que el keep-warm deje de tocar la grafica
-        # cada 90 segundos: el modelo se calienta cuando hace falta, no todo
-        # el dia por si acaso.
         try:
             modes.precalentar_en_segundo_plano()
         except Exception as e:
@@ -701,23 +519,6 @@ async def endpoint_alexa(request: Request):
                 mantener_sesion=SESION_CONTINUA,
             )
 
-        # MensajeIntent: dictado libre con AMAZON.SearchQuery.
-        #
-        # Existe porque el slot personalizado no reconoce una frase cualquiera
-        # ("llego en diez minutos" no se parece a ninguna orden) y Alexa la
-        # mandaba al Fallback. Y el Fallback NO TRAE EL TEXTO: solo dice que no
-        # entendio. El mensaje se perdia y la conversacion se rompia justo
-        # despues de preguntar "¿que le digo?".
-        # Si y no: intents integrados de Amazon.
-        #
-        # Sin esto, un "si" suelto no se parecia a nada del slot personalizado
-        # y caia al Fallback una y otra vez. En el registro se ve el bucle:
-        # cuatro AMAZON.FallbackIntent seguidos mientras un mensaje esperaba
-        # confirmacion, hasta que el usuario dijo "pausa" y lo dejo.
-        #
-        # Se enrutan por el mismo camino que el texto libre, asi que la logica
-        # de confirmaciones no cambia: solo se le entrega la palabra que
-        # esperaba.
         if nombre_intent in ("AMAZON.YesIntent", "AMAZON.NoIntent"):
             palabra = "sí" if nombre_intent == "AMAZON.YesIntent" else "no"
             log.info("Respuesta de sí o no: %s", palabra)
@@ -745,16 +546,9 @@ async def endpoint_alexa(request: Request):
             return respuesta_alexa(respuesta, mantener_sesion=SESION_CONTINUA)
 
         if nombre_intent == "AMAZON.FallbackIntent":
-            # Si habia un mensaje a medias, esto es lo que acaba de pasar:
-            # dictaste el texto y Alexa no supo encajarlo. Decir solo "no
-            # entendi" deja al usuario sin saber que la conversacion sigue
-            # viva y que basta con empezar por "que".
             import confirmaciones
             import foco
 
-            # Lo mas urgente: si hay algo esperando un si o un no, decir solo
-            # "no entendi" deja al usuario dando vueltas sin saber que la
-            # pregunta sigue en pie.
             if confirmaciones.hay_pendiente():
                 return respuesta_alexa(
                     "No te entendí. Dime sí para confirmar, o no para cancelar.",
@@ -793,9 +587,6 @@ async def endpoint_alexa(request: Request):
                 "No capté el comando. ¿Me lo repites?", mantener_sesion=SESION_CONTINUA
             )
 
-        # ¿Nos está devolviendo el micrófono? Mientras la sesión de la skill
-        # está abierta, Alexa no atiende sus propios servicios, así que esta
-        # salida tiene que ser fácil y natural.
         if nlu.es_despedida(comando):
             log.info("Despedida detectada, cierro la sesión.")
             return respuesta_alexa(
@@ -804,9 +595,6 @@ async def endpoint_alexa(request: Request):
             )
 
         try:
-            # A un hilo tambien, y por la misma razon: aqui dentro se espera
-            # al modelo hasta 6,5 segundos. Bloquear el bucle ese rato deja
-            # sordo al servidor justo cuando mas ocupado esta.
             respuesta = await asyncio.to_thread(
                 procesar_comando, comando, alexa_directivas.datos_de_peticion(cuerpo)
             )
@@ -821,10 +609,6 @@ async def endpoint_alexa(request: Request):
         peticion = cuerpo.get("request", {}) or {}
         motivo = peticion.get("reason", "")
 
-        # Cuando el motivo es ERROR, Amazon adjunta el tipo y el mensaje. Sin
-        # registrarlos, "Sesión terminada: ERROR" no dice nada y el problema es
-        # imposible de diagnosticar: es la diferencia entre saber que algo
-        # falló y saber POR QUÉ falló.
         error = peticion.get("error") or {}
 
         if motivo == "ERROR" or error:

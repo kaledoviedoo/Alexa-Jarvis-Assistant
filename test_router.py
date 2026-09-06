@@ -1,8 +1,8 @@
-"""
-Batería de pruebas del router determinista.
+"""Pruebas del router determinista.
 
-Sustituye las herramientas reales por dobles que solo registran qué se llamó,
-así podemos comprobar el enrutado sin crear archivos ni cerrar programas.
+Sustituye las herramientas reales por dobles que solo registran que se
+llamo, asi se comprueba el enrutado sin crear archivos ni cerrar programas.
+Incluye tambien el freno de acciones, el keep-warm y la capa semantica.
 
 Ejecutar:  py test_router.py
 """
@@ -13,9 +13,6 @@ from types import SimpleNamespace
 import foco
 import nlu
 
-# -------------------------------------------------------------------------
-# Dobles de prueba
-# -------------------------------------------------------------------------
 registro: list[tuple] = []
 
 
@@ -93,10 +90,6 @@ nlu.modes = SimpleNamespace(
 )
 nlu.tareas = SimpleNamespace(consultar_pendiente=_doble("pendiente"))
 
-# Estas tres llegaron con los arreglos del registro del 22 de agosto.
-# app_tiene_buscador NO es un doble tonto: su valor decide si la orden se
-# queda dentro de la app o cae a la busqueda web, asi que la prueba tiene
-# que ver la misma decision que tomaria el sistema real.
 nlu.sistema.app_tiene_buscador = lambda nombre: (
     (nombre or "").strip().lower()
     if (nombre or "").strip().lower() in
@@ -140,9 +133,6 @@ nlu.pantalla = SimpleNamespace(
 nlu.sistema.arrancar_partida = _doble("arrancar_partida")
 
 
-# -------------------------------------------------------------------------
-# Casos:  (frase, herramienta esperada, comprobación opcional de argumentos)
-# -------------------------------------------------------------------------
 CASOS = [
     # ---- El caso original que fallaba ----
     ("por favor crea el archivo llamado prueba punto py con el codigo print hola",
@@ -206,9 +196,6 @@ CASOS = [
     # ---- Navegador ----
     ("busca en internet el clima de bogotá", "buscar_web", None),
     ("búscame recetas de arepas", "buscar_web", None),
-    # Ya no es una busqueda web de una linea: "investiga" dispara la
-    # investigacion larga, que se lanza al fondo porque tarda mas de lo que
-    # Alexa espera. La prueba decia "buscar_web" desde antes de ese cambio.
     ("investiga cómo funciona un transformer", "al_fondo", None),
     ("pon música relajante en youtube", "youtube", None),
     ("abre la página github", "abrir_sitio", None),
@@ -223,8 +210,6 @@ CASOS = [
     ("sube el volumen", "atajo", None),
 
     # ---- Obsidian y contexto: nunca se habian probado ----
-    # No habia dobles para estos modulos, asi que sus handlers podian estar
-    # rotos sin que ninguna prueba se enterase.
     ("apunta en el diario que termine la configuracion", "obs_diario", None),
     ("busca en mis notas el proyecto", "obs_buscar", None),
     ("cuantas notas tengo", "obs_estado", None),
@@ -276,12 +261,6 @@ CASOS = [
     # ---- Meta ----
     ("cómo quedó lo último", "pendiente", None),
 
-    # ---------------------------------------------------------------
-    # ORDENES QUE SE ENTENDIAN AL REVES  (registro real del 22-08)
-    # ---------------------------------------------------------------
-    # Estas ocho no fallaban: hacian otra cosa y sonaban convincentes,
-    # que es el fallo peor. Cada una lleva al lado lo que hacia antes.
-
     # Hacia: buscar "tame impala" en Google.
     ("busca tame impala en spotify",
      "buscar_en_app", lambda a, k: a[0] == "tame impala" and a[1] == "spotify"),
@@ -319,17 +298,10 @@ CASOS = [
     ("abre 1 pestaña en comic", "abrir_navegador", None),
     ("abre comic", "abrir_app", lambda a, k: a[0] in ("comic", "comet")),
 
-    # ---------------------------------------------------------------
-    # SELECCION DE ARCHIVOS
-    # ---------------------------------------------------------------
-    # El equivalente hablado de arrastrar el raton sobre varios archivos.
     ("entra a descargas", "sel_entrar", lambda a, k: a[0] == "descargas"),
     ("entra a la carpeta parciales", "sel_entrar", lambda a, k: a[0] == "parciales"),
     ("métete en escritorio", "sel_entrar", lambda a, k: a[0] == "escritorio"),
 
-    # "los 3 primeros" es alfabetico y "los 3 mas recientes" es por fecha.
-    # En Descargas los dos ordenes no se parecen en nada, asi que la
-    # diferencia tiene que sobrevivir al router.
     ("selecciona los 3 primeros", "sel_coger", lambda a, k: a[1] == 3 and a[2] is False),
     ("coge los cinco primeros archivos", "sel_coger", lambda a, k: a[1] == 5),
     ("selecciona los 3 más recientes", "sel_coger", lambda a, k: a[1] == 3 and a[2] is True),
@@ -345,11 +317,6 @@ CASOS = [
     ("archívalos en la bóveda", "al_fondo", None),
     ("olvida la selección", "sel_soltar", None),
 
-    # ---------------------------------------------------------------
-    # RAZONAR SOBRE LO QUE SE VE
-    # ---------------------------------------------------------------
-    # Un lanzador no es el juego: "abre valorant" dejaba Riot Client abierto
-    # esperando a que alguien pinchara JUGAR.
     ("juega valorant", "arrancar_partida", lambda a, k: "valorant" in a[0]),
     ("ponte a jugar lol", "arrancar_partida", None),
     ("abre epic games y dale a jugar", "arrancar_partida", None),
@@ -361,11 +328,6 @@ CASOS = [
     ("pincha en aceptar", "clic_intencion", lambda a, k: a[0] == "aceptar"),
     ("dale a cancelar", "clic_intencion", lambda a, k: a[0] == "cerrar"),
 
-    # ---------------------------------------------------------------
-    # MEMORIA DEL PROPIO CODIGO
-    # ---------------------------------------------------------------
-    # "donde esta X" a secas NO entra aqui: es ambiguo y se llevaba por
-    # delante "donde esta el contexto". Hace falta decir codigo o archivo.
     ("indexa el código", "al_fondo", None),
     ("indexa el proyecto", "al_fondo", None),
     ("dónde está el contexto", "donde_contexto", None),
@@ -391,21 +353,7 @@ DEBEN_IR_AL_MODELO = [
 
 
 def probar_intenciones() -> list[str]:
-    """
-    Que cada frase canonica de la capa semantica siga siendo una orden real.
-
-    La capa de intencion no ejecuta nada: traduce lo que dijiste a una frase
-    que el router entiende y la vuelve a pasar por el. Toda su utilidad
-    depende de que esas frases canonicas SIGAN estando en nlu.INTENTS.
-
-    Si alguien cambia un patron y una canonica deja de casar, la capa no da
-    error: devuelve una traduccion que no lleva a ninguna parte y la orden se
-    va al modelo, o sea al comportamiento lento de antes, sin que nadie se
-    entere. Esta prueba es lo unico que lo hace visible.
-
-    No se comprueban los parecidos porque eso necesita el modelo de vectores
-    corriendo; aqui solo se valida la parte que puede romperse en frio.
-    """
+    """Que cada frase canonica de la capa semantica siga siendo una orden real."""
     from tools import intencion
     fallos = []
 
@@ -445,14 +393,7 @@ def probar_intenciones() -> list[str]:
 
 
 def probar_keep_warm() -> list[str]:
-    """
-    Que la grafica descanse cuando no la usas, sin que se note al volver.
-
-    El keep-warm tocaba el modelo cada 90 segundos las 24 horas. No gastaba
-    calculo, pero dejaba 2 GB clavados en la VRAM todo el dia. Ahora solo se
-    toca dentro de la ventana de gracia, y al abrir la skill se precalienta
-    mientras suena el saludo.
-    """
+    """Que la grafica descanse cuando no la usas, sin que se note al volver."""
     import mantener_caliente
     fallos = []
 
@@ -500,16 +441,7 @@ def probar_keep_warm() -> list[str]:
 
 
 def probar_freno_de_mano() -> list[str]:
-    """
-    Que la conversacion normal no acabe tocando el equipo.
-
-    Del registro real, hablando sin dar ninguna orden: escribio texto en la
-    ventana que hubiera al frente, intento cerrar Alexa, y llamo a cerrar
-    con 'nada' y con el nombre de otra herramienta como argumento.
-
-    Contestar mal se nota y se repite. Escribir en una ventana que no
-    mirabas o cerrar algo con trabajo sin guardar, no.
-    """
+    """Que la conversacion normal no acabe tocando el equipo."""
     import ollama_client
     fallos = []
 
@@ -562,14 +494,7 @@ def probar_freno_de_mano() -> list[str]:
 
 
 def probar_modelos_instalados() -> list[str]:
-    """
-    Que Jarvis vea los modelos que de verdad tienes descargados.
-
-    Esto no da error cuando se rompe: devuelve una lista vacia, que se lee
-    como "no tienes nada instalado". Por eso el arranque decia que faltaba
-    nomic-embed-text con el modelo ya descargado. Se prueban las dos formas
-    de respuesta de la biblioteca de Ollama, la vieja y la nueva.
-    """
+    """Que Jarvis vea los modelos que de verdad tienes descargados."""
     import sys as _sys
     import types as _types
     fallos = []
@@ -633,14 +558,7 @@ def probar_modelos_instalados() -> list[str]:
 
 
 def probar_limpieza_modelo() -> list[str]:
-    """
-    Lo que el modelo escribe de mas y Alexa acaba leyendo en voz alta.
-
-    Del registro: el modelo contesto 'listar_archivos \\nEn Desktop hay 108
-    archivos.' y el altavoz dijo "listar guion bajo archivos" antes de la
-    frase util. No es un fallo del router: la respuesta era correcta, venia
-    con el nombre de la herramienta pegado delante.
-    """
+    """Lo que el modelo escribe de mas y Alexa acaba leyendo en voz alta."""
     import ollama_client
     fallos = []
 
@@ -682,14 +600,7 @@ def probar_limpieza_modelo() -> list[str]:
 
 
 def probar_confirmaciones() -> list[str]:
-    """
-    Las ordenes sin vuelta atras no se ejecutan a la primera.
-
-    Se comprueba aqui y no arriba porque no son un "patron -> funcion": son
-    dos turnos. La primera vez preguntan, y solo el "si" del turno siguiente
-    dispara la accion. Un fallo en esto significa que Alexa puede apagarte el
-    equipo por haber oido mal, que ya paso una vez.
-    """
+    """Las ordenes sin vuelta atras no se ejecutan a la primera."""
     import confirmaciones
     fallos = []
 
@@ -771,10 +682,6 @@ def main() -> int:
 
     for frase, esperado, comprobar in CASOS:
         registro.clear()
-        # Cada frase parte de cero. Sin esto, un caso que deje un
-        # destinatario pendiente hace que el SIGUIENTE lo capture el patron
-        # de "texto del mensaje", que es amplisimo a proposito. Paso: dos
-        # casos daban por buenos enrutados que en realidad no ocurrian.
         foco.olvidar()
         try:
             resultado = nlu.enrutar(frase)

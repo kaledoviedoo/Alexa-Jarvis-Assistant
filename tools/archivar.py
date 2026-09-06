@@ -1,28 +1,12 @@
-"""
-Meter un archivo en la boveda como debe ir, sin que tengas que pensarlo.
+"""Archivado automatico de archivos en la boveda de Obsidian.
 
-Que hace exactamente
---------------------
-Coges un pdf de Descargas, dices "archiva la guia de bases de datos", y Jarvis:
+Lee el archivo, decide a que carpeta va y crea una nota con un resumen, el
+adjunto y enlaces a las notas relacionadas. Para decidir la carpeta usa
+primero unas pistas por palabras clave y, si no bastan, le pregunta al
+modelo con las carpetas REALES de la boveda delante y para que sirve cada
+una.
 
-  1. Encuentra el archivo, aunque digas el nombre a medias.
-  2. Lee su contenido si puede (pdf, docx, txt, md).
-  3. Decide QUE es: apunte de clase, documento, recurso o captura sin
-     clasificar. Y con eso, en que carpeta va y que plantilla usa.
-  4. Copia el archivo a la boveda y crea la nota, con el frontmatter, los tags
-     y la fecha que manda el CLAUDE.md.
-  5. Busca en la MEMORIA SEMANTICA notas que traten de lo mismo y las enlaza en
-     la seccion Relacionado.
-
-Ese ultimo paso es el que convierte esto en un segundo cerebro y no en una
-carpeta ordenada. Un archivo que entra sin enlaces esta tan perdido como en
-Descargas; lo que lo hace util dentro de seis meses es estar conectado con lo
-que ya sabias.
-
-Nada se borra
--------------
-El archivo original se COPIA, no se mueve. Si algo sale mal, tu pdf sigue
-donde estaba.
+Copia, nunca mueve: si algo falla, el original sigue donde estaba.
 """
 
 import logging
@@ -48,9 +32,6 @@ EXTENSIONES = {
 }
 
 
-# -------------------------------------------------------------------------
-# ENCONTRAR EL ARCHIVO
-# -------------------------------------------------------------------------
 def buscar_archivo(descripcion: str) -> list[Path]:
     """Archivos que encajan con lo que se dijo, los recientes primero."""
     import difflib
@@ -90,9 +71,6 @@ def buscar_archivo(descripcion: str) -> list[Path]:
     return [ruta for _, _, ruta in candidatos[:5]]
 
 
-# -------------------------------------------------------------------------
-# LEER EL CONTENIDO
-# -------------------------------------------------------------------------
 def _texto_del_archivo(ruta: Path) -> str:
     """Lo que se pueda leer del archivo. Vacio si es binario opaco."""
     sufijo = ruta.suffix.lower()
@@ -132,11 +110,6 @@ def _texto_del_archivo(ruta: Path) -> str:
     return ""
 
 
-# -------------------------------------------------------------------------
-# DECIDIR QUE ES
-# -------------------------------------------------------------------------
-# Señales del nombre y del contenido. Se mira esto ANTES de preguntarle al
-# modelo: es instantaneo y acierta en la mayoria de los casos reales.
 _PISTAS = {
     "clase": r"\b(clase|apunte|tema|unidad|cap[ií]tulo|lecci[oó]n|teor[ií]a|"
              r"semana\s*\d|sesi[oó]n)\b",
@@ -150,17 +123,7 @@ _PISTAS = {
 
 
 def clasificar(nombre: str, texto: str) -> tuple[str, str]:
-    """
-    Devuelve (tipo, por que). El 'por que' se dice en voz alta.
-
-    Si las pistas no bastan, se le pregunta al modelo con las reglas de la
-    boveda delante. Y si el modelo tampoco lo tiene claro, va a inbox, que es
-    exactamente para lo que existe segun tu CLAUDE.md.
-    """
-    # Los separadores de los nombres de archivo tienen que volverse espacios
-    # ANTES de buscar. "_" cuenta como letra para una expresion regular, asi
-    # que en "BD_clase_3" la palabra "clase" no tiene limites a los lados y no
-    # encajaba: el archivo mas obvio del mundo acababa en inbox.
+    """Devuelve (tipo, por que). El 'por que' se dice en voz alta."""
     base = re.sub(r"[_\-.]+", " ", f"{nombre} {texto[:1500]}").lower()
 
     for tipo, patron in _PISTAS.items():
@@ -176,15 +139,7 @@ def clasificar(nombre: str, texto: str) -> tuple[str, str]:
 
 
 def _clasificar_con_modelo(nombre: str, texto: str) -> str:
-    """
-    Le pregunta al modelo a que carpeta va, con las carpetas REALES delante.
-
-    Antes se le daba una lista fija de seis palabras. El problema es que esa
-    lista es la del CLAUDE.md, no la de tu boveda: si tienes una carpeta que
-    no esta en la lista, el modelo no podia elegirla ni sabiendo que era la
-    buena. Ahora se le enseña lo que hay de verdad en disco, con para que
-    sirve cada carpeta, y elige entre eso.
-    """
+    """Le pregunta al modelo a que carpeta va, con las carpetas REALES delante."""
     try:
         import ollama
         import modes
@@ -243,9 +198,6 @@ def _clasificar_con_modelo(nombre: str, texto: str) -> str:
     return ""
 
 
-# -------------------------------------------------------------------------
-# CREAR LA NOTA
-# -------------------------------------------------------------------------
 def _relacionadas(consulta: str, cuantas: int = 4) -> list[str]:
     """Titulos de notas que tratan de lo mismo, por significado."""
     try:
@@ -301,12 +253,7 @@ origen: archivado por Jarvis
 
 
 def archivar(descripcion: str) -> str:
-    """
-    Archiva en la boveda el archivo que encaje con la descripcion.
-
-    Lento de verdad: leer un pdf, clasificarlo y buscar relacionadas son varios
-    segundos. Quien llama debe hacerlo en segundo plano.
-    """
+    """Archiva en la boveda el archivo que encaje con la descripcion."""
     vault = obsidian.vault()
     if vault is None:
         return "No encuentro tu bóveda de Obsidian."
@@ -319,13 +266,7 @@ def archivar(descripcion: str) -> str:
 
 
 def archivar_ruta(origen: Path) -> str:
-    """
-    Lo mismo, pero cuando YA sabes cual es el archivo.
-
-    Existe para la seleccion por voz: ahi los archivos ya estan elegidos uno
-    a uno y volver a buscarlos por descripcion podria dar con otro distinto,
-    que es justo lo que no queremos al mover cosas.
-    """
+    """Lo mismo, pero cuando YA sabes cual es el archivo."""
     vault = obsidian.vault()
     if vault is None:
         return "No encuentro tu bóveda de Obsidian."

@@ -1,27 +1,11 @@
-"""
-Catalogo de las aplicaciones que hay instaladas de verdad.
+"""Catalogo de lo que hay instalado de verdad en el equipo.
 
-El problema de las listas a mano
---------------------------------
-Habia una tabla con veinte programas y su comando de arranque. Funciona hasta
-que pides uno que no esta: "abre epic games" fallaba porque nadie habia
-escrito su ruta, aunque el lanzador estuviera instalado. Y esa tabla no puede
-crecer al ritmo de lo que instalas.
+Se construye rastreando el menu Inicio (leyendo los accesos directos), el
+registro de Windows y las aplicaciones de la Store. Se guarda en disco y se
+rehace en segundo plano.
 
-De donde sale la informacion
-----------------------------
-De donde la saca Windows para su propio buscador, tres fuentes que se
-complementan:
-
-  1. MENU INICIO. Cada programa deja ahi un acceso directo al instalarse. Es
-     la fuente mas fiable y la que da el nombre tal y como lo ves.
-  2. REGISTRO, claves de desinstalacion. Cubre lo que no puso acceso directo,
-     y aporta el nombre comercial completo.
-  3. APLICACIONES DE LA STORE. No tienen .exe accesible; se lanzan por un
-     identificador propio. Aqui viven WhatsApp, la calculadora o Teams nuevo.
-
-El catalogo se guarda en disco. Rastrear las tres fuentes tarda unos segundos,
-demasiado para hacerlo en cada orden con Alexa esperando ocho.
+`buscar` puntua de 0 a 1 por parecido, para que "el epic" encuentre "Epic
+Games Launcher" aunque Alexa lo haya transcrito torcido.
 """
 
 import json
@@ -68,17 +52,8 @@ def normalizar(nombre: str) -> str:
     return re.sub(r"\s+", " ", limpio).strip()
 
 
-# -------------------------------------------------------------------------
-# FUENTE 1: MENU INICIO
-# -------------------------------------------------------------------------
 def _destino_del_acceso(ruta: Path) -> str:
-    """
-    Lee a donde apunta un .lnk sin librerias externas.
-
-    El formato guarda la ruta en texto plano dentro del binario, asi que basta
-    con pescar algo que parezca "X:\\...\\algo.exe". No es elegante, pero
-    evita depender de pywin32 para algo que tiene que funcionar siempre.
-    """
+    """Lee a donde apunta un .lnk sin librerias externas."""
     try:
         crudo = ruta.read_bytes()
     except OSError:
@@ -135,9 +110,6 @@ def _del_menu_inicio() -> dict:
     return encontradas
 
 
-# -------------------------------------------------------------------------
-# FUENTE 2: REGISTRO
-# -------------------------------------------------------------------------
 def _del_registro() -> dict:
     if os.name != "nt":
         return {}
@@ -202,12 +174,7 @@ def _del_registro() -> dict:
 
 
 def _mejor_exe(carpeta: Path, nombre: str) -> str:
-    """
-    El ejecutable principal de una carpeta de instalacion.
-
-    Una carpeta tiene muchos .exe: actualizadores, ayudantes, informes de
-    fallos. El bueno suele llamarse como el programa, asi que ese gana.
-    """
+    """El ejecutable principal de una carpeta de instalacion."""
     try:
         candidatos = list(carpeta.glob("*.exe")) + list(carpeta.glob("*/*.exe"))
     except OSError:
@@ -236,14 +203,8 @@ def _mejor_exe(carpeta: Path, nombre: str) -> str:
         return str(utiles[0])
 
 
-# -------------------------------------------------------------------------
-# FUENTE 3: APLICACIONES DE LA STORE
-# -------------------------------------------------------------------------
 def _de_la_store() -> dict:
-    """
-    Aplicaciones empaquetadas (UWP). No tienen .exe al que llamar: se lanzan
-    con shell:appsFolder y su identificador de familia.
-    """
+    """Aplicaciones empaquetadas (UWP)."""
     if os.name != "nt":
         return {}
 
@@ -285,9 +246,6 @@ def _de_la_store() -> dict:
     return encontradas
 
 
-# -------------------------------------------------------------------------
-# CATALOGO
-# -------------------------------------------------------------------------
 _memoria: dict | None = None
 
 
@@ -352,16 +310,6 @@ def refrescar_en_segundo_plano() -> None:
                      name="catalogo").start()
 
 
-# -------------------------------------------------------------------------
-# BUSCAR EN EL CATALOGO
-# -------------------------------------------------------------------------
-# Aqui esta el razonamiento. Alexa transcribe "epic games" como "epi games",
-# "epicgeims" o "e pick games", y tu dices "el epic" cuando el programa se
-# llama "Epic Games Launcher". Exigir el nombre exacto seria inutil.
-#
-# En vez de acertar o fallar, se PUNTUA cada candidato y se devuelven los
-# mejores con su nota. Quien llama decide: nota alta, se abre; nota media, se
-# pregunta; nota baja, se sugiere.
 import difflib  # noqa: E402
 
 
@@ -399,12 +347,7 @@ def _puntuar(consulta: str, clave: str, nombre: str) -> float:
 
 
 def buscar(nombre_hablado: str, cuantos: int = 5) -> list[dict]:
-    """
-    Las aplicaciones que mas se parecen a lo que se dijo, con su nota.
-
-    Ordenadas de mejor a peor. Nunca devuelve vacio por capricho: si hay
-    catalogo, siempre hay algo que proponer.
-    """
+    """Las aplicaciones que mas se parecen a lo que se dijo, con su nota."""
     consulta = normalizar(nombre_hablado)
     if not consulta:
         return []

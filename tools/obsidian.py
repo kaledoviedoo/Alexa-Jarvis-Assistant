@@ -1,15 +1,8 @@
-"""
-Integracion con Obsidian.
+"""Lectura y escritura en la boveda de Obsidian.
 
-Un vault de Obsidian no es mas que una carpeta con archivos .md, asi que no
-hace falta ninguna API: basta con encontrarla y escribir markdown correcto.
-
-Lo que si importa es respetar sus convenciones, porque si no las notas quedan
-sueltas y no sirven de nada:
-  - Enlaces internos con [[dobles corchetes]]
-  - Etiquetas con #almohadilla
-  - Frontmatter YAML al principio para fecha y origen
-  - Diario en la carpeta que Obsidian tenga configurada
+Crea notas, agrega a las existentes, escribe en el diario y busca por
+nombre. Localiza la boveda desde el .env o buscandola en las carpetas
+habituales.
 """
 
 import logging
@@ -108,9 +101,6 @@ def _frontmatter(etiquetas: str = "") -> str:
     return "\n".join(lineas)
 
 
-# -------------------------------------------------------------------------
-# OPERACIONES
-# -------------------------------------------------------------------------
 def crear_nota(titulo: str, contenido: str = "", etiquetas: str = "", carpeta: str = "") -> str:
     """Crea una nota nueva en el vault."""
     v = vault()
@@ -183,11 +173,7 @@ def agregar_a_nota(titulo: str, contenido: str) -> str:
 
 
 def agregar_al_diario(contenido: str) -> str:
-    """
-    Añade una linea a la nota diaria de hoy, creandola si hace falta.
-
-    Busca la carpeta de diario que ya uses; si no hay ninguna, usa la raiz.
-    """
+    """Añade una linea a la nota diaria de hoy, creandola si hace falta."""
     v = vault()
     if v is None:
         return "No encontré tu vault de Obsidian."

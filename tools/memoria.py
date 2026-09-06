@@ -1,28 +1,12 @@
-"""
-Memoria semantica de la boveda: buscar por SIGNIFICADO, no por palabras.
+"""Memoria semantica: buscar por significado, no por nombre.
 
-El problema
------------
-Buscar por texto encuentra lo que comparte letras. Pero "normalizar tablas" y
-"tercera forma normal" son lo mismo sin compartir casi nada, y "el profe que
-da redes" no comparte una palabra con la nota que se llama "Andres Ramirez".
-Ahi es donde la busqueda por palabras se queda corta, y es justo el caso de
-alguien que recuerda la IDEA y no el titulo.
+Trocea las notas de la boveda y el codigo del proyecto, convierte cada trozo
+en un vector con nomic-embed-text y los guarda. Buscar es vectorizar la
+consulta y comparar por coseno, con numpy si esta disponible.
 
-Como funciona
--------------
-Cada trozo de nota se convierte en un vector de 768 numeros con
-nomic-embed-text, un modelo pequeño de Ollama hecho para esto. Los textos que
-significan cosas parecidas caen cerca en ese espacio, aunque no compartan ni
-una palabra. Buscar es convertir tu frase en otro vector y mirar cual esta mas
-cerca.
-
-Sobre el reloj
---------------
-Indexar es lento: hay que pasar cada nota por el modelo. Se hace UNA vez en
-segundo plano, y despues solo lo que cambie (se compara la fecha y un hash del
-contenido). BUSCAR es rapido: un vector para tu frase y una multiplicacion.
-Eso si cabe en los ocho segundos de Alexa.
+El codigo se trocea por definiciones usando el arbol sintactico, porque un
+fragmento util es una funcion entera con su docstring y no quince lineas
+cortadas por donde cayera.
 """
 
 import hashlib
@@ -42,18 +26,12 @@ ARCHIVO = CARPETA_DATOS / "memoria_vault.json"
 
 MODELO = "nomic-embed-text"
 
-# Trozos de unos mil caracteres. Una nota entera en un solo vector diluye los
-# temas: si habla de tres cosas, el vector queda en un punto medio que no se
-# parece a ninguna. Trozos mas pequeños tampoco: pierden el contexto.
 TAMANO_TROZO = 1000
 SOLAPE = 150
 
 _indice: dict | None = None
 
 
-# -------------------------------------------------------------------------
-# VECTORES
-# -------------------------------------------------------------------------
 def _numpy():
     try:
         import numpy
@@ -96,9 +74,6 @@ def _parecido(a: list[float], b: list[float]) -> float:
     return producto / (norma_a * norma_b)
 
 
-# -------------------------------------------------------------------------
-# TROCEAR
-# -------------------------------------------------------------------------
 def _partir_largo(parrafo: str) -> list[str]:
     """Parte un parrafo que por si solo ya pasa del tamaño de trozo."""
     piezas = []
@@ -118,17 +93,7 @@ def _partir_largo(parrafo: str) -> list[str]:
 
 
 def _trozos(texto: str, titulo: str) -> list[str]:
-    """
-    Parte una nota en trozos aprovechables.
-
-    Dos cosas que parecen detalles y no lo son:
-
-    - El titulo va DENTRO de cada trozo. Es la señal mas fuerte de que trata
-      la nota, y sin el se pierde al vectorizar el cuerpo suelto.
-    - Nada de trozos minusculos. Un fragmento de cuarenta caracteres vectoriza
-      a un punto casi aleatorio y luego aparece como resultado de cualquier
-      busqueda. Mejor pegarlo al siguiente.
-    """
+    """Parte una nota en trozos aprovechables."""
     limpio = re.sub(r"\n{3,}", "\n\n", (texto or "").strip())
     if not limpio:
         return []
@@ -176,9 +141,6 @@ def _firma(ruta: Path) -> str:
         return ""
 
 
-# -------------------------------------------------------------------------
-# INDICE
-# -------------------------------------------------------------------------
 def _cargar() -> dict:
     global _indice
     if _indice is not None:
@@ -206,13 +168,7 @@ def _guardar(indice: dict) -> None:
 
 
 def indexar(forzar: bool = False) -> str:
-    """
-    Recorre la boveda y vectoriza lo que haga falta.
-
-    Solo toca lo que cambio: comparar la firma de cada archivo cuesta
-    microsegundos, y vectorizar cuesta cientos de milisegundos. En una boveda
-    que ya esta indexada, esto termina casi al instante.
-    """
+    """Recorre la boveda y vectoriza lo que haga falta."""
     vault = obsidian.vault()
     if vault is None:
         return "No encuentro tu bóveda de Obsidian."
@@ -310,17 +266,6 @@ def indexar_en_segundo_plano(forzar: bool = False) -> None:
                      name="memoria-vault").start()
 
 
-# -------------------------------------------------------------------------
-# EL CODIGO DEL PROPIO PROYECTO
-# -------------------------------------------------------------------------
-# La boveda guarda lo que estudias; esto guarda lo que construyes. Sirve para
-# preguntarle a Jarvis por su propio codigo: "donde esta lo que decide si una
-# orden es peligrosa", "que hace el modulo de seleccion", "en que archivo esta
-# el freno de mano".
-#
-# Se indexa aparte de la boveda pero en el MISMO indice, porque buscar() ya
-# sabe recorrerlo y no hay razon para tener dos busquedas distintas.
-
 RAIZ_PROYECTO = Path(__file__).resolve().parent.parent
 
 # Que se lee. Nada de binarios ni de datos: solo lo que un humano escribio.
@@ -339,17 +284,7 @@ MAXIMO_TROZOS_POR_ARCHIVO = 12
 
 
 def _trozos_de_codigo(texto: str, ruta: Path) -> list[str]:
-    """
-    Parte un archivo de codigo por sus definiciones, no por parrafos.
-
-    Un fragmento util de codigo es una funcion entera con su docstring, no
-    quince lineas cortadas por donde cayera. Se usa el arbol sintactico para
-    saber donde empieza y acaba cada def y cada class.
-
-    Si el archivo no es Python o no compila (algo a medio escribir), se cae
-    al troceado normal por parrafos, que para markdown y PowerShell es lo
-    correcto de todas formas.
-    """
+    """Parte un archivo de codigo por sus definiciones, no por parrafos."""
     if ruta.suffix.lower() != ".py":
         return _trozos(texto, ruta.stem)
 
@@ -397,17 +332,7 @@ def _archivos_del_proyecto():
 
 
 def indexar_proyecto(forzar: bool = False) -> str:
-    """
-    Mete el codigo del propio Jarvis en la memoria.
-
-    Va aparte de `indexar()` a proposito: la boveda cambia cuando estudias y
-    el codigo cambia cuando programas, y no tiene sentido revectorizar
-    ochenta notas porque tocaste un archivo .py. Comparten indice, asi que
-    `buscar()` los encuentra a los dos sin saber que hay dos origenes.
-
-    Incremental igual que el otro: solo se revectoriza lo que cambio de
-    verdad, comparando la firma del archivo.
-    """
+    """Mete el codigo del propio Jarvis en la memoria."""
     if not modelo_disponible():
         return (f"Me falta el modelo {MODELO}. Instálalo con: ollama pull {MODELO}.")
 
@@ -451,9 +376,6 @@ def indexar_proyecto(forzar: bool = False) -> str:
 
         notas_previas[clave] = firma
 
-    # Archivos borrados del proyecto: fuera. Se comparan SOLO contra los que
-    # hemos mirado ahora, no contra todo el indice, porque ahi tambien estan
-    # las notas de la boveda y las barreriamos enteras.
     del_proyecto = {c for c in notas_previas
                     if c.startswith(str(RAIZ_PROYECTO))}
     borrados = del_proyecto - vistos
@@ -480,15 +402,8 @@ def indexar_proyecto(forzar: bool = False) -> str:
             f"{actualizados} actualizados.")
 
 
-# -------------------------------------------------------------------------
-# BUSCAR
-# -------------------------------------------------------------------------
 def buscar(consulta: str, cuantos: int = 5, minimo: float = 0.45) -> list[dict]:
-    """
-    Los fragmentos que mas se parecen en SIGNIFICADO a la consulta.
-
-    Rapido: un vector para la consulta y una comparacion contra el indice.
-    """
+    """Los fragmentos que mas se parecen en SIGNIFICADO a la consulta."""
     consulta = (consulta or "").strip()
     if not consulta:
         return []

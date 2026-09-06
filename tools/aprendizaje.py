@@ -1,20 +1,10 @@
-"""
-Que Jarvis mejore solo con el uso.
+"""Telemetria de que ordenes se le atragantan a Jarvis.
 
-La idea
--------
-El router resuelve la mayoria de ordenes en menos de un milisegundo. Lo que no
-reconoce se va al modelo: varios segundos, y a veces una respuesta regular.
+Registra cada orden con quien la resolvio y cuanto tardo, agrupa por la
+FORMA de la frase (no por su contenido) y escribe propuestas de patrones
+nuevos para el router.
 
-Ese porcentaje hoy solo puede EMPEORAR: cada capacidad nueva trae frases que
-nadie previo. Esto lo invierte. Se apunta que frases acaban en el modelo, y
-cuando una se repite, se propone convertirla en un patron instantaneo.
-
-Que NO hace
------------
-No toca el codigo. Escribe una propuesta y te la cuenta. Un asistente que se
-reescribe solo el router mientras duermes es una idea preciosa hasta la
-primera vez que se rompe a las tres de la mañana.
+Nunca modifica codigo: solo deja escrito lo que convendria añadir.
 """
 
 import json
@@ -46,13 +36,7 @@ def _normalizar(texto: str) -> str:
 
 
 def _esqueleto(texto: str) -> str:
-    """
-    La forma de la frase, sin los datos concretos.
-
-    "crea un archivo llamado notas punto txt" y "crea un archivo llamado
-    informe punto pdf" son la MISMA orden con distinto relleno. Sin esto,
-    cada variante contaria como una frase nueva y nunca se repetiria nada.
-    """
+    """La forma de la frase, sin los datos concretos."""
     plano = _normalizar(texto)
     plano = re.sub(r"\b\d+\b", "N", plano)
     palabras = [p for p in plano.split() if p not in _VACIAS]

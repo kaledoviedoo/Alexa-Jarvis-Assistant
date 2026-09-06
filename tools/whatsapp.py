@@ -1,29 +1,11 @@
-"""
-WhatsApp por la web, en Comet.
+"""Enviar mensajes de WhatsApp por la version web.
 
-Por que NO la aplicacion de escritorio
---------------------------------------
-El primer intento lanzaba el protocolo `whatsapp:`. Si la aplicacion no esta
-instalada, Windows no falla: abre la Microsoft Store ofreciendola. O sea que
-en vez de mandar un mensaje aparecia una tienda, y el bucle que esperaba a que
-la ventana apareciera se comia DOCE SEGUNDOS antes de rendirse. Alexa concede
-ocho. La sesion moria antes de que el usuario supiera que habia pasado.
+Abre web.whatsapp.com en Comet, busca el contacto, escribe el texto y
+ANTES DE ENVIAR lee con OCR el nombre del chat que se abrio y lo confirma en
+voz alta. Solo con el si se pulsa enviar; con el no se borra el texto.
 
-Ahora se usa https://web.whatsapp.com/ en Comet, que es donde ya tienes la
-sesion iniciada.
-
-El reloj manda
---------------
-Abrir el navegador y cargar WhatsApp Web en frio tarda bastante mas de lo que
-Alexa aguanta. Por eso hay dos caminos:
-
-  - Si WhatsApp Web YA esta abierto  -> se busca, se escribe y se pregunta.
-    Son unos cinco segundos: entra, justo pero entra.
-  - Si NO lo esta -> se abre y se contesta AL MOMENTO pidiendo que repitas la
-    orden. Nada de esperar con la sesion de Alexa colgando.
-
-La seguridad no cambia: el nombre que se te dice para confirmar sale de leer
-la cabecera del chat que WhatsApp tiene abierto de verdad.
+Ese paso existe porque mandar un mensaje a la persona equivocada no se
+deshace.
 """
 
 import logging
@@ -38,12 +20,6 @@ log = logging.getLogger("jarvis.whatsapp")
 
 URL = "https://web.whatsapp.com/"
 
-# Zona donde WhatsApp Web pinta el nombre del chat abierto. En navegador hay
-# barra de pestañas y de direcciones encima, asi que la cabecera cae mas abajo
-# que en la aplicacion de escritorio.
-# La franja del nombre del chat. En navegador hay pestañas y barra de
-# direcciones encima, asi que cae mas abajo que en una aplicacion. Estrecha a
-# proposito: si se abre de mas, entra el subtitulo y se confunde con el nombre.
 ZONA_CABECERA = (0.30, 0.11, 0.70, 0.175)
 ZONA_CONVERSACION = (0.32, 0.20, 1.0, 0.88)
 
@@ -84,14 +60,6 @@ def esta_abierto() -> bool:
     return _ventana_de_whatsapp() is not None
 
 
-# Banderas para que Comet no se pare a preguntar nada al arrancar en frio.
-#
-# El problema: si Comet estaba cerrado, al abrirlo aparece la barra de
-# "¿Restaurar paginas?" (o el globo de sesion interrumpida). Se queda encima,
-# roba el foco del teclado, y todo lo que Jarvis escriba despues se pierde o
-# va a parar donde no debe. El flujo se quedaba a medias sin decir por que.
-#
-# Son banderas estandar de Chromium; Comet esta construido sobre el.
 BANDERAS_COMET = [
     "--disable-session-crashed-bubble",   # el globo de "se cerro inesperadamente"
     "--hide-crash-restore-bubble",        # el mismo globo en versiones nuevas
@@ -102,14 +70,7 @@ BANDERAS_COMET = [
 
 
 def descartar_avisos() -> None:
-    """
-    Cierra cualquier aviso que se haya colado encima del navegador.
-
-    Las banderas cubren el caso normal, pero no todos: una actualizacion
-    reciente, un permiso pendiente o una notificacion pueden dejar algo
-    delante. Escape las cierra sin tocar la pagina, y es inofensivo si no hay
-    nada que cerrar.
-    """
+    """Cierra cualquier aviso que se haya colado encima del navegador."""
     try:
         import pyautogui
         pyautogui.press("escape")
@@ -157,10 +118,6 @@ def _enfocar() -> bool:
     return "Ahí tienes" in resultado or _ventana_de_whatsapp() is not None
 
 
-# Texto de la interfaz que NO es el nombre de nadie. Sale en la cabecera, justo
-# debajo del nombre, y el OCR lo mezcla con el. En el registro llego a
-# confirmarse un envio "a here for group info", que es el subtitulo de un grupo
-# en la version inglesa.
 _RUIDO_CABECERA = (
     "click here", "here for", "group info", "info del grupo", "informacion del grupo",
     "haz clic", "haz click", "en linea", "en línea", "online", "last seen",
@@ -226,9 +183,6 @@ def _enviar_ahora() -> str:
 
 def _buscar_y_abrir_chat(pg, nombre: str) -> None:
     """Busca el chat y lo abre. El cursor queda en la caja de mensaje."""
-    # Doble Escape: el primero se lleva por delante cualquier aviso del
-    # navegador que se haya quedado encima (restaurar sesion, permisos), el
-    # segundo cierra el chat anterior y devuelve el foco a la lista.
     pg.press("escape")
     time.sleep(0.15)
     pg.press("escape")
@@ -262,9 +216,6 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     if pg is None:
         return "No puedo manejar WhatsApp, falta pyautogui."
 
-    # --- WhatsApp Web todavia no esta abierto ---
-    # Contestamos YA. Esperar a que cargue serian mas de ocho segundos y Alexa
-    # cerraria la sesion: exactamente lo que pasaba antes.
     if not _enfocar():
         lanzar_en_segundo_plano()
         return ("Estoy abriendo WhatsApp Web en Comet. "
@@ -289,10 +240,6 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
                       f"Pedí buscar {destinatario}. ¿Lo envío igual? Di sí o no."),
         )
 
-    # ¿Se parece lo que abrio WhatsApp a lo que pediste? Si no comparten ni una
-    # palabra, lo mas probable es que Alexa transcribiera mal el nombre y el
-    # buscador abriera el primer chat que le sono. Este aviso es lo unico que
-    # separa "casi lo mando a quien no era" de haberlo mandado.
     pedidas = {p for p in _re.split(r"\W+", destinatario.lower()) if len(p) > 2}
     reales = {p for p in _re.split(r"\W+", nombre_real.lower()) if len(p) > 2}
 

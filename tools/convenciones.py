@@ -1,20 +1,14 @@
-"""
-Las reglas de la boveda, leidas de la propia boveda.
+"""Las reglas de organizacion de la boveda.
 
-Kaled tiene un CLAUDE.md en la raiz del vault con como esta organizado todo:
-que carpeta para cada cosa, que plantilla usar, que tags existen, y las reglas
-de enlazado. Este modulo lo lee y lo pone a disposicion del resto.
-
-Por que no dejarlo escrito aqui
--------------------------------
-Porque la boveda cambia y este archivo no se enteraria. Si mañana añades una
-carpeta o un tag, lo escribes en tu CLAUDE.md —donde ya lo escribirias de
-todas formas— y Jarvis se entera solo. Los valores de aqui abajo son solo la
-red de seguridad para cuando ese archivo no exista.
+Lee el CLAUDE.md de la raiz de la boveda para saber como estan organizadas
+las carpetas y como se nombran los archivos, y comprueba en disco cuales
+existen de verdad. Sin ese archivo usa unas convenciones por defecto.
 """
 
 import logging
 import re
+
+from config import NOMBRE_USUARIO
 
 from tools import obsidian
 
@@ -54,11 +48,7 @@ _cache: dict | None = None
 
 
 def nombre_de_archivo(titulo: str) -> str:
-    """
-    Minusculas con guiones, que es la convencion de la boveda.
-
-    "Bases de Datos - Clase 3" -> "bases-de-datos-clase-3.md"
-    """
+    """Minusculas con guiones, que es la convencion de la boveda."""
     import unicodedata
 
     limpio = "".join(c for c in unicodedata.normalize("NFD", titulo or "")
@@ -96,13 +86,7 @@ def leer_reglas() -> str:
 
 
 def carpetas_reales() -> dict:
-    """
-    Las carpetas que EXISTEN en la boveda, mapeadas por tipo.
-
-    Se comprueba en disco a proposito: da igual lo que diga el CLAUDE.md si la
-    carpeta no esta creada. Y los nombres se comparan sin distinguir mayusculas
-    ni acentos, porque "Recursos y Proyectos" tiene ambas cosas.
-    """
+    """Las carpetas que EXISTEN en la boveda, mapeadas por tipo."""
     vault = obsidian.vault()
     if vault is None:
         return {}
@@ -158,18 +142,12 @@ def plantilla(tipo: str) -> str:
 
 
 def resumen_para_modelo() -> str:
-    """
-    Las reglas condensadas, para meterlas en el prompt del modelo.
-
-    El CLAUDE.md entero son ~2.500 caracteres. En un modelo local cada token
-    del prompt es tiempo de GPU, y aqui solo hacen falta las decisiones: donde
-    va cada cosa y como se nombra.
-    """
+    """Las reglas condensadas, para meterlas en el prompt del modelo."""
     carpetas = carpetas_reales()
     if not carpetas:
         return ""
 
-    lineas = ["Reglas de la boveda de Obsidian de Kaled:"]
+    lineas = [f"Reglas de la boveda de Obsidian de {NOMBRE_USUARIO}:"]
     descripciones = {
         "clase": "apuntes de una materia",
         "documento": "un archivo importante (pdf, guia, entrega)",
