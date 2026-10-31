@@ -26,7 +26,7 @@ function Leer-Env {
 }
 
 $Puerto  = Leer-Env "JARVIS_PUERTO" "8000"
-$dominio = Leer-Env "JARVIS_NGROK_URL" ""
+$dominio = Leer-Env "JARVIS_TUNEL_URL" (Leer-Env "JARVIS_NGROK_URL" "")
 if ($dominio) {
     if ($dominio -notmatch '^https?://') { $dominio = "https://$dominio" }
     $dominio = $dominio.TrimEnd('/')

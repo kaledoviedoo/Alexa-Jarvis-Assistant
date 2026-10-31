@@ -116,8 +116,8 @@ def _escribir_via_portapapeles(texto: str, pyautogui) -> None:
         respaldo = ""
         try:
             respaldo = pyperclip.paste()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("No pude leer el portapapeles: %s", e)
 
         pyperclip.copy(texto)
         time.sleep(0.05)
@@ -128,8 +128,10 @@ def _escribir_via_portapapeles(texto: str, pyautogui) -> None:
         if respaldo:
             try:
                 pyperclip.copy(respaldo)
-            except Exception:
-                pass
+            except Exception as e:
+                # Si esto falla te quedas con mi texto en el portapapeles en
+                # vez del tuyo, y no hay forma de saber por que.
+                log.debug("No pude devolver el portapapeles: %s", e)
     except ImportError:
         # Sin pyperclip: escribimos igual, aceptando que algún acento se pierda.
         pyautogui.write(texto, interval=0.01)
@@ -221,8 +223,10 @@ def _siguiente_nombre_captura() -> str:
             resto = archivo.stem[len("captura"):]
             if resto.isdigit():
                 usados.add(int(resto))
-    except Exception:
-        pass
+    except Exception as e:
+        # Sin esta cuenta la numeracion empieza de cero y puede pisar una
+        # captura que ya tenias.
+        log.debug("No pude mirar las capturas que ya hay: %s", e)
 
     numero = 1
     while numero in usados:

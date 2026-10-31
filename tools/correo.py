@@ -87,8 +87,10 @@ def _mensajes(carpeta, cuantos: int, solo_sin_leer: bool = False) -> list:
     if solo_sin_leer:
         try:
             elementos = elementos.Restrict("[Unread] = True")
-        except Exception:
-            pass
+        except Exception as e:
+            # Importante: si el filtro no entra, devolvemos TODOS los correos
+            # como si fueran los sin leer. Conviene que quede escrito.
+            log.debug("Outlook no aceptó el filtro de no leidos: %s", e)
 
     salida = []
     for i, mensaje in enumerate(elementos):
@@ -245,8 +247,8 @@ def _resolver_destinatario(mensaje, quien: str):
                 usuario = entrada.GetExchangeUser()
                 if usuario:
                     direccion = getattr(usuario, "PrimarySmtpAddress", "") or direccion
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Me quedo con la direccion X500 sin traducir: %s", e)
 
         return nombre, direccion
     except Exception as e:
@@ -309,8 +311,8 @@ def enviar_correo(quien: str, cuerpo: str, asunto: str = "") -> str:
         try:
             # Sin esto quedaria un borrador fantasma abierto en Outlook.
             mensaje.Close(1)        # 1 = olDiscard
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("No pude cerrar el borrador: %s", e)
         return "Vale, lo descarté. No se envió nada."
 
     corto = cuerpo if len(cuerpo) <= 70 else cuerpo[:70] + "..."
@@ -360,8 +362,8 @@ def responder_ultimo(cuerpo: str) -> str:
     def _descartar():
         try:
             respuesta.Close(1)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("No pude cerrar la respuesta: %s", e)
         return "Vale, descarté la respuesta."
 
     corto = cuerpo if len(cuerpo) <= 70 else cuerpo[:70] + "..."

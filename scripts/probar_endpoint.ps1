@@ -28,7 +28,7 @@ function Leer-Env {
 
 $Puerto  = Leer-Env "JARVIS_PUERTO" "8000"
 $SkillId = Leer-Env "ALEXA_SKILL_ID" ""
-$dominio = Leer-Env "JARVIS_NGROK_URL" ""
+$dominio = Leer-Env "JARVIS_TUNEL_URL" (Leer-Env "JARVIS_NGROK_URL" "")
 
 if ($dominio) {
     if ($dominio -notmatch '^https?://') { $dominio = "https://$dominio" }

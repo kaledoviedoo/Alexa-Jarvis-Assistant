@@ -1,0 +1,14 @@
+# ============================================================================
+#  Solo para correr las pruebas.
+#
+#     py -m pip install -r requirements-dev.txt
+#     py test_router.py && py test_frases.py
+#     py test_archivos.py && py test_alexa.py
+# ============================================================================
+
+# test_alexa.py levanta el servidor y le manda peticiones reales de Alexa.
+# El TestClient de FastAPI se apoya en httpx.
+httpx>=0.27.0
+
+# Para medir que parte del codigo ejecutan de verdad las pruebas.
+coverage>=7.4.0

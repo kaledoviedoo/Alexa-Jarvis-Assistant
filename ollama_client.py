@@ -476,8 +476,10 @@ def construir_prompt_sistema() -> str:
                 f"\n--- OBSIDIAN ---\nEl usuario tiene un vault en {v}. "
                 "Usa las herramientas obsidian_* para apuntar notas e ideas."
             )
-    except Exception:
-        pass
+    except Exception as e:
+        # Si esto falla el modelo se queda sin saber que hay boveda, y luego
+        # no se entiende por que no apunta nada.
+        log.debug("No pude anadir el contexto de Obsidian: %s", e)
 
     return "\n".join(partes)
 
@@ -536,6 +538,19 @@ HERRAMIENTAS_QUE_TOCAN = {
     "crear_archivo":     ("crea", "crear", "cree", "hazme", "haz un", "nuevo"),
     "crear_carpeta":     ("crea", "crear", "cree", "carpeta", "nueva"),
     "cambiar_modo":      ("modo", "gaming", "dedicado", "normal", "juego"),
+
+    # Estas cuatro escriben en la boveda y en el contexto. Estaban fuera del
+    # freno por descuido mio: el modelo podia garabatear en las notas desde una
+    # conversacion normal, que es justo el fallo para el que existe esto.
+    "obsidian_crear_nota":       ("nota", "apunta", "anota", "crea", "guarda",
+                                  "escrib", "boveda", "obsidian"),
+    "obsidian_agregar_a_nota":   ("agrega", "agregue", "añade", "anade", "suma",
+                                  "apunta", "anota", "mete", "nota"),
+    "obsidian_agregar_al_diario": ("diario", "apunta", "anota", "registra",
+                                   "guarda", "bitacora"),
+    "recordar_en_contexto":      ("recuerda", "acuerdate", "ten en cuenta",
+                                  "contexto", "apunta que", "no olvides",
+                                  "que sepas"),
 }
 
 LARGO_MAXIMO_DE_UNA_ORDEN = 70
@@ -637,8 +652,10 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
         if sobran:
             log.info("Descarto argumentos que %s no acepta: %s", nombre, sobran)
             argumentos = {k: v for k, v in argumentos.items() if k in validas}
-    except (TypeError, ValueError):
-        pass
+    except (TypeError, ValueError) as e:
+        # Sin poder mirar la firma no se filtra nada, y el fallo aparece mas
+        # tarde como un TypeError dentro de la herramienta.
+        log.debug("No pude leer la firma de %s: %s", nombre, e)
 
     try:
         return funcion(**argumentos)

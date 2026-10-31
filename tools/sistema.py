@@ -561,8 +561,8 @@ def cerrar_aplicacion(nombre_app: str) -> str:
     for proceso in vivos_aun:
         try:
             proceso.kill()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("No pude matar %s: %s", getattr(proceso, "pid", "?"), e)
 
     log.info("Cerrada aplicacion %s (%d procesos)", real, cerrados)
     return f"Cerré {real}."

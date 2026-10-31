@@ -133,7 +133,7 @@ Comprobar "Tarea programada" {
 
 # El más importante de todos: comprueba la cadena COMPLETA tal y como la ve
 # Alexa, desde internet hasta Jarvis. Si esto pasa, el endpoint es válido.
-$dominio = Leer-Env "JARVIS_NGROK_URL" ""
+$dominio = Leer-Env "JARVIS_TUNEL_URL" (Leer-Env "JARVIS_NGROK_URL" "")
 if ($dominio) {
     if ($dominio -notmatch '^https?://') { $dominio = "https://$dominio" }
     $dominio = $dominio.TrimEnd('/')

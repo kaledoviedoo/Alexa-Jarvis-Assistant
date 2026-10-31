@@ -1,0 +1,29 @@
+# ============================================================================
+#  Opcionales: cada bloque enciende una capacidad concreta.
+#
+#     py -m pip install -r requirements-extras.txt
+#
+#  Sin esto Jarvis arranca igual y solo te dice que no puede con esas ordenes
+#  en vez de fallar. Los scripts instalar_extras.ps1 e instalar_cerebro.ps1
+#  instalan lo mismo y ademas comprueban lo que no es un paquete de Python
+#  (Tesseract, el modelo de vectores, Outlook).
+# ============================================================================
+
+# ---- Memoria semantica: buscar en la boveda y en el codigo ----
+# Sin numpy funciona igual pero comparando vector a vector en Python puro:
+# con 600 fragmentos se nota, con 5000 es inviable.
+numpy>=1.26.0
+
+# ---- Leer el contenido de los PDF al archivarlos ----
+pypdf>=4.0.0
+
+# ---- Ver la pantalla ----
+# Ademas hace falta el propio Tesseract, que no es un paquete de Python:
+# lo instala scripts\idioma_ocr.ps1 con el idioma espanol.
+mss>=9.0.0
+pytesseract>=0.3.10
+
+# ---- Correo por Outlook de escritorio ----
+# Solo Windows. Despues de instalarlo hay que registrar sus DLLs:
+#     py -m pywin32_postinstall -install
+pywin32>=306; sys_platform == "win32"

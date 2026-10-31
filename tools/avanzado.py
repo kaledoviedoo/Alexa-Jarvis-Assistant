@@ -34,8 +34,8 @@ def _elegir_ruta_contexto() -> Path:
         # Comprobamos que se pueda escribir de verdad, no solo que exista.
         if candidata.exists() or os.access(candidata.parent, os.W_OK):
             return candidata
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("No puedo escribir el contexto en el proyecto: %s", e)
     return CARPETA_DATOS / "contexto.md"
 
 
@@ -152,8 +152,8 @@ def info_equipo_dict() -> dict:
         datos = _sistema.info_gpu()
         if datos.get("disponible"):
             gpu = f"{datos['nombre']} ({datos['vram_total_mb'] / 1024:.0f} GB)"
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("No pude leer la GPU: %s", e)
 
     try:
         arranque = datetime.fromtimestamp(psutil.boot_time())

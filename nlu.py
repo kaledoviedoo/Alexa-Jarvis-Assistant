@@ -537,8 +537,9 @@ def _codigo_buscar(m) -> str:
     if not consulta:
         return "¿Qué parte del código buscas?"
 
-    encontrados = [t for t in memoria.buscar(consulta, cuantos=12, minimo=0.35)
-                   if str(t.get("ruta", "")).startswith(str(memoria.RAIZ_PROYECTO))]
+    # El codigo tiene su propio indice, asi que ya no hay que pedir doce
+    # resultados de todo para luego tirar los que no eran del proyecto.
+    encontrados = memoria.buscar(consulta, cuantos=4, minimo=0.35, donde="codigo")
 
     if not encontrados:
         return (f"No encuentro nada del código que trate de {consulta}. "

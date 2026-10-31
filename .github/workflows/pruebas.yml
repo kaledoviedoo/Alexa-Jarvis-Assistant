@@ -1,0 +1,68 @@
+# ============================================================================
+#  Corre las cuatro tandas de pruebas en cada push y en cada pull request.
+#
+#  Para que sirve: las pruebas ya existian pero solo se ejecutaban cuando me
+#  acordaba de lanzarlas a mano. Un cambio en nlu.py que rompiera treinta
+#  frases se subia igual y no se notaba hasta hablarle al Echo.
+#
+#  Corre en Linux aunque Jarvis solo viva en Windows: las pruebas no tocan el
+#  equipo (el router esta doblado, el sandbox de archivos trabaja en una
+#  carpeta temporal y el servidor se levanta en memoria).
+# ============================================================================
+
+name: pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # La de abajo es la version minima que declara el README; la de arriba,
+        # la que tengo instalada. Si algo solo funciona en una de las dos,
+        # prefiero enterarme aqui.
+        python: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Instalar dependencias
+        # No se instala requirements.txt entero a proposito: pyautogui y
+        # pygetwindow necesitan una pantalla y aqui no hay ninguna. Todo lo
+        # que los usa los importa dentro de la funcion, asi que las pruebas
+        # corren sin ellos.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install fastapi "uvicorn[standard]" cryptography psutil \
+                                python-docx openpyxl numpy
+          python -m pip install -r requirements-dev.txt
+
+      - name: El router entiende lo que tiene que entender
+        run: python test_router.py
+
+      - name: El fraseo sigue siendo tolerante
+        run: python test_frases.py
+
+      - name: Los archivos y la seleccion hacen lo que dicen
+        run: python test_archivos.py
+
+      - name: El servidor contesta en formato Alexa
+        run: python test_alexa.py
+
+      - name: Que ningun archivo se quede sin compilar
+        # Coge los errores de sintaxis de los modulos que las pruebas no
+        # llegan a importar (los de Windows, sobre todo).
+        run: python -m compileall -q . -x "__pycache__"

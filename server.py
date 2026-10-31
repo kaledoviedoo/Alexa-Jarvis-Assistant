@@ -94,7 +94,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-08-22-semantico-30"
+SELLO_CODIGO = "2026-09-16-ola2-32"
 
 
 @app.on_event("startup")
@@ -125,8 +125,8 @@ def al_arrancar():
 
         v = obsidian.vault()
         log.info("Obsidian          : %s", v or "vault no detectado")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("No pude mirar si hay boveda: %s", e)
 
     comet = detectar_comet()
     log.info("Comet             : %s", comet or "no detectado (usaré el navegador por defecto)")
@@ -150,6 +150,20 @@ def al_arrancar():
         log.info("Precalentando el modelo en segundo plano...")
     else:
         log.warning("Ollama            : NO responde. Solo funcionarán los comandos básicos.")
+
+    # Que la direccion por la que entra Amazon exista de verdad. Si no, se
+    # dice aqui y con ERROR, no enterrado en un aviso repetido cada 90 s.
+    try:
+        bien, detalle = mantener_caliente.comprobar_camino_publico()
+        if bien:
+            log.info("Camino público   : %s", detalle)
+        else:
+            log.error("=" * 62)
+            log.error("ALEXA NO PUEDE LLEGAR HASTA AQUI")
+            log.error("%s", detalle)
+            log.error("=" * 62)
+    except Exception as e:
+        log.warning("No pude comprobar el camino público: %s", e)
 
     # Mantener el camino caliente: es lo que evita que la primera orden tras
     # un rato de inactividad falle y haya que repetirla.
@@ -179,8 +193,10 @@ def _hay_sitio_para_trabajar() -> tuple[bool, str]:
     try:
         if modes.modo_actual() == MODO_GAMING:
             return False, "estás en modo gaming"
-    except Exception:
-        pass
+    except Exception as e:
+        # Si esto falla se sigue adelante, o sea que se pondria a rastrear el
+        # equipo en mitad de una partida sin que nada lo explique.
+        log.debug("No pude leer el modo actual: %s", e)
 
     try:
         from tools import sistema
@@ -297,8 +313,8 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
     try:
         from tools import aprendizaje
         aprendizaje.registrar(texto, origen, transcurrido)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("No pude registrar la orden para aprender: %s", e)
 
     return respuesta
 

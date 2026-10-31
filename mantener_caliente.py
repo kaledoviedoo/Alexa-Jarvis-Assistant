@@ -10,6 +10,7 @@ El modelo solo se mantiene en la VRAM si has usado el asistente hace poco.
 
 import json
 import logging
+import os
 import socket
 import ssl
 import threading
@@ -79,8 +80,8 @@ def _ips_del_tunel(host: str) -> list[str]:
                     "Caliento por la publica, que es por donde entra Amazon.",
                     host, local, encontradas[0],
                 )
-        except OSError:
-            pass
+        except OSError as e:
+            log.debug("MagicDNS no resolvio %s: %s", host, e)
 
     return _ips_publicas
 
@@ -266,3 +267,77 @@ def iniciar() -> bool:
 
 def detener() -> None:
     _parar.set()
+
+
+def _funnel_publicado() -> str:
+    """El nombre que Tailscale dice estar publicando ahora mismo, o "".
+
+    Se lee de `tailscale funnel status` porque es la unica fuente que sabe la
+    verdad: el .env puede haberse quedado viejo y el propio Jarvis no tiene
+    forma de enterarse.
+    """
+    import re
+    import subprocess
+
+    try:
+        salida = subprocess.run(
+            ["tailscale", "funnel", "status"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=(subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0),
+        ).stdout
+    except Exception as e:
+        log.debug("No pude consultar el Funnel: %s", e)
+        return ""
+
+    encontrado = re.search(r"https://([a-z0-9-]+\.[a-z0-9.-]+\.ts\.net)", salida, re.I)
+    return encontrado.group(1) if encontrado else ""
+
+
+def comprobar_camino_publico() -> tuple[bool, str]:
+    """Comprueba que la direccion configurada exista de verdad y sea la buena.
+
+    Devuelve (todo_bien, explicacion). La explicacion trae ya escrito lo que
+    hay que hacer, porque el fallo tipico aqui es imposible de adivinar
+    mirando el equipo: todo parece correcto y nada funciona.
+
+    Existe por lo del 16 de septiembre. El equipo se renombro en Tailscale, la
+    direccion vieja dejo de resolver, y Jarvis siguio arrancando tan contento
+    y diciendo "listo y escuchando" mientras Amazon llamaba a una puerta que
+    ya no existia. Cuarenta pings fallidos seguidos, cero peticiones, y la
+    unica pista enterrada en una linea de aviso repetida.
+    """
+    if not TUNEL_URL:
+        return False, ("No hay JARVIS_TUNEL_URL en el .env. Alexa no tiene "
+                       "por donde entrar.")
+
+    configurado = urllib.parse.urlparse(TUNEL_URL).hostname or ""
+    if not configurado:
+        return False, f"JARVIS_TUNEL_URL no parece una direccion: {TUNEL_URL}"
+
+    resuelve = bool(_resolver_por_dns_publico(configurado))
+    publicado = _funnel_publicado()
+
+    # El caso que nos costo la tarde: el nombre del .env ya no existe, pero
+    # Tailscale esta publicando otro. Podemos decir exactamente cual.
+    if publicado and publicado.lower() != configurado.lower():
+        return False, (
+            f"El .env apunta a {configurado}, pero Tailscale esta publicando "
+            f"{publicado}. Cambia JARVIS_TUNEL_URL a https://{publicado} y "
+            f"actualiza tambien el endpoint en la consola de Alexa."
+        )
+
+    if not resuelve:
+        if publicado:
+            return False, (
+                f"{configurado} no resuelve por DNS publico aunque el Funnel "
+                "este activo. Suele tardar un par de minutos tras publicarlo; "
+                "si sigue igual, vuelve a lanzarlo: "
+                "tailscale funnel --bg --https=443 localhost:8000"
+            )
+        return False, (
+            f"{configurado} no resuelve y Tailscale no esta publicando nada. "
+            "Comprueba que Tailscale este corriendo y lanza: "
+            "tailscale funnel --bg --https=443 localhost:8000"
+        )
+
+    return True, configurado

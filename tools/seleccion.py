@@ -69,6 +69,11 @@ _carpeta: Path = ESCRITORIO
 _elegidos: list[Path] = []
 _sellado: float = 0.0
 
+# Si lo ultimo que se solto fue por caducidad y no porque tu lo pidieras. Hace
+# falta acordarse aparte: al caducar se vacia la lista, y sin lista no hay
+# forma de distinguir "caduco" de "nunca seleccionaste nada".
+_caduco: bool = False
+
 
 def _refrescar_sello() -> None:
     global _sellado
@@ -91,8 +96,10 @@ def carpeta_actual() -> Path:
 
 def seleccionados() -> list[Path]:
     """Los archivos vivos de la seleccion. Vacia si caduco."""
+    global _caduco
     if _caducada():
         log.info("La seleccion caduco tras %d s", VIDA_SEGUNDOS)
+        _caduco = True
         olvidar()
     # Uno pudo desaparecer entre medias: no lo arrastramos.
     return [r for r in _elegidos if r.exists()]
@@ -152,12 +159,20 @@ def entrar_en(nombre_carpeta: str) -> str:
 
 
 def _familia_de(palabra: str) -> tuple | None:
-    clave = (palabra or "").strip().lower()
-    familia = ALIAS_FAMILIA.get(clave)
-    if familia:
-        return FAMILIAS[familia]
-    # Una extension dicha tal cual: "selecciona todos los .ini"
-    limpia = clave.lstrip(".")
+    """Las extensiones de una familia dicha hablando ("los pdf", "las fotos")."""
+    familia = ALIAS_FAMILIA.get((palabra or "").strip().lower())
+    return FAMILIAS[familia] if familia else None
+
+
+def _extension_suelta(palabra: str) -> tuple | None:
+    """Una extension dicha tal cual: "selecciona todos los punto ini".
+
+    Se prueba DESPUES de buscar por nombre, no antes. Cualquier palabra corta
+    parece una extension ("beca" es .beca), asi que si se mira primero,
+    "selecciona los de beca" no encuentra beca.docx y contesta que no hay
+    archivos de ese tipo, que es la respuesta mas confusa posible.
+    """
+    limpia = (palabra or "").strip().lower().lstrip(".")
     if limpia and limpia.isalnum() and len(limpia) <= 5:
         return ("." + limpia,)
     return None
@@ -178,7 +193,7 @@ def _describir(elegidos: list[Path], que_hice: str) -> str:
 
 def seleccionar(criterio: str = "", cantidad: int = 0, recientes: bool = False) -> str:
     """Coge archivos de la carpeta actual."""
-    global _elegidos
+    global _elegidos, _caduco
 
     dentro = _listar(_carpeta)
     if not dentro:
@@ -199,6 +214,13 @@ def seleccionar(criterio: str = "", cantidad: int = 0, recientes: bool = False) 
             # porque lo estas diciendo en voz alta y Alexa transcribe regular.
             aguja = _sin_tildes(crudo)
             candidatos = [r for r in dentro if aguja in _sin_tildes(r.stem.lower())]
+
+            # Si no encaja ningun nombre, puede que fuera una extension.
+            if not candidatos:
+                suelta = _extension_suelta(crudo)
+                if suelta:
+                    candidatos = [r for r in dentro if r.suffix.lower() in suelta]
+
             if not candidatos:
                 return f"En {_carpeta.name} no hay ninguno que diga {criterio}."
 
@@ -210,6 +232,7 @@ def seleccionar(criterio: str = "", cantidad: int = 0, recientes: bool = False) 
         candidatos = candidatos[:cantidad]
 
     _elegidos = candidatos
+    _caduco = False
     _refrescar_sello()
     log.info("Seleccionados %d archivos en %s", len(_elegidos), _carpeta)
 
@@ -233,7 +256,7 @@ def que_hay() -> str:
     """Lee lo que tienes cogido ahora mismo."""
     vivos = seleccionados()
     if not vivos:
-        if _caducada():
+        if _caduco:
             return "Tenía una selección pero ya caducó. Vuelve a decirme cuáles."
         return f"No tengo nada seleccionado. Estoy en {_carpeta.name}."
     return _describir(vivos, "Tienes seleccionados")

@@ -1,17 +1,35 @@
-# ---- Núcleo (imprescindibles) ----
+# ============================================================================
+#  Nucleo: sin esto Jarvis no arranca.
+#
+#     py -m pip install -r requirements.txt
+#
+#  Lo opcional (correo, vision, memoria semantica) esta en
+#  requirements-extras.txt, para que un equipo que solo quiera el control por
+#  voz no tenga que bajarse Tesseract ni pywin32.
+# ============================================================================
+
+# ---- Servidor ----
 fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
+
+# ---- Verificacion de la firma de Amazon ----
+# Sin esto el tunel publico queda sin proteccion criptografica.
+cryptography>=42.0.0
+
+# ---- Sistema y modelo ----
 psutil>=5.9.0
 ollama>=0.3.0
 
-# ---- Seguridad (verificación de la firma de Amazon) ----
-# Sin esto, tu túnel público queda sin protección criptográfica.
-cryptography>=42.0.0
-
-# ---- Control de teclado y mouse ----
+# ---- Control de teclado, raton y ventanas ----
 pyautogui>=0.9.54
 pyperclip>=1.8.2
 pillow>=10.0.0
+
+# pygetwindow lo usan el cambio de ventanas, WhatsApp y el buscador de
+# aplicaciones. Estaba sin declarar y funcionaba solo porque pyautogui lo
+# arrastra en Windows: en cuanto eso cambie, tres funciones dejan de ir sin
+# que nadie sepa por que.
+pygetwindow>=0.0.9
 
 # ---- Documentos ----
 python-docx>=1.1.0

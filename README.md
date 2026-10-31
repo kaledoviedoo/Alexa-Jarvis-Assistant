@@ -1,6 +1,7 @@
 # Jarvis
 
 ![estado](https://img.shields.io/badge/estado-en%20uso%20diario-success)
+[![pruebas](https://github.com/kaledoviedoo/Alexa-Jarvis-Assistant/actions/workflows/pruebas.yml/badge.svg)](https://github.com/kaledoviedoo/Alexa-Jarvis-Assistant/actions/workflows/pruebas.yml)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![fastapi](https://img.shields.io/badge/FastAPI-0.110-009688)
 ![ollama](https://img.shields.io/badge/Ollama-local-black)
@@ -53,7 +54,7 @@ Echo ──▶ Amazon ──▶ túnel ──▶ FastAPI ──▶ router regex 
 - **Integraciones**: WhatsApp Web, Outlook (COM local), Teams, Obsidian, Epic/Steam.
 - **Freno de acciones**: las herramientas que tocan el equipo exigen que la frase original de verdad las pidiera.
 - **Seguridad**: firma de Amazon verificada, escrituras confinadas a tres carpetas, nada se borra de verdad, confirmación en dos turnos para lo irreversible.
-- **175 pruebas de enrutado + 195 de fraseo**, ejecutables sin tocar el equipo.
+- **458 pruebas** de enrutado, fraseo, sandbox de archivos y formato Alexa, ejecutables sin tocar el equipo y en cada push.
 
 ## Getting Started
 
@@ -64,7 +65,9 @@ de desarrollador de Alexa (gratis).
 git clone https://github.com/kaledoviedoo/Alexa-Jarvis-Assistant.git jarvis
 cd jarvis
 
-py -m pip install -r requirements.txt
+py -m pip install -r requirements.txt          # núcleo
+py -m pip install -r requirements-extras.txt   # correo, visión, memoria
+
 ollama pull llama3.2:3b
 ollama pull nomic-embed-text
 
@@ -77,8 +80,13 @@ Rellena `ALEXA_SKILL_ID` en el `.env`, y luego:
 ```powershell
 .\scripts\configurar_tailscale.ps1
 .\scripts\instalar_autoarranque.ps1
+.\scripts\vigilante.ps1 -Instalar
 .\reiniciar_jarvis.ps1
 ```
+
+Los extras son opcionales: sin ellos Jarvis arranca igual y solo dice que no
+puede con esas órdenes. El vigilante comprueba cada 5 minutos que el servidor
+responda y lo levanta si se cayó.
 
 En la consola de Alexa: pega `alexa/interaction_model.json` en el editor JSON, dale
 a *Build Model* y apunta el endpoint a tu túnel.
@@ -105,7 +113,8 @@ Y contra el servidor directamente:
 ```powershell
 curl http://localhost:8000/salud     # sello del código, modo, GPU, Ollama
 .\scripts\diagnostico.ps1            # revisa túnel, puertos y dependencias
-py test_router.py                    # 175 casos de enrutado
+py test_router.py                    # 188 casos de enrutado
+py test_archivos.py                  # el sandbox y la selección, sobre disco
 ```
 
 ## Estructura
@@ -129,8 +138,9 @@ jarvis/
 │   ├── archivar.py        Archivado razonado en Obsidian
 │   └── ...
 ├── alexa/                 Modelo de interacción de la skill
-├── scripts/               12 scripts de instalación y diagnóstico
-└── test_*.py              370 pruebas
+├── scripts/               13 scripts de instalación, diagnóstico y vigilancia
+├── .github/workflows/     Las pruebas en cada push
+└── test_*.py              458 pruebas
 ```
 
 ## Contacto

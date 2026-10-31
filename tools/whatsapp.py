@@ -75,8 +75,8 @@ def descartar_avisos() -> None:
         import pyautogui
         pyautogui.press("escape")
         time.sleep(0.15)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("No pude descartar avisos: %s", e)
 
 
 def _abrir_en_comet() -> None:

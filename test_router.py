@@ -392,6 +392,62 @@ def probar_intenciones() -> list[str]:
     return fallos
 
 
+def probar_camino_publico() -> list[str]:
+    """Que Jarvis se entere solo de que Alexa no puede llegar.
+
+    El 16 de septiembre el equipo se renombro en Tailscale, la direccion del
+    .env dejo de existir, y Jarvis siguio arrancando y diciendo "listo y
+    escuchando" mientras Amazon llamaba a una puerta que ya no estaba. Costo
+    una tarde averiguarlo. Esto comprueba los cuatro escenarios.
+    """
+    import mantener_caliente as mc
+    fallos = []
+
+    print()
+    print("-" * 70)
+    print("  EL CAMINO POR EL QUE ENTRA ALEXA")
+    print("-" * 70)
+
+    guardados = (mc.TUNEL_URL, mc._resolver_por_dns_publico, mc._funnel_publicado)
+    casos = [
+        ("renombraste el equipo",
+         "viejo.tail1.ts.net", False, "nuevo.tail1.ts.net", False, "nuevo.tail1.ts.net"),
+        ("todo en orden",
+         "pc.tail1.ts.net", True, "pc.tail1.ts.net", True, ""),
+        ("Funnel puesto, DNS sin propagar",
+         "pc.tail1.ts.net", False, "pc.tail1.ts.net", False, "vuelve a lanzarlo"),
+        ("Tailscale caido",
+         "pc.tail1.ts.net", False, "", False, "no esta publicando nada"),
+        ("sin URL configurada",
+         "", False, "", False, "No hay JARVIS_TUNEL_URL"),
+    ]
+
+    try:
+        for etiqueta, url, resuelve, publicado, debe_ir_bien, pista in casos:
+            mc.TUNEL_URL = f"https://{url}" if url else ""
+            mc._resolver_por_dns_publico = lambda h, r=resuelve: (["1.2.3.4"] if r else [])
+            mc._funnel_publicado = lambda p=publicado: p
+
+            bien, detalle = mc.comprobar_camino_publico()
+
+            if bien != debe_ir_bien:
+                fallos.append(f"CAMINO {etiqueta}: dijo {bien} y tocaba {debe_ir_bien}")
+                print(f"  FALLO  {etiqueta:<34} -> {bien}, esperaba {debe_ir_bien}")
+                continue
+
+            # Cuando avisa, el aviso tiene que traer la pista util. Un error
+            # que no dice que hacer no sirve de nada a las once de la noche.
+            if pista and pista not in detalle:
+                fallos.append(f"CAMINO {etiqueta}: el aviso no dice {pista!r}")
+                print(f"  FALLO  {etiqueta:<34} -> sin la pista {pista!r}")
+            else:
+                print(f"  OK     {etiqueta:<34} -> {'sigue' if bien else 'avisa y explica'}")
+    finally:
+        mc.TUNEL_URL, mc._resolver_por_dns_publico, mc._funnel_publicado = guardados
+
+    return fallos
+
+
 def probar_keep_warm() -> list[str]:
     """Que la grafica descanse cuando no la usas, sin que se note al volver."""
     import mantener_caliente
@@ -476,6 +532,27 @@ def probar_freno_de_mano() -> list[str]:
         ("estaba pensando en que no se muy bien que archivos tengo por ahi "
          "tirados en el escritorio",
          "listar_archivos", {"carpeta": "escritorio"}, True),
+
+        # Las cuatro que escriben en la boveda y en el contexto. Estuvieron
+        # fuera del freno, que era el agujero mas grande que quedaba: el
+        # modelo podia garabatear en las notas desde una charla cualquiera.
+        ("hoy fui a clase de calculo y estuvo densa la verdad no entendi nada",
+         "obsidian_crear_nota", {"titulo": "clase de calculo"}, False),
+        ("te digo que ayer me acoste tardisimo y hoy no rindo",
+         "obsidian_agregar_al_diario", {"texto": "me acoste tarde"}, False),
+        ("es que el profe andres explica muy rapido y no alcanzo a copiar",
+         "obsidian_agregar_a_nota", {"nota": "andres", "texto": "explica rapido"}, False),
+        ("la verdad es que prefiero estudiar de noche que de dia",
+         "recordar_en_contexto", {"texto": "estudia de noche"}, False),
+
+        # Y las mismas cuatro pedidas de verdad, que tienen que pasar.
+        ("apunta en el diario que termine la configuracion",
+         "obsidian_agregar_al_diario", {"texto": "termine la configuracion"}, True),
+        ("crea una nota de calculo", "obsidian_crear_nota", {"titulo": "calculo"}, True),
+        ("agrega a la nota de redes que falta el taller",
+         "obsidian_agregar_a_nota", {"nota": "redes", "texto": "falta el taller"}, True),
+        ("recuerda que uso vs code",
+         "recordar_en_contexto", {"texto": "uso vs code"}, True),
     ]
 
     for frase, herramienta, argumentos, debe_pasar in casos:
@@ -667,6 +744,98 @@ def probar_confirmaciones() -> list[str]:
     return fallos
 
 
+def probar_memoria_partida() -> list[str]:
+    """Que la boveda y el codigo vivan en indices separados.
+
+    Estaban en el mismo archivo y el proyecto se comio las notas: 540
+    fragmentos de Python contra 105 de apuntes, asi que preguntar por algo de
+    clase competia contra medio millar de trozos de codigo. Se comprueba que
+    el indice viejo se parte solo (sin volver a vectorizar nada, que son
+    minutos y necesita Ollama) y que cada busqueda solo ve lo suyo.
+    """
+    import json
+    import tempfile
+    from pathlib import Path
+    from tools import memoria
+
+    fallos = []
+
+    print()
+    print("-" * 70)
+    print("  LA MEMORIA: BOVEDA Y CODIGO POR SEPARADO")
+    print("-" * 70)
+
+    raiz = str(memoria.RAIZ_PROYECTO)
+    viejo = {
+        "generado": 1,
+        "normalizado": True,
+        "notas": {f"{raiz}/nlu.py": "aa", "/vault/Cálculo.md": "bb"},
+        "trozos": [
+            {"ruta": f"{raiz}/nlu.py", "titulo": "nlu.py", "n": 0,
+             "texto": "el router", "v": [1.0, 0.0]},
+            {"ruta": "/vault/Cálculo.md", "titulo": "Cálculo", "n": 0,
+             "texto": "la derivada", "v": [0.0, 1.0]},
+        ],
+    }
+
+    guardados = (dict(memoria.ARCHIVOS), dict(memoria._indices),
+                 dict(memoria._matrices), memoria._vector)
+
+    with tempfile.TemporaryDirectory() as carpeta:
+        try:
+            memoria.ARCHIVOS = {
+                "boveda": Path(carpeta) / "memoria_vault.json",
+                "codigo": Path(carpeta) / "memoria_codigo.json",
+            }
+            memoria._indices.clear()
+            memoria._matrices.clear()
+            memoria.ARCHIVOS["boveda"].write_text(json.dumps(viejo), encoding="utf-8")
+
+            de_codigo = memoria._cargar("codigo")["trozos"]
+            de_boveda = memoria._cargar("boveda")["trozos"]
+
+            casos = [
+                ("el codigo se va a su archivo", len(de_codigo), 1),
+                ("la boveda se queda en el suyo", len(de_boveda), 1),
+            ]
+            for etiqueta, salio, tocaba in casos:
+                if salio != tocaba:
+                    fallos.append(f"MEMORIA {etiqueta}: {salio} trozos, tocaban {tocaba}")
+                    print(f"  FALLO  {etiqueta:<40} -> {salio}, esperaba {tocaba}")
+                else:
+                    print(f"  OK     {etiqueta:<40} -> {salio} trozo")
+
+            if de_codigo and de_codigo[0]["titulo"] != "nlu.py":
+                fallos.append("MEMORIA el trozo de codigo no es el del proyecto")
+                print("  FALLO  el trozo de código no es el del proyecto")
+
+            # Y que una busqueda en un indice no devuelva nunca lo del otro,
+            # que es justo el fallo que se venia arreglando a mano en nlu.py.
+            memoria._vector = lambda texto: [1.0, 0.0]
+            encontrados = memoria.buscar("el router", minimo=0.5, donde="codigo")
+            en_boveda = memoria.buscar("el router", minimo=0.5, donde="boveda")
+
+            if len(encontrados) != 1 or encontrados[0]["titulo"] != "nlu.py":
+                fallos.append(f"MEMORIA buscar en codigo devolvio {encontrados}")
+                print("  FALLO  buscar en código no devuelve el código")
+            else:
+                print(f"  OK     {'buscar en código solo ve código':<40} -> nlu.py")
+
+            if en_boveda:
+                fallos.append(f"MEMORIA la boveda contesto a una consulta de codigo: {en_boveda}")
+                print("  FALLO  la bóveda contesta a una consulta de código")
+            else:
+                print(f"  OK     {'la bóveda no se mete donde no la llaman':<40} -> nada")
+        finally:
+            (memoria.ARCHIVOS, indices, matrices, memoria._vector) = guardados
+            memoria._indices.clear()
+            memoria._indices.update(indices)
+            memoria._matrices.clear()
+            memoria._matrices.update(matrices)
+
+    return fallos
+
+
 def main() -> int:
     fallos = []
     print("=" * 70)
@@ -678,7 +847,9 @@ def main() -> int:
     fallos.extend(probar_modelos_instalados())
     fallos.extend(probar_freno_de_mano())
     fallos.extend(probar_keep_warm())
+    fallos.extend(probar_camino_publico())
     fallos.extend(probar_intenciones())
+    fallos.extend(probar_memoria_partida())
 
     for frase, esperado, comprobar in CASOS:
         registro.clear()
@@ -748,7 +919,7 @@ def main() -> int:
 
     print()
     print("=" * 70)
-    total = len(CASOS) + len(SIN_HERRAMIENTA) + len(DEBEN_IR_AL_MODELO) + 6 + 5 + 12 + 4 + len(__import__('tools.intencion', fromlist=['x']).EJEMPLOS)
+    total = len(CASOS) + len(SIN_HERRAMIENTA) + len(DEBEN_IR_AL_MODELO) + 6 + 5 + 20 + 4 + 5 + len(__import__('tools.intencion', fromlist=['x']).EJEMPLOS)
     if fallos:
         print(f"  RESULTADO: {total - len(fallos)}/{total} correctos, {len(fallos)} fallos")
         print("=" * 70)
