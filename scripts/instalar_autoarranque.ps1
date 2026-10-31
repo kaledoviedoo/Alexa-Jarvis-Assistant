@@ -86,5 +86,5 @@ Write-Host ""
 $respuesta = Read-Host "¿Quieres arrancar Jarvis ahora mismo para probar? (s/n)"
 if ($respuesta -eq "s") {
     Start-ScheduledTask -TaskName $NombreTarea
-    Write-Host "Arrancando... dale unos 30 segundos y abre http://localhost:8000/salud" -ForegroundColor Cyan
+    Write-Host "Arrancando... dale unos 30 segundos y ejecuta .\scripts\diagnostico.ps1" -ForegroundColor Cyan
 }

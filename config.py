@@ -226,6 +226,11 @@ VERIFICAR_FIRMA = _env_bool("JARVIS_VERIFICAR_FIRMA", True)
 # Tolerancia del timestamp: Amazon exige 150 segundos.
 TOLERANCIA_TIMESTAMP_SEGUNDOS = 150
 
+# Llave para las rutas de uso local (/probar y el detalle de /salud y /jarvis).
+# El tunel publica el puerto entero, asi que sin esto cualquiera con la URL
+# podria mandar ordenes por /probar. Vacia = esas rutas quedan cerradas.
+TOKEN_LOCAL = _env("JARVIS_TOKEN_LOCAL", "").strip()
+
 
 _LOCAL = Path(_env("LOCALAPPDATA", str(HOME / "AppData" / "Local")))
 _PROGRAMAS = Path(_env("PROGRAMFILES", r"C:\Program Files"))

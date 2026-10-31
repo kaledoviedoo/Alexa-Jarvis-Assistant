@@ -18,6 +18,10 @@ import os
 
 os.environ["JARVIS_VERIFICAR_FIRMA"] = "false"
 os.environ["ALEXA_SKILL_ID"] = ""
+# Llave fija para las pruebas: se pone antes de importar config, asi gana al .env.
+TOKEN_PRUEBA = "llave-de-prueba-local"
+os.environ["JARVIS_TOKEN_LOCAL"] = TOKEN_PRUEBA
+CON_LLAVE = {"X-Jarvis-Token": TOKEN_PRUEBA}
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -391,6 +395,47 @@ def probar_que_no_se_bloquea() -> list[str]:
     return fallos
 
 
+def probar_rutas_locales() -> list[str]:
+    """/probar y el detalle de /salud solo con la llave y nunca desde el tunel."""
+    print()
+    print("RUTAS LOCALES (LLAVE)")
+    fallos = []
+    orden = {"comando": "en qué modo estás"}
+
+    casos = [
+        ("POST /probar sin llave", None, 404),
+        ("POST /probar con llave equivocada", {"X-Jarvis-Token": "otra"}, 404),
+        ("POST /probar con llave pero desde Funnel",
+         {**CON_LLAVE, "Tailscale-Funnel-Request": "?1"}, 404),
+        ("POST /probar con llave pero con X-Forwarded-For",
+         {**CON_LLAVE, "X-Forwarded-For": "203.0.113.7"}, 404),
+        ("POST /probar con llave", CON_LLAVE, 200),
+    ]
+    for nombre, cabeceras, esperado in casos:
+        respuesta = cliente.post("/probar", json=orden, headers=cabeceras or {})
+        if respuesta.status_code == esperado:
+            print(f"  OK     {nombre} -> {esperado}")
+        else:
+            fallos.append(f"{nombre}: {respuesta.status_code}, se esperaba {esperado}")
+            print(f"  FALLO  {nombre} -> {respuesta.status_code}")
+
+    salud = cliente.get("/salud").json()
+    if set(salud) == {"servidor"}:
+        print("  OK     GET /salud sin llave no cuenta nada del equipo")
+    else:
+        fallos.append(f"GET /salud sin llave expone: {sorted(salud)}")
+        print("  FALLO  GET /salud sin llave expone datos")
+
+    estado = cliente.get("/jarvis").json()
+    if "modo" not in estado and "modelo" not in estado:
+        print("  OK     GET /jarvis sin llave no dice modo ni modelo")
+    else:
+        fallos.append("GET /jarvis sin llave expone modo o modelo")
+        print("  FALLO  GET /jarvis sin llave expone modo o modelo")
+
+    return fallos
+
+
 def main() -> int:
     fallos = []
     print("=" * 70)
@@ -407,7 +452,7 @@ def main() -> int:
         fallos.append(f"GET /jarvis devolvió {respuesta.status_code}")
         print(f"  FALLO  GET /jarvis  -> {respuesta.status_code}")
 
-    respuesta = cliente.get("/salud")
+    respuesta = cliente.get("/salud", headers=CON_LLAVE)
     if respuesta.status_code == 200:
         salud = respuesta.json()
         print(f"  OK     GET /salud   -> modo={salud['modo']} ollama={salud['ollama']['conectado']}")
@@ -498,6 +543,7 @@ def main() -> int:
     fallos.extend(probar_modelo_de_interaccion())
     fallos.extend(probar_si_y_no())
     fallos.extend(probar_dictado_libre())
+    fallos.extend(probar_rutas_locales())
     fallos.extend(probar_que_no_se_bloquea())
 
     # ---- Resultado ----

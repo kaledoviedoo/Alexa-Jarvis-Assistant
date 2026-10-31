@@ -163,7 +163,7 @@ if ($servidorOk) {
     Write-Host ""
     Write-Host "ESTADO INTERNO DE JARVIS" -ForegroundColor Cyan
     try {
-        $salud = Invoke-RestMethod -Uri "http://127.0.0.1:8000/salud" -TimeoutSec 5
+        $salud = Invoke-RestMethod -Uri "http://127.0.0.1:8000/salud" -TimeoutSec 5 -Headers @{ "X-Jarvis-Token" = (Leer-Env "JARVIS_TOKEN_LOCAL" "") }
         Write-Host "  Modo actual        : $($salud.modo)"
         Write-Host "  Modelo             : $($salud.perfil.modelo)"
         Write-Host "  Ollama conectado   : $($salud.ollama.conectado)"

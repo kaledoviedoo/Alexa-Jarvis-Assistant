@@ -10,13 +10,14 @@ solo entonces el modelo.
 """
 
 import asyncio
+import hmac
 import logging
 import sys
 import logging.handlers
 import threading
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 import alexa_directivas
@@ -33,6 +34,7 @@ from config import (
     MAX_CARACTERES_VOZ,
     MODO_GAMING,
     SESION_CONTINUA,
+    TOKEN_LOCAL,
     VERIFICAR_FIRMA,
     detectar_comet,
 )
@@ -94,7 +96,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-09-16-ola2-32"
+SELLO_CODIGO = "2026-10-31-fase0-seguridad"
 
 
 @app.on_event("startup")
@@ -379,19 +381,48 @@ def respuesta_alexa(
     return cuerpo
 
 
+# Cabeceras que pone un proxy delante (Tailscale Funnel, ngrok). Una peticion
+# que las trae vino de fuera, aunque llegue a 127.0.0.1.
+_CABECERAS_DE_TUNEL = (
+    "tailscale-funnel-request",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "forwarded",
+)
+
+
+def es_peticion_local_autorizada(request: Request) -> bool:
+    """Solo pasa quien esta en este equipo Y trae la llave del .env."""
+    if not TOKEN_LOCAL:
+        return False
+
+    for cabecera in _CABECERAS_DE_TUNEL:
+        if cabecera in request.headers:
+            log.warning("Ruta local pedida desde el tunel (%s). Rechazada.", cabecera)
+            return False
+
+    recibido = request.headers.get("x-jarvis-token", "")
+    return hmac.compare_digest(recibido.encode("utf-8"), TOKEN_LOCAL.encode("utf-8"))
+
+
+def _exigir_local(request: Request) -> None:
+    # 404 y no 401: desde fuera no se confirma ni que la ruta exista.
+    if not es_peticion_local_autorizada(request):
+        raise HTTPException(status_code=404)
+
+
 @app.get("/jarvis")
-def estado():
-    return {
-        "status": "ok",
-        "mensaje": "Jarvis activo y escuchando.",
-        "modo": modes.modo_actual(),
-        "modelo": modes.perfil_actual()["modelo"],
-    }
+def estado(request: Request):
+    datos = {"status": "ok", "mensaje": "Jarvis activo y escuchando."}
+    if es_peticion_local_autorizada(request):
+        datos["modo"] = modes.modo_actual()
+        datos["modelo"] = modes.perfil_actual()["modelo"]
+    return datos
 
 
 @app.get("/")
-def estado_raiz():
-    return estado()
+def estado_raiz(request: Request):
+    return estado(request)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
@@ -400,8 +431,11 @@ def robots():
 
 
 @app.get("/salud")
-def salud():
-    """Diagnóstico completo. Abre esto en el navegador si algo no funciona."""
+def salud(request: Request):
+    """Diagnóstico completo, solo con la llave local (scripts\\diagnostico.ps1)."""
+    if not es_peticion_local_autorizada(request):
+        return {"servidor": "ok"}
+
     datos_gpu = sistema.info_gpu()
     perfil = modes.perfil_actual()
 
@@ -436,8 +470,10 @@ def salud():
 
 
 @app.post("/probar")
-async def probar(cuerpo: dict):
-    """Prueba local sin pasar por Alexa."""
+async def probar(request: Request, cuerpo: dict):
+    """Prueba local sin pasar por Alexa. Exige la llave del .env."""
+    _exigir_local(request)
+
     comando = (cuerpo or {}).get("comando", "")
     if not comando:
         return {"error": "Falta el campo 'comando'."}

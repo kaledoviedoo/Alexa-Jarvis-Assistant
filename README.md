@@ -111,7 +111,7 @@ qué archivo maneja whatsapp
 Y contra el servidor directamente:
 
 ```powershell
-curl http://localhost:8000/salud     # sello del código, modo, GPU, Ollama
+curl -H "X-Jarvis-Token: <JARVIS_TOKEN_LOCAL>" http://localhost:8000/salud   # sello, modo, GPU, Ollama
 .\scripts\diagnostico.ps1            # revisa túnel, puertos y dependencias
 py test_router.py                    # 188 casos de enrutado
 py test_archivos.py                  # el sandbox y la selección, sobre disco

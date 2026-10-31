@@ -231,7 +231,7 @@ Write-Host "   responde" -ForegroundColor Green
 # ---------------------------------------------------------------------------
 # Que algo conteste en el 8000 no prueba nada: el que contesta puede ser el
 # proceso viejo que nunca murio. El sello lo zanja.
-$SELLO_ESPERADO = "2026-09-16-ola1-31"
+$SELLO_ESPERADO = "2026-10-31-fase0-seguridad"
 
 Write-Host ""
 Write-Host "6. Comprobando la version que esta corriendo..." -ForegroundColor Cyan
@@ -239,7 +239,7 @@ Write-Host ""
 
 $ok = $false
 try {
-    $salud = Invoke-RestMethod -Uri "http://127.0.0.1:$Puerto/salud" -TimeoutSec 8
+    $salud = Invoke-RestMethod -Uri "http://127.0.0.1:$Puerto/salud" -TimeoutSec 8 -Headers @{ "X-Jarvis-Token" = (Leer-Env "JARVIS_TOKEN_LOCAL" "") }
 
     $sello = $salud.sello
     if (-not $sello) { $sello = "(sin sello: es codigo viejo)" }
