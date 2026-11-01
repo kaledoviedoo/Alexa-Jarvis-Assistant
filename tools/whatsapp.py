@@ -182,7 +182,33 @@ def _enviar_ahora() -> str:
         return f"No pude enviar: {e}"
 
 
-def _buscar_y_abrir_chat(pg, nombre: str) -> None:
+def coincide(pedido: str, real: str) -> bool:
+    """¿El chat abierto es el pedido? 'familia' encaja con 'Familia Pérez Gómez'."""
+    import re as _re
+    pedidas = {p for p in _re.split(r"\W+", (pedido or "").lower()) if len(p) > 2}
+    pedidas -= {"mis", "del", "los", "las", "grupo", "chat"}
+    reales = {p for p in _re.split(r"\W+", (real or "").lower()) if len(p) > 2}
+    return not pedidas or bool(pedidas & reales)
+
+
+def abrir_y_comprobar(pg, destinatario: str) -> str:
+    """Abre el chat y devuelve el nombre que se lee arriba.
+
+    Si no es el pedido, repite la busqueda una vez con mas calma: lo normal
+    es que WhatsApp Web acabara de cargar y la primera busqueda se perdiera.
+    """
+    _buscar_y_abrir_chat(pg, destinatario)
+    nombre_real = _quien_esta_abierto()
+    if nombre_real and coincide(destinatario, nombre_real):
+        return nombre_real
+
+    log.info("El chat abierto es %r y pedi %r: busco otra vez, mas despacio.", nombre_real, destinatario)
+    time.sleep(2.0)
+    _buscar_y_abrir_chat(pg, destinatario, lento=True)
+    return _quien_esta_abierto()
+
+
+def _buscar_y_abrir_chat(pg, nombre: str, lento: bool = False) -> None:
     """Busca el chat y lo abre. El cursor queda en la caja de mensaje."""
     pg.press("escape")
     time.sleep(0.15)
@@ -194,10 +220,10 @@ def _buscar_y_abrir_chat(pg, nombre: str) -> None:
     time.sleep(0.45)
 
     pg.write(nombre, interval=0.015)
-    time.sleep(ESPERA_BUSQUEDA)
+    time.sleep(ESPERA_BUSQUEDA * (2.5 if lento else 1))
 
     pg.press("enter")
-    time.sleep(ESPERA_CHAT)
+    time.sleep(ESPERA_CHAT * (2 if lento else 1))
 
 
 @herramienta(
@@ -229,13 +255,25 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
         return ("Estoy abriendo WhatsApp Web en Comet. "
                 "Dame unos segundos y repíteme el mensaje.")
 
+    # Primero se abre el chat y se comprueba que es el pedido; solo despues se
+    # escribe. Antes se escribia y luego se miraba, y si WhatsApp acababa de
+    # cargar el texto quedaba en el chat que estuviera abierto.
     try:
-        _buscar_y_abrir_chat(pg, destinatario)
-        nombre_real = _quien_esta_abierto()
+        nombre_real = abrir_y_comprobar(pg, destinatario)
+    except Exception as e:
+        log.exception("Falló abriendo el chat")
+        return f"Algo falló manejando WhatsApp: {e}"
+
+    if nombre_real and not coincide(destinatario, nombre_real):
+        log.warning("Pedi %r y el chat abierto es %r: no escribo nada.", destinatario, nombre_real)
+        return (f"No encontré el chat {destinatario}: el que quedó abierto es {nombre_real}. "
+                "No escribí nada. Dime el nombre del chat tal como sale en WhatsApp.")
+
+    try:
         pg.write(mensaje, interval=0.008)
         time.sleep(0.25)
     except Exception as e:
-        log.exception("Falló preparando el mensaje")
+        log.exception("Falló escribiendo el mensaje")
         return f"Algo falló manejando WhatsApp: {e}"
 
     corto = mensaje if len(mensaje) <= 60 else mensaje[:60] + "..."
@@ -291,7 +329,7 @@ def abrir_chat(nombre: str) -> str:
         return "Estoy abriendo WhatsApp Web en Comet. Dame unos segundos y repítemelo."
 
     try:
-        _buscar_y_abrir_chat(pg, nombre)
+        abrir_y_comprobar(pg, nombre)
     except Exception as e:
         return f"No pude abrir el chat: {e}"
 

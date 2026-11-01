@@ -213,6 +213,43 @@ def main() -> int:
         ollama_client.envio_pendiente = original_ep
         registro._registro.pop("prueba_ventanas2", None)
 
+    print("\nWHATSAPP: PRIMERO COMPRUEBA EL CHAT, LUEGO ESCRIBE")
+    from tools import whatsapp
+    comprobar(whatsapp.coincide("familia", "Familia Pérez Gómez"), "'familia' encaja con 'Familia Pérez Gómez'")
+    comprobar(not whatsapp.coincide("familia", "ua esta activa"), "'familia' no encaja con 'ua esta activa'")
+
+    class TecladoFalso:
+        def __init__(self): self.escrito = []
+        def write(self, texto, interval=0): self.escrito.append(texto)
+        def press(self, *a): pass
+        def hotkey(self, *a): pass
+
+    teclado = TecladoFalso()
+    guardado = (whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep)
+    try:
+        whatsapp._pyautogui = lambda: teclado
+        whatsapp._enfocar = lambda: True
+        whatsapp.time.sleep = lambda s: None
+        whatsapp._quien_esta_abierto = lambda: "ua esta activa"
+        confirmaciones.olvidar()
+        salida = whatsapp.enviar_mensaje("familia", "Las ventanas abiertas son: Steam y Claude.")
+        comprobar("Las ventanas" not in " ".join(teclado.escrito),
+                  "si el chat abierto no es el pedido, no escribe el mensaje")
+        comprobar(salida.startswith("No encontré el chat familia") and not confirmaciones.hay_pendiente(),
+                  "y lo dice, sin dejar nada pendiente de enviar")
+
+        teclado.escrito.clear()
+        lecturas = iter(["ua esta activa", "Familia Pérez Gómez"])
+        whatsapp._quien_esta_abierto = lambda: next(lecturas)
+        salida = whatsapp.enviar_mensaje("familia", "Las ventanas abiertas son: Steam y Claude.")
+        comprobar("Las ventanas abiertas son: Steam y Claude." in teclado.escrito,
+                  "si al segundo intento si es el chat, escribe")
+        comprobar("Familia Pérez Gómez" in salida and confirmaciones.hay_pendiente(),
+                  f"y pregunta con el nombre real ('{salida[:60]}')")
+        confirmaciones.olvidar()
+    finally:
+        whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep = guardado
+
     print("\nENVIAR SOLO SE OFRECE SI SE PIDE")
     r = ollama_client.riesgos_para
     comprobar("externa" in r("mandale un whatsapp a familia"), "'mandale un whatsapp' ofrece enviar")
