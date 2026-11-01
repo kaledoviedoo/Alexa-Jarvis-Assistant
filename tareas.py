@@ -143,8 +143,19 @@ def descartar(identificador: str) -> None:
         _ejecutar("DELETE FROM tareas WHERE id = ?", (identificador,))
 
 
+def observar_hilo(funcion) -> None:
+    """Quien quiere ver los pasos de este hilo en vivo (el chat). None lo quita."""
+    _local.observador = funcion
+
+
 def registrar_paso(herramienta: str, argumentos, resultado) -> None:
     """Apunta una herramienta usada por la tarea que corre en este hilo."""
+    observador = getattr(_local, "observador", None)
+    if observador is not None:
+        try:
+            observador(herramienta, argumentos, resultado)
+        except Exception as e:
+            log.debug("El observador del paso fallo: %s", e)
     tarea = getattr(_local, "tarea", None)
     if not tarea:
         return
@@ -223,6 +234,10 @@ def _hace(momento: str | None) -> str:
 def _marcar_leidas(ids: list[str]) -> None:
     for identificador in ids:
         _ejecutar("UPDATE tareas SET leida = 1 WHERE id = ?", (identificador,))
+
+
+def marcar_leida(identificador: str) -> None:
+    _marcar_leidas([identificador])
 
 
 def ultimo_resultado() -> str | None:

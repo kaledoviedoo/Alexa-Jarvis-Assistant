@@ -288,9 +288,34 @@ Cuando algo te salga mal, dilo claro y sin excusas largas. "No pude, el archivo 
 Nada de emojis ni de simbolos: esto se lee en voz alta."""
 
 
+_canal = threading.local()
+
+AVISO_CHAT = ("\n--- POR DONDE TE HABLA ---\nAhora te escribe por el chat en pantalla, no por el altavoz: "
+              "puedes extenderte lo que haga falta, usar saltos de linea y listas cortas con guiones. "
+              "Sigue sin emojis.")
+TOKENS_VOZ = 140
+TOKENS_CHAT = 700
+
+
+def en_canal(nombre: str, funcion, *args, **kwargs):
+    """Ejecuta funcion sabiendo por donde llega la orden ('voz' o 'chat')."""
+    anterior = getattr(_canal, "valor", None)
+    _canal.valor = nombre
+    try:
+        return funcion(*args, **kwargs)
+    finally:
+        _canal.valor = anterior
+
+
+def canal_actual() -> str:
+    return getattr(_canal, "valor", None) or "voz"
+
+
 def construir_prompt_sistema() -> str:
     """Monta el prompt con el contexto real del usuario y del equipo."""
     partes = [PROMPT_BASE.replace("{NOMBRE_USUARIO}", NOMBRE_USUARIO or "el usuario")]
+    if canal_actual() == "chat":
+        partes.append(AVISO_CHAT)
 
     try:
         partes.append("\n--- ESTE EQUIPO ---\n" + avanzado.resumen_equipo_para_modelo())
@@ -968,7 +993,7 @@ def _conversar(comando: str) -> str:
                 messages=mensajes,
                 tools=ofrecidas,
                 keep_alive=perfil["keep_alive"],
-                options=modes.opciones_ollama(),
+                options=modes.opciones_ollama(TOKENS_CHAT if canal_actual() == "chat" else TOKENS_VOZ),
             )
         except Exception as e:
             log.exception("Error hablando con Ollama")
@@ -1230,6 +1255,24 @@ def _terminar_en_segundo_plano(identificador: str, resumen: str, comando: str) -
         valor = f"La tarea falló: {e}"
     tareas.registrar_resultado(identificador, resumen, valor)
     sesion.completar(comando, valor)
+
+
+def procesar_aqui(comando: str) -> str:
+    """Como procesar, pero en este mismo hilo y sin limite de tiempo (el chat).
+
+    Asi el chat ve en vivo lo que hace la orden: sus lineas del log y sus
+    pasos salen de este hilo.
+    """
+    identificador = uuid.uuid4().hex[:8]
+    resumen = comando[:60]
+    tareas.registrar_inicio(identificador, resumen, origen="chat")
+    try:
+        resultado = tareas.con_tarea(identificador, _conversar, comando)
+    except Exception as e:
+        log.exception("Error procesando la orden del chat")
+        resultado = f"La tarea falló: {e}"
+    tareas.registrar_resultado(identificador, resumen, resultado, avisar=False)
+    return resultado
 
 
 def procesar(comando: str) -> str:

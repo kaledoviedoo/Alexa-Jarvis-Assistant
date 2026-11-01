@@ -21,6 +21,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 import alexa_directivas
+import chat
 import confirmaciones
 import mantener_caliente
 import modes
@@ -98,7 +99,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-11-01-fase5-fondo"
+SELLO_CODIGO = "2026-11-01-fase6-chat"
 
 
 def novedades_al_abrir() -> str:
@@ -335,7 +336,8 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
 
 
 def procesar_con_origen(texto: str, datos_alexa: dict | None = None,
-                        presupuesto: float | None = None) -> tuple[str, str]:
+                        presupuesto: float | None = None,
+                        en_este_hilo: bool = False) -> tuple[str, str]:
     """Como procesar_comando, pero dice tambien quien lo resolvio.
 
     `presupuesto` es cuanto se puede esperar al modelo antes de mandarlo a
@@ -365,7 +367,8 @@ def procesar_con_origen(texto: str, datos_alexa: dict | None = None,
 
         alexa_directivas.avisar_que_estamos_en_ello(datos_alexa)
 
-        respuesta = ollama_client.procesar(texto)
+        # El chat espera lo que haga falta y quiere ver los pasos en vivo.
+        respuesta = ollama_client.procesar_aqui(texto) if en_este_hilo else ollama_client.procesar(texto)
         origen = "modelo"
 
     transcurrido = (time.perf_counter() - inicio) * 1000
@@ -570,6 +573,10 @@ async def probar(request: Request, cuerpo: dict):
 
 
 PRESUPUESTO_PROBAR = 50.0
+
+# Fase 6: el chat local, en /chat. Solo desde este PC o tu red de Tailscale.
+chat.configurar(procesar_con_origen)
+app.include_router(chat.router)
 
 
 @app.post("/")

@@ -75,6 +75,9 @@ jobs:
         # Sin pyyaml a proposito: asi se prueba el camino en JSON.
         run: python test_fondo.py
 
+      - name: El chat solo existe en casa y ensena cada paso
+        run: python test_chat.py
+
       - name: El servidor contesta en formato Alexa
         run: python test_alexa.py
 

@@ -50,6 +50,7 @@ Echo ──▶ Amazon ──▶ túnel ──▶ FastAPI ──▶ router regex 
 - **Capa semántica** entre el router y el modelo: si no dices la palabra exacta, traduce por significado (~30 ms) en vez de gastar segundos de LLM.
 - **Presupuesto de tiempo**: lo que no cabe en los 8 s de Alexa se muda a un hilo y se recoge después con "cómo quedó lo último".
 - **Tareas que sobreviven** (SQLite en `~/.jarvis/jarvis.db`): un reinicio no pierde nada; lo que termina sin que nadie espere salta como aviso de Windows y se cuenta al abrir la siguiente sesión.
+- **Chat local** en `/chat` (`.\chat`): sin el límite de 8 s de Alexa, con cada paso en vivo y confirmaciones con botón. Solo desde el PC o tu red de Tailscale, nunca por el Funnel; el celular se vincula con un código de 6 cifras.
 - **Rutinas** en `~/.jarvis/rutinas.yaml`: buenos días, Descargas, disco lleno, modo juego y memoria al día, más recordatorios por voz ("todos los lunes a las 8 recuérdame…"). Nunca envían ni hacen nada irreversible.
 - **Memoria semántica** de la bóveda de Obsidian y del propio código (troceado por definiciones vía AST).
 - **Visión**: lee la pantalla y pulsa por función, no por nombre (JUGAR en Epic, PLAY en Steam).
@@ -129,6 +130,7 @@ jarvis/
 ├── tareas.py              Tareas de fondo en SQLite, con sus pasos
 ├── rutinas.py             Planificador, rutinas de serie y recordatorios por voz
 ├── avisos.py              Notificaciones de Windows, sin instalar nada
+├── chat.py, chat.html     El chat local: pasos en vivo y botones de confirmar
 ├── security.py            Verificación de la firma de Amazon
 ├── modes.py               Perfiles de modelo según la GPU
 ├── voz.py                 Vocativo y pronunciación (SSML)

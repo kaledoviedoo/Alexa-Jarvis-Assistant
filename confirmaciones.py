@@ -39,6 +39,17 @@ def pedir(descripcion: str, accion, al_rechazar=None, pregunta: str = "") -> str
     return pregunta or f"¿Confirmas que quieres {descripcion}? Di sí o no."
 
 
+def pendiente() -> dict | None:
+    """Lo que espera un si o un no, y cuantos segundos le quedan (para el chat)."""
+    if not hay_pendiente():
+        return None
+    with _candado:
+        if not _pendiente:
+            return None
+        quedan = SEGUNDOS_VIDA - (time.monotonic() - _pendiente["momento"])
+        return {"descripcion": _pendiente.get("descripcion", "eso"), "segundos": max(0, int(quedan))}
+
+
 def hay_pendiente() -> bool:
     with _candado:
         if not _pendiente:
