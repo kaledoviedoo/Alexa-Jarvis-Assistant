@@ -457,6 +457,56 @@ def _anotar_foco(argumentos: dict, resultado: str) -> None:
             return
 
 
+# "Apuntalo", "guardalo", "mandaselo", "eso": la orden se refiere a algo dicho
+# antes. Un modelo de 3B tiende a escribir la orden tal cual ("apuntalo en el
+# diario") en vez de lo que se dijo; esto lo corrige sin depender de el.
+_REFERENCIA = re.compile(
+    r"\b(?:apunt|anot|guard|mand|envi|escrib|pon|copi|peg|resum|muev|agreg|a[nñ]ad|"
+    r"met|sub|compart|registr|dict)[aeií]?(?:me|te|se|nos)?(?:lo|la|los|las)\b"
+    r"|\b(?:eso|esto|lo\s+anterior|lo\s+de\s+antes|lo\s+que\s+(?:dijiste|me\s+dijiste|encontraste))\b",
+    re.IGNORECASE,
+)
+_ARGUMENTOS_DE_CONTENIDO = ("contenido", "texto", "mensaje", "cuerpo")
+
+
+def _palabras(texto: str) -> set[str]:
+    import unicodedata
+    t = unicodedata.normalize("NFD", (texto or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return {p for p in re.split(r"\W+", t) if p}
+
+
+def resolver_referencia(argumentos: dict, frase: str, anterior: str) -> dict:
+    """Si el modelo copio la orden donde iba "lo de antes", pone lo de antes."""
+    if not anterior or not _REFERENCIA.search(_sin_tildes(frase)):
+        return argumentos
+    nuevos = dict(argumentos)
+    palabras_frase = _palabras(frase)
+    for clave in _ARGUMENTOS_DE_CONTENIDO:
+        valor = nuevos.get(clave)
+        if not isinstance(valor, str):
+            continue
+        propias = _palabras(valor)
+        # Copio la orden si sus palabras son casi todas las de la orden, o si
+        # trae la propia palabra de referencia ("apuntalo"). "comprar leche"
+        # en "apuntalo: comprar leche" es contenido de verdad y se respeta.
+        referencias = {w for w in propias if _REFERENCIA.fullmatch(w)}
+        copia_la_orden = not propias or (propias <= palabras_frase and (
+            bool(referencias) or len(propias) >= 0.7 * len(palabras_frase)))
+        solo_referencia = bool(_REFERENCIA.fullmatch(_sin_tildes(valor.strip(" .")))) if valor.strip() else True
+        if copia_la_orden or solo_referencia:
+            log.info("'%s' era la propia orden: pongo lo dicho antes (%d caracteres).",
+                     valor[:40], len(anterior))
+            nuevos[clave] = anterior
+    return nuevos
+
+
+def _sin_tildes(texto: str) -> str:
+    import unicodedata
+    t = unicodedata.normalize("NFD", texto or "")
+    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+
+
 def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
     h = registro.obtener(nombre)
     if h is None:
@@ -481,6 +531,7 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
             argumentos = {}
 
     argumentos = _desenvolver_argumentos(argumentos)
+    argumentos = resolver_referencia(argumentos, _frase_original(), sesion.ultima_respuesta_util())
 
     veto = _por_que_no(nombre, argumentos)
     if veto:

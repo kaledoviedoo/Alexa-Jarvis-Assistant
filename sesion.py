@@ -68,6 +68,23 @@ def completar(orden: str, resultado: str) -> None:
                 return
 
 
+# Respuestas que no son contenido: avisos de "estoy en ello" del router y
+# del modelo, y la coletilla que añade "como quedo lo ultimo".
+_AVISO = ("pregúntame cómo quedó", "preguntame como quedo", "estoy trabajando en eso",
+          "lo dejo trabajando")
+
+
+def ultima_respuesta_util() -> str:
+    """Lo ultimo que Jarvis dijo con contenido, para resolver "apuntalo"."""
+    import re
+    for turno in reversed(turnos()):
+        texto = turno.respuesta or ""
+        if not texto or any(a in texto.lower() for a in _AVISO):
+            continue
+        return re.sub(r"\s*\((?:termin[oó]|hace)[^)]*\)\.?\s*$", "", texto).strip()
+    return ""
+
+
 def olvidar() -> None:
     with _candado:
         _turnos.clear()

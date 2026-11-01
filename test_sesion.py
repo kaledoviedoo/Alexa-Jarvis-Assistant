@@ -97,6 +97,27 @@ def main() -> int:
     comprobar(foco.actual("archivo")["valor"] == "notas.txt", "lo que no se encontro no pasa a foco")
     del registro._registro["prueba_leer_archivo"], registro._registro["prueba_falla"]
 
+    print("\n'APUNTALO' ESCRIBE LO DICHO, NO LA ORDEN")
+    sesion.olvidar()
+    sesion.agregar("investiga como funciona un transformer",
+                   "Buscando sobre eso. Dame unos segundos y pregúntame cómo quedó lo último.", "router")
+    sesion.agregar("como quedo lo ultimo",
+                   "Un transformer es una red neuronal basada en atención. (terminó hace un momento).", "router")
+    anterior = sesion.ultima_respuesta_util()
+    comprobar(anterior == "Un transformer es una red neuronal basada en atención.",
+              f"la ultima respuesta util, sin avisos ni coletillas ('{anterior[:50]}')")
+    r = ollama_client.resolver_referencia
+    for frase, valor in [("apuntalo en el diario", "apuntalo en el diario"),
+                         ("apúntalo en el diario", "apúntalo"),
+                         ("guarda eso en una nota", "eso"),
+                         ("mandaselo a familia", "")]:
+        nuevo = r({"contenido": valor}, frase, anterior)["contenido"]
+        comprobar(nuevo == anterior, f"'{frase}' con contenido '{valor}' -> lo dicho antes")
+    propio = r({"contenido": "mañana hay parcial de redes"}, "apunta en el diario que mañana hay parcial de redes", anterior)
+    comprobar(propio["contenido"] == "mañana hay parcial de redes", "sin referencia, el contenido no se toca")
+    propio = r({"contenido": "comprar leche"}, "apuntalo: comprar leche", anterior)
+    comprobar(propio["contenido"] == "comprar leche", "si el modelo puso algo propio, se respeta")
+
     print("\nEL SERVIDOR APUNTA CADA ORDEN")
     import server
     sesion.olvidar()
