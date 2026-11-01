@@ -416,6 +416,9 @@ def probar_camino_publico() -> list[str]:
          "pc.tail1.ts.net", True, "pc.tail1.ts.net", True, ""),
         ("dos nombres publicados, el .env usa uno",
          "mi-pc.tail1.ts.net", True, "pc-viejo.tail1.ts.net mi-pc.tail1.ts.net", True, ""),
+        ("el .env usa un nombre que ya no existe",
+         "viejo.tail1.ts.net", False, "fantasma.tail1.ts.net mi-pc.tail1.ts.net", False,
+         "https://mi-pc.tail1.ts.net"),
         ("Funnel puesto, DNS sin propagar",
          "pc.tail1.ts.net", False, "pc.tail1.ts.net", False, "vuelve a lanzarlo"),
         ("Tailscale caido",
@@ -427,7 +430,9 @@ def probar_camino_publico() -> list[str]:
     try:
         for etiqueta, url, resuelve, publicado, debe_ir_bien, pista in casos:
             mc.TUNEL_URL = f"https://{url}" if url else ""
-            mc._resolver_por_dns_publico = lambda h, r=resuelve: (["1.2.3.4"] if r else [])
+            mc._resolver_por_dns_publico = lambda h, r=resuelve, u=url: (
+                [] if h.startswith(("fantasma", "viejo")) else
+                (["1.2.3.4"] if (r or h != u) else []))
             mc._salida_funnel = lambda p=publicado: "\n".join(
                 f"https://{n} (Funnel on)" for n in p.split())
 

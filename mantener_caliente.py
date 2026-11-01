@@ -343,12 +343,24 @@ def comprobar_camino_publico() -> tuple[bool, str]:
 
     resuelve = bool(_resolver_por_dns_publico(configurado))
     publicados = nombres_publicados(_salida_funnel())
-    publicado = publicados[0] if publicados else ""
+    # Tailscale puede seguir listando el nombre viejo de un equipo renombrado
+    # aunque ya no exista en internet. Solo se sugiere uno que resuelva: el
+    # 1 de noviembre se sugirio el fantasma, se puso en la consola de Alexa y
+    # el Echo dejo de llegar.
+    vivos = [n for n in publicados if n == configurado.lower() and resuelve
+             or n != configurado.lower() and _resolver_por_dns_publico(n)]
+    publicado = (vivos or publicados or [""])[0]
 
     # El caso que nos costo la tarde: el nombre del .env ya no existe, pero
     # Tailscale esta publicando otro. Podemos decir exactamente cual. Si el
-    # del .env esta entre los publicados, no hay nada que arreglar.
+    # del .env esta entre los publicados y resuelve, no hay nada que arreglar.
     if publicados and configurado.lower() not in publicados:
+        if not vivos:
+            return False, (
+                f"El .env apunta a {configurado} y Tailscale publica "
+                f"{', '.join(publicados)}, pero ninguno resuelve en internet. "
+                "Vuelve a lanzar: tailscale funnel --bg --https=443 localhost:8000"
+            )
         return False, (
             f"El .env apunta a {configurado}, pero Tailscale esta publicando "
             f"{publicado}. Cambia JARVIS_TUNEL_URL a https://{publicado} y "
