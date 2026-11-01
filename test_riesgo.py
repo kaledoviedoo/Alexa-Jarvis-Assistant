@@ -100,6 +100,40 @@ def main() -> int:
               "'mi hermano me manda mensajes' no pide enviar")
     comprobar(not p("ayer cerre el trabajo temprano", ("cierra",)), "'ayer cerre' no pide cerrar")
 
+    print("\nLAS ORDENES DE VARIOS PASOS VAN ENTERAS AL MODELO")
+    c = ollama_client.es_orden_compuesta
+    for f in ["revisa que correos tengo sin leer y mandale a juan un resumen por whatsapp",
+              "mira que hay en mi correo mas reciente, resumelo y apunta el resumen en el diario",
+              "fijate que ventanas tengo abiertas y apunta en el diario cuales son",
+              "busca el informe de calculo y muevelo a documentos"]:
+        comprobar(c(f), f"compuesta: '{f[:50]}'")
+    for f in ["abre spotify y busca tame impala", "abre epic games y dale a jugar",
+              "abre una pestaña en comet y ve a youtube", "abre una pestaña y entra a github",
+              "entra a descargas", "apunta en el diario que termine",
+              "estoy cansado y no quiero hacer nada", "cuanta ram y cuanta vram me quedan"]:
+        comprobar(not c(f), f"no compuesta: '{f[:50]}'")
+
+    print("\n'RESUMELO' EN LA MISMA ORDEN USA LO QUE SE ACABA DE LEER")
+    apuntado = []
+
+    @registro.herramienta("prueba_diario", descripcion="Apunta en el diario (prueba).", riesgo="escritura",
+                          args={"contenido": "Que apuntar"}, palabras=("diario",), corroboran=("apunta",))
+    def _diario(contenido: str) -> str:
+        apuntado.append(contenido)
+        return "Apuntado."
+
+    @registro.herramienta("prueba_leer_aviso", descripcion="Lee un aviso (prueba).", palabras=("aviso",))
+    def _aviso() -> str:
+        return "El parcial de redes es el jueves a las 7."
+
+    guion[:] = [_llamada("prueba_leer_aviso"),
+                _llamada("prueba_diario", contenido="resumelo y apuntalo en el diario"),
+                {"message": {"content": "Hecho."}}]
+    ollama_client._conversar("lee el ultimo aviso, resumelo y apuntalo en el diario")
+    comprobar(apuntado == ["El parcial de redes es el jueves a las 7."],
+              f"en el diario queda lo leido, no la orden ({apuntado})")
+    registro._registro.pop("prueba_diario", None); registro._registro.pop("prueba_leer_aviso", None)
+
     print("\nENVIAR SOLO SE OFRECE SI SE PIDE")
     r = ollama_client.riesgos_para
     comprobar("externa" in r("mandale un whatsapp a familia"), "'mandale un whatsapp' ofrece enviar")

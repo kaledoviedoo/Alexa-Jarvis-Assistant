@@ -298,10 +298,17 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
     # El presupuesto empieza a contar AQUI, no cuando llamemos al modelo.
     ollama_client.empezar_presupuesto()
 
-    respuesta = nlu.enrutar(texto)
+    # Una orden de varios pasos ("revisa mis correos y mandale un resumen a
+    # juan") va entera al modelo: el router resolveria solo la primera parte.
+    # Un "si" o un "no" pendiente de confirmar nunca es compuesto.
+    if ollama_client.es_orden_compuesta(texto):
+        log.info("Orden de varios pasos: va entera al modelo.")
+        respuesta = None
+    else:
+        respuesta = nlu.enrutar(texto)
     origen = "router"
 
-    if respuesta is None:
+    if respuesta is None and not ollama_client.es_orden_compuesta(texto):
         respuesta, origen = _segunda_oportunidad(texto)
 
     if respuesta is None:

@@ -410,6 +410,34 @@ def _raices(verbos) -> list[str]:
     return salida
 
 
+def es_orden_compuesta(frase: str) -> bool:
+    """¿Despues de la primera parte viene otra que pide cambiar algo?
+
+    "revisa mis correos y mandale un resumen a juan": el router se quedaba
+    con "revisa mis correos" y tiraba el resto. Estas van enteras al modelo.
+    "abre spotify y busca tame impala" no cuenta: "busca" no cambia nada y
+    el router ya la resuelve bien.
+    """
+    partes = clausulas(frase)
+    if len(partes) < 2:
+        return False
+    verbos = [v for n, vs in registro.corroboracion().items()
+              if n in ACCIONES_QUE_ENCADENAN for v in vs]
+    return any(pide_la_accion(p, verbos) for p in partes[1:])
+
+
+# Las acciones que usan lo que salio del paso anterior: apuntarlo, guardarlo,
+# moverlo, mandarlo. "Dale a jugar" o "entra a github" despues de "abre..." no
+# usan nada de antes, y el router ya las encadena bien.
+ACCIONES_QUE_ENCADENAN = {
+    "obsidian_crear_nota", "obsidian_agregar_a_nota", "obsidian_agregar_al_diario",
+    "recordar_en_contexto", "crear_archivo", "editar_archivo", "mover_archivo",
+    "copiar_archivo", "eliminar_archivo", "eliminar_varios", "mover_seleccion",
+    "archivar_seleccion", "archivar_en_boveda", "enviar_mensaje", "enviar_correo",
+    "responder_ultimo",
+}
+
+
 def pide_la_accion(frase: str, verbos) -> bool:
     """¿Alguna parte de la frase EMPIEZA pidiendo esto?"""
     raices = _raices(verbos)
@@ -567,6 +595,7 @@ _turno = threading.local()
 def _empezar_turno() -> None:
     _turno.contaminado = False
     _turno.pregunta = ""
+    _turno.ultimo_resultado = ""
 
 
 def _contaminado() -> bool:
@@ -647,7 +676,10 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
             argumentos = {}
 
     argumentos = _desenvolver_argumentos(argumentos)
-    argumentos = resolver_referencia(argumentos, _frase_original(), sesion.ultima_respuesta_util())
+    # "Resumelo" dentro de la misma orden se refiere a lo que se acaba de leer
+    # en ella; si no se leyo nada, a lo ultimo que se hablo.
+    anterior = getattr(_turno, "ultimo_resultado", "") or sesion.ultima_respuesta_util()
+    argumentos = resolver_referencia(argumentos, _frase_original(), anterior)
 
     veto = _por_que_no(nombre, argumentos) or _veto_por_dato_externo(h, argumentos)
     if veto:
@@ -768,6 +800,7 @@ def _conversar(comando: str) -> str:
             contenido_para_el_modelo = str(resultado)
             if not str(resultado).startswith(("No ejecuto", "No existe")):
                 ultimo_resultado = str(resultado)
+                _turno.ultimo_resultado = ultimo_resultado
                 h = registro.obtener(nombre)
                 if h is not None and h.riesgo == "lectura":
                     lecturas.append(str(resultado))
