@@ -227,6 +227,21 @@ def main() -> int:
               "el freno pide mirar en vez de inventar")
 
     print()
+    print("LAS NOTAS TIENEN QUE CUBRIR EL TEMA")
+    from tools import estudio
+    notas = [{"titulo": "calculo-integral", "texto": "La integral definida y la sustitucion."},
+             {"titulo": "parcial", "texto": "Integración por partes: u dv = uv - v du"}]
+    comprobar([n["titulo"] for n in estudio.notas_que_cubren("integral por partes", notas)] == ["parcial"],
+              "solo cuenta la nota que habla de integral Y de partes")
+    original = estudio._notas_relacionadas
+    estudio._notas_relacionadas = lambda tema: notas[:1]
+    try:
+        salida = estudio.explicar_desde_notas("integral por partes")
+        comprobar(salida.startswith("Tus notas no cubren"), "si ninguna lo cubre, lo dice sin llamar al modelo")
+    finally:
+        estudio._notas_relacionadas = original
+
+    print()
     print("LATEX DICHO CON PALABRAS")
     dicho = ollama_client.latex_a_palabras(r"Se usa \(\int u \, dv = uv - \int v \, du\).")
     comprobar("\\" not in dicho and "la integral de" in dicho, f"'{dicho}'")

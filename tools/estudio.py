@@ -128,6 +128,24 @@ def _preguntar_al_modelo(instruccion: str, material: str) -> str:
         return f"No pude procesar los apuntes: {e}"
 
 
+def _sin_tildes(texto: str) -> str:
+    import unicodedata
+    t = unicodedata.normalize("NFD", (texto or "").lower())
+    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+
+
+def notas_que_cubren(tema: str, notas: list[dict]) -> list[dict]:
+    """Las notas que nombran TODAS las palabras clave del tema."""
+    # Por la raiz: "integral" tiene que encontrar "integracion", "partes"
+    # tiene que encontrar "parte".
+    claves = [_sin_tildes(c) for c in _palabras_clave(tema)]
+    claves = [c[:max(5, len(c) - 3)] if len(c) > 5 else c for c in claves]
+    if not claves:
+        return notas
+    return [n for n in notas
+            if all(c in _sin_tildes(n["titulo"] + " " + n["texto"]) for c in claves)]
+
+
 def _sin_notas(tema: str) -> str:
     return (f"No encontré nada sobre {tema} en tu bóveda. "
             "Si lo tienes apuntado con otro nombre, dime cuál.")
@@ -188,6 +206,18 @@ def explicar_desde_notas(tema: str) -> str:
     notas = _notas_relacionadas(tema)
     if not notas:
         return _sin_notas(tema)
+
+    # Que una nota de calculo diga "integral" no significa que explique la
+    # integral POR PARTES. Si ninguna nombra todas las palabras del tema, el
+    # modelo rellenaria con lo suyo y lo presentaria como tus apuntes.
+    cubren = notas_que_cubren(tema, notas)
+    if not cubren:
+        cercanas = ", ".join(n["titulo"] for n in notas[:2])
+        return (f"Tus notas no cubren {tema}: ninguna habla de "
+                f"{' y '.join(_palabras_clave(tema))} a la vez. Lo más cercano es "
+                f"{cercanas}. Dile que sus apuntes no lo tienen; no lo expliques "
+                "como si viniera de ellos.")
+    notas = cubren
 
     return _preguntar_al_modelo(
         f"Explicame {tema} usando solo estos apuntes, en cuatro frases como "
