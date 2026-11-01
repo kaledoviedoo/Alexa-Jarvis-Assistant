@@ -217,6 +217,11 @@ def main() -> int:
     from tools import whatsapp
     comprobar(whatsapp.coincide("familia", "Familia Pérez Gómez"), "'familia' encaja con 'Familia Pérez Gómez'")
     comprobar(not whatsapp.coincide("familia", "ua esta activa"), "'familia' no encaja con 'ua esta activa'")
+    izq, arr, der, aba = whatsapp.zona_cabecera(1096, 1936)
+    comprobar(0.46 < izq < 0.5 and 80 <= arr * 1936 and aba * 1936 <= 190,
+              "en el monitor vertical (1096x1936) la cabecera esta a la derecha del panel, bajo la barra")
+    izq, arr, der, aba = whatsapp.zona_cabecera(1920, 1040)
+    comprobar(0.29 < izq < 0.33, "en uno horizontal de 1920 empieza en el 31 %")
 
     class TecladoFalso:
         def __init__(self): self.escrito, self.atajos, self.clics = [], [], []

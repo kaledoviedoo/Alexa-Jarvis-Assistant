@@ -207,13 +207,40 @@ def _limpiar_nombre(crudo: str) -> str:
     return nombre[:60] if len(nombre) > 1 else ""
 
 
+# La cabecera del chat esta justo debajo de la barra del navegador (unos
+# 90 px a escala 100 %, unos 115 a 125 %) y a la derecha del panel de chats.
+CABECERA_DESDE_PX = 85
+CABECERA_HASTA_PX = 185
+
+
+def zona_cabecera(ancho: int, alto: int) -> tuple[float, float, float, float]:
+    """Donde esta el nombre del chat abierto, segun la forma de la ventana.
+
+    El panel de chats de WhatsApp Web ocupa mas proporcion cuanto mas
+    estrecha es la ventana: ~46 % en un monitor vertical de 1096 px, ~30 %
+    en uno horizontal de 1920. La zona fija de antes (pensada para 1920x1080)
+    caia en un monitor vertical sobre la fila de filtros.
+    """
+    if ancho < 1100:
+        izquierda = 0.47
+    elif ancho < 1441:
+        izquierda = 0.41
+    else:
+        izquierda = 0.31
+    alto = max(alto, CABECERA_HASTA_PX + 1)
+    return (izquierda, CABECERA_DESDE_PX / alto, 0.98, CABECERA_HASTA_PX / alto)
+
+
 def _quien_esta_abierto() -> str:
     """Lee de la pantalla el nombre del chat abierto."""
     # La primera linea, no la mas larga: el nombre va arriba y el subtitulo
     # debajo. Ordenar por longitud devolvia el subtitulo.
     # Dentro de la ventana de WhatsApp: con una zona fija de la pantalla se
     # leia lo que hubiera ahi ("Calculando", de otra aplicacion).
-    crudo = pantalla.leer_primera_linea(ZONA_CABECERA, ventana=_ventana_de_whatsapp())
+    ventana = _ventana_de_whatsapp()
+    if ventana is None:
+        return ""
+    crudo = pantalla.leer_primera_linea(zona_cabecera(ventana.width, ventana.height), ventana=ventana)
     return _limpiar_nombre(crudo)
 
 
@@ -291,7 +318,8 @@ def guardar_captura_de_diagnostico() -> None:
         carpeta.mkdir(parents=True, exist_ok=True)
         ventana = _ventana_de_whatsapp()
         entera = pantalla._captura(None, ventana)
-        cabecera = pantalla._captura(ZONA_CABECERA, ventana)
+        cabecera = (pantalla._captura(zona_cabecera(ventana.width, ventana.height), ventana)
+                    if ventana is not None else None)
         if entera is not None:
             entera.save(carpeta / "whatsapp_ventana.png")
         if cabecera is not None:
@@ -423,7 +451,12 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
         log.exception("Falló abriendo el chat")
         return f"Algo falló manejando WhatsApp: {e}"
 
-    if nombre_real and not coincide(destinatario, nombre_real):
+    if not nombre_real:
+        log.warning("No pude leer el nombre del chat abierto: no escribo nada.")
+        return (f"Busqué {destinatario} en WhatsApp pero no consigo leer qué chat quedó abierto. "
+                "No escribí nada para no mandarlo a quien no es.")
+
+    if not coincide(destinatario, nombre_real):
         log.warning("Pedi %r y el chat abierto es %r: no escribo nada.", destinatario, nombre_real)
         return (f"No encontré el chat {destinatario}: el que quedó abierto es {nombre_real}. "
                 "No escribí nada. Dime el nombre del chat tal como sale en WhatsApp.")
