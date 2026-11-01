@@ -273,7 +273,34 @@ def abrir_y_comprobar(pg, destinatario: str) -> str:
     log.info("El chat abierto es %r y pedi %r: busco otra vez, mas despacio.", nombre_real, destinatario)
     time.sleep(2.0)
     _buscar_y_abrir_chat(pg, destinatario, lento=True)
-    return _quien_esta_abierto()
+    nombre_real = _quien_esta_abierto()
+    if not coincide(destinatario, nombre_real):
+        guardar_captura_de_diagnostico()
+    return nombre_real
+
+
+def guardar_captura_de_diagnostico() -> None:
+    """Guarda lo que vio el OCR cuando el nombre del chat no encaja.
+
+    Una sola copia en ~/.jarvis/capturas, que se pisa cada vez: sirve para
+    ajustar la zona de la cabecera viendo la imagen en vez de adivinando.
+    """
+    try:
+        from config import CARPETA_DATOS
+        carpeta = CARPETA_DATOS / "capturas"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        ventana = _ventana_de_whatsapp()
+        entera = pantalla._captura(None, ventana)
+        cabecera = pantalla._captura(ZONA_CABECERA, ventana)
+        if entera is not None:
+            entera.save(carpeta / "whatsapp_ventana.png")
+        if cabecera is not None:
+            cabecera.save(carpeta / "whatsapp_cabecera.png")
+        titulo = ventana.title if ventana is not None else "(sin ventana)"
+        caja = (ventana.left, ventana.top, ventana.width, ventana.height) if ventana is not None else None
+        log.info("Captura de diagnostico guardada en %s (ventana %r, caja %s)", carpeta, titulo, caja)
+    except Exception as e:
+        log.debug("No pude guardar la captura de diagnostico: %s", e)
 
 
 class SinFoco(RuntimeError):
