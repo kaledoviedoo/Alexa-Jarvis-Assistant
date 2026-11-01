@@ -62,6 +62,9 @@ jobs:
       - name: Cada herramienta esta en el registro y bien declarada
         run: python test_registro.py
 
+      - name: Jarvis recuerda de que se esta hablando
+        run: python test_sesion.py
+
       - name: El servidor contesta en formato Alexa
         run: python test_alexa.py
 

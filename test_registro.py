@@ -130,9 +130,18 @@ def main() -> int:
     registro.disponible = lambda h: True
     try:
         frase = "lee mis correos y mira que ventanas tengo y busca en mis notas y en internet"
-        sistema = [{"role": "system", "content": ollama_client.construir_prompt_sistema()},
-                   {"role": "user", "content": frase}]
+        import sesion
+        sesion.olvidar()
+        for _ in range(sesion.TURNOS):     # el peor caso: conversacion llena
+            sesion.agregar("busca el informe de calculo y dime que dice " * 3, "x " * 400, "modelo")
         for modo, perfil in modes.PERFILES.items():
+            original_modo = modes.perfil_actual
+            modes.perfil_actual = lambda p=perfil: p
+            try:
+                sistema = [{"role": "system", "content": ollama_client.construir_prompt_sistema()},
+                           {"role": "user", "content": frase}]
+            finally:
+                modes.perfil_actual = original_modo
             extras = ollama_client._extras_para(perfil["num_ctx"])
             ofrecidas = registro.esquemas(registro.para_el_modelo(frase, extras))
             usados = ollama_client.tokens_estimados(sistema, ofrecidas)
@@ -140,6 +149,7 @@ def main() -> int:
                       f"modo {modo}: ~{usados} tokens de {perfil['num_ctx']} (con {extras} extras)")
     finally:
         registro.disponible = original
+        sesion.olvidar()
 
     print()
     print("SE LE INSISTE AL MODELO QUE DESCRIBE EN VEZ DE ACTUAR")

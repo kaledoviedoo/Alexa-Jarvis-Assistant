@@ -96,7 +96,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-10-31-fase0-seguridad"
+SELLO_CODIGO = "2026-10-31-fase2-sesion"
 
 
 @app.on_event("startup")
@@ -314,6 +314,14 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
 
     transcurrido = (time.perf_counter() - inicio) * 1000
     log.info("Resuelto por %s en %.0f ms: %r", origen, transcurrido, respuesta[:100])
+
+    # La conversacion la comparten router y modelo: lo que resolvio uno lo
+    # sabe el otro en la orden siguiente.
+    try:
+        import sesion
+        sesion.agregar(texto, respuesta, origen)
+    except Exception as e:
+        log.debug("No pude apuntar el turno: %s", e)
 
     try:
         from tools import aprendizaje

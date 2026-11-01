@@ -22,6 +22,7 @@ import modes
 import tareas
 from config import MAX_PASOS_TOOLS, NOMBRE_USUARIO, PRESUPUESTO_SEGUNDOS
 import registro
+import sesion
 from tools import avanzado, obsidian
 
 log = logging.getLogger("jarvis.ollama")
@@ -258,6 +259,7 @@ REGLAS:
 10. Elige la herramienta que hace EXACTAMENTE lo pedido. Si la orden es una pregunta ("tengo...", "hay...", "cual es...", "que dice..."), usa solo herramientas que miran (listar, leer, buscar, explicar); NUNCA una que cambia algo (cerrar, apuntar, mover, borrar, crear).
 11. Si dice "segun mis apuntes", "en mis notas" o "en mi boveda", la respuesta sale de sus notas: usa explicar_desde_notas o encontrar_nota, no tu memoria.
 12. Nada de LaTeX ni simbolos matematicos: las formulas se dicen con palabras ("la integral de u por dv es u por v menos la integral de v por du").
+13. Si la orden dice "lo", "la", "eso", "ese archivo", "el segundo" o similar, busca a que se refiere en LO QUE HAY ENTRE MANOS y en LO QUE LLEVAMOS HABLADO, y usalo. Pregunta solo si de verdad no esta ahi.
 
 COMO HABLAS:
 Hablas con {NOMBRE_USUARIO}, que es quien te construyo. Tuteale.
@@ -300,6 +302,16 @@ def construir_prompt_sistema() -> str:
         # Si esto falla el modelo se queda sin saber que hay boveda, y luego
         # no se entiende por que no apunta nada.
         log.debug("No pude anadir el contexto de Obsidian: %s", e)
+
+    # Lo que llevamos hablado: sin esto "resumelo" no sabe que es "lo".
+    try:
+        num_ctx = int(modes.perfil_actual().get("num_ctx", 4096))
+        # En gaming (CPU, 6144) solo cabe lo ultimo: el nucleo ya ocupa casi todo.
+        bloque = sesion.para_el_modelo(2800 if num_ctx >= 8192 else 500)
+        if bloque:
+            partes.append("\n" + bloque)
+    except Exception as e:
+        log.debug("No pude añadir la conversacion: %s", e)
 
     return "\n".join(partes)
 
@@ -426,6 +438,25 @@ def _por_que_no(nombre: str, argumentos: dict) -> str:
     return ""
 
 
+# Argumentos que dicen sobre que se acaba de actuar. Si el modelo encuentra o
+# abre algo, "abrelo" o "cierralo" tienen que funcionar despues por el router.
+_FOCO_POR_ARGUMENTO = {"nombre_archivo": "archivo", "origen": "archivo", "nombre_app": "app"}
+
+
+def _anotar_foco(argumentos: dict, resultado: str) -> None:
+    if re.match(r"\s*(no\s|la herramienta|error)", resultado or "", re.IGNORECASE):
+        return
+    for clave, tipo in _FOCO_POR_ARGUMENTO.items():
+        valor = argumentos.get(clave)
+        if isinstance(valor, str) and valor.strip():
+            try:
+                import foco
+                foco.recordar(tipo, valor.strip())
+            except Exception as e:
+                log.debug("No pude anotar el foco: %s", e)
+            return
+
+
 def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
     h = registro.obtener(nombre)
     if h is None:
@@ -468,7 +499,9 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
 
     try:
         resultado = funcion(**argumentos)
-        return resultado if isinstance(resultado, str) else str(resultado)
+        resultado = resultado if isinstance(resultado, str) else str(resultado)
+        _anotar_foco(argumentos, resultado)
+        return resultado
     except TypeError as e:
         # El modelo mandó argumentos que no encajan con la firma.
         log.warning("Argumentos inválidos para %s: %s", nombre, e)
@@ -686,6 +719,7 @@ def _terminar_en_segundo_plano(identificador: str, resumen: str, comando: str) -
     except Exception as e:
         valor = f"La tarea falló: {e}"
     tareas.registrar_resultado(identificador, resumen, valor)
+    sesion.completar(comando, valor)
 
 
 def procesar(comando: str) -> str:
@@ -720,6 +754,7 @@ def procesar(comando: str) -> str:
             except Exception as e:
                 valor = f"La tarea falló: {e}"
             tareas.registrar_resultado(identificador, resumen, valor)
+            sesion.completar(comando, valor)
 
         threading.Thread(target=_al_terminar, daemon=True, name=f"seguim-{identificador}").start()
 

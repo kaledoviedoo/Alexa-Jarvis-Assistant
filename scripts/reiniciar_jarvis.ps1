@@ -231,7 +231,7 @@ Write-Host "   responde" -ForegroundColor Green
 # ---------------------------------------------------------------------------
 # Que algo conteste en el 8000 no prueba nada: el que contesta puede ser el
 # proceso viejo que nunca murio. El sello lo zanja.
-$SELLO_ESPERADO = "2026-10-31-fase0-seguridad"
+$SELLO_ESPERADO = "2026-10-31-fase2-sesion"
 
 Write-Host ""
 Write-Host "6. Comprobando la version que esta corriendo..." -ForegroundColor Cyan
