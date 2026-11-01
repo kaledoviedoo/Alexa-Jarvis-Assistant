@@ -213,10 +213,8 @@ def explicar_desde_notas(tema: str) -> str:
     cubren = notas_que_cubren(tema, notas)
     if not cubren:
         cercanas = ", ".join(n["titulo"] for n in notas[:2])
-        return (f"Tus notas no cubren {tema}: ninguna habla de "
-                f"{' y '.join(_palabras_clave(tema))} a la vez. Lo más cercano es "
-                f"{cercanas}. Dile que sus apuntes no lo tienen; no lo expliques "
-                "como si viniera de ellos.")
+        return (f"Tus apuntes no cubren {tema}. Lo más cercano que tienes es "
+                f"{cercanas}.")
     notas = cubren
 
     return _preguntar_al_modelo(

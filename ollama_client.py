@@ -119,8 +119,10 @@ def _quitar_prefijos(texto: str) -> str:
         limpio = nuevo
 
     # Si ademas lo envolvio en comillas, se las quitamos: Alexa las lee.
-    if len(limpio) > 1 and limpio[0] in '"\u201c\u00ab' and limpio[-1] in '"\u201d\u00bb':
-        limpio = limpio[1:-1].strip()
+    # Tambien con el punto fuera: "No lo tengo en mis apuntes".
+    m = re.fullmatch(r'["\u201c\u00ab](.+?)["\u201d\u00bb]\s*([.!?]?)', limpio, re.DOTALL)
+    if m:
+        limpio = (m.group(1).strip() + m.group(2)).strip()
 
     return limpio
 
@@ -494,6 +496,7 @@ def _conversar(comando: str) -> str:
     ofrecidas = herramientas_para(comando)
     _avisar_si_no_cabe(mensajes, ofrecidas, perfil)
     insistido = False
+    ultimo_resultado = ""
 
     for paso in range(MAX_PASOS_TOOLS):
         try:
@@ -537,6 +540,12 @@ def _conversar(comando: str) -> str:
                 return ("No me salió esa. Dímela más directa, o cambia a modo "
                         "dedicado, que razona mejor.")
 
+            # "Listo, hecha" despues de mirar las ventanas no dice nada: se
+            # lee lo que devolvio la herramienta, que ya viene para la voz.
+            if ultimo_resultado and es_relleno(contenido):
+                log.info("Respuesta de relleno %r: leo el resultado de la herramienta.", contenido)
+                return ultimo_resultado
+
             log.info("Ollama respondió sin herramientas (paso %d)", paso)
             return limpiar_respuesta_modelo(contenido)
 
@@ -548,6 +557,8 @@ def _conversar(comando: str) -> str:
             argumentos = funcion.get("arguments", {}) or {}
 
             resultado = _ejecutar_herramienta(nombre, argumentos)
+            if not str(resultado).startswith(("No ejecuto", "No existe")):
+                ultimo_resultado = str(resultado)
 
             mensajes.append({
                 "role": "tool",
@@ -576,6 +587,19 @@ def _avisar_si_no_cabe(mensajes: list[dict], ofrecidas: list[dict], perfil: dict
         log.warning("El prompt ocupa ~%d tokens y el contexto es de %d: el modelo "
                     "perderá el principio (las reglas). Sube num_ctx o quita herramientas.",
                     estimados, limite)
+
+
+_RELLENO = re.compile(
+    r"^\W*(?:listo|hecho|hecha|ya\s+est[aá]|ah[ií]\s+(?:lo|la)\s+tienes|perfecto|"
+    r"de\s+acuerdo|ok|okay|vale|claro|entendido|completado|terminado)\b[\W\w]{0,20}$",
+    re.IGNORECASE,
+)
+
+
+def es_relleno(texto: str) -> bool:
+    """Una respuesta que no cuenta nada: "Listo, hecha.", "Ya está"."""
+    t = (texto or "").strip()
+    return len(t) <= 30 and bool(_RELLENO.match(t))
 
 
 INSISTIR = ("No me expliques qué función usar ni me preguntes si la uso: llama tú "

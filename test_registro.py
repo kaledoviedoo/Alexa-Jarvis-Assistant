@@ -237,9 +237,18 @@ def main() -> int:
     estudio._notas_relacionadas = lambda tema: notas[:1]
     try:
         salida = estudio.explicar_desde_notas("integral por partes")
-        comprobar(salida.startswith("Tus notas no cubren"), "si ninguna lo cubre, lo dice sin llamar al modelo")
+        comprobar(salida.startswith("Tus apuntes no cubren"), "si ninguna lo cubre, lo dice sin llamar al modelo")
     finally:
         estudio._notas_relacionadas = original
+
+    print()
+    print("RESPUESTAS QUE NO DICEN NADA")
+    for t, esperado in [("Listo, hecha.", True), ("Ya está", True), ("Hecho.", True),
+                        ("Listo, Steam está entre tus ventanas abiertas.", False),
+                        ("Tienes 7 ventanas abiertas.", False)]:
+        comprobar(ollama_client.es_relleno(t) == esperado, f"{'relleno' if esperado else 'contenido'}: '{t}'")
+    limpio = ollama_client.limpiar_respuesta_modelo('"No lo tengo en mis apuntes".')
+    comprobar(limpio == "No lo tengo en mis apuntes.", f"comillas fuera aunque el punto quede afuera ('{limpio}')")
 
     print()
     print("LATEX DICHO CON PALABRAS")
