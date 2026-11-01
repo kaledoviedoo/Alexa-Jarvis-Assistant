@@ -57,6 +57,28 @@ def _ventana_de_whatsapp():
     return None
 
 
+SEGUNDOS_PARA_CARGAR = 25
+SEGUNDOS_TRAS_APARECER = 4
+
+
+def esperar_whatsapp() -> bool:
+    """Abre WhatsApp Web y espera a que su ventana exista y cargue.
+
+    Antes se lanzaba y se devolvia "repiteme el mensaje": el modelo lo tomaba
+    como hecho y contestaba "voy a enviarlo" sin que nada pasara.
+    """
+    lanzar_en_segundo_plano()
+    limite = time.monotonic() + SEGUNDOS_PARA_CARGAR
+    while time.monotonic() < limite:
+        time.sleep(1.0)
+        if _ventana_de_whatsapp() is not None:
+            # La ventana aparece antes de que carguen los chats.
+            time.sleep(SEGUNDOS_TRAS_APARECER)
+            return _enfocar()
+    log.warning("WhatsApp Web no aparecio en %d s.", SEGUNDOS_PARA_CARGAR)
+    return False
+
+
 def esta_abierto() -> bool:
     return _ventana_de_whatsapp() is not None
 
@@ -250,10 +272,9 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     if pg is None:
         return "No puedo manejar WhatsApp, falta pyautogui."
 
-    if not _enfocar():
-        lanzar_en_segundo_plano()
-        return ("Estoy abriendo WhatsApp Web en Comet. "
-                "Dame unos segundos y repíteme el mensaje.")
+    if not _enfocar() and not esperar_whatsapp():
+        return ("Abrí WhatsApp Web pero no terminó de cargar a tiempo. "
+                "No escribí nada; cuando lo veas cargado, repíteme el mensaje.")
 
     # Primero se abre el chat y se comprueba que es el pedido; solo despues se
     # escribe. Antes se escribia y luego se miraba, y si WhatsApp acababa de

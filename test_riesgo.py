@@ -250,6 +250,22 @@ def main() -> int:
     finally:
         whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep = guardado
 
+    print("\nSI EL ENVIO NO LLEGA A PREGUNTAR, SE DICE LO QUE PASO")
+    confirmaciones.olvidar()
+
+    @registro.herramienta("prueba_enviar_falla", descripcion="Envia (prueba que no carga).", riesgo="externa",
+                          args={"destinatario": "A quien", "mensaje": "Texto"}, palabras=("manda",),
+                          corroboran=("manda",))
+    def _enviar_falla(destinatario: str, mensaje: str) -> str:
+        return "Abrí WhatsApp Web pero no terminó de cargar a tiempo. No escribí nada."
+
+    guion[:] = [_llamada("prueba_enviar_falla", destinatario="familia", mensaje="hola"),
+                {"message": {"content": "Ya estoy en WhatsApp Web. Voy a enviar el mensaje."}}]
+    respuesta = ollama_client._conversar("mandale a familia que hola")
+    comprobar(respuesta.startswith("Abrí WhatsApp Web pero no terminó"),
+              f"no se cuela la promesa del modelo ('{respuesta[:50]}')")
+    registro._registro.pop("prueba_enviar_falla", None)
+
     print("\nENVIAR SOLO SE OFRECE SI SE PIDE")
     r = ollama_client.riesgos_para
     comprobar("externa" in r("mandale un whatsapp a familia"), "'mandale un whatsapp' ofrece enviar")

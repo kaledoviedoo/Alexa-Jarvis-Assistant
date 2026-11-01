@@ -624,6 +624,7 @@ def _empezar_turno() -> None:
     _turno.vetos = []
     _turno.hechas = 0
     _turno.envio_intentado = False
+    _turno.resultado_envio = ""
     _turno.insistido_envio = False
     _turno.lecturas = []
 
@@ -875,6 +876,14 @@ def _conversar(comando: str) -> str:
                 log.info("Respuesta de relleno %r: leo el resultado de la herramienta.", contenido)
                 return ultimo_resultado
 
+            # Se intento enviar y no quedo pregunta (WhatsApp no cargo, el chat no
+            # aparecio...): lo que cuenta es lo que dijo la herramienta, no lo
+            # que el modelo promete ("voy a enviarlo").
+            resultado_envio = getattr(_turno, "resultado_envio", "")
+            if resultado_envio and not resultado_envio.startswith("No ejecuto"):
+                log.info("El envio no llego a confirmacion; digo lo que paso: %r", resultado_envio[:80])
+                return resultado_envio
+
             # La frase pide enviar y el modelo acaba sin haberlo intentado
             # ("ahora mando a familia la lista..."). Se le dice que le falta,
             # y si vuelve a no hacerlo, se prepara el envio aqui: siempre acaba
@@ -917,6 +926,7 @@ def _conversar(comando: str) -> str:
             h = registro.obtener(nombre)
             if h is not None and h.riesgo == "externa":
                 _turno.envio_intentado = True
+                _turno.resultado_envio = str(resultado)
 
             if str(resultado).startswith("No ejecuto"):
                 _turno.vetos.append(str(resultado))
