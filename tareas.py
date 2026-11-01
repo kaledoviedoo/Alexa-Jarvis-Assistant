@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS pasos (
     resultado   TEXT,
     momento     TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS chat (
+    id          TEXT PRIMARY KEY,
+    texto       TEXT NOT NULL,
+    respuesta   TEXT,
+    origen      TEXT,
+    ms          INTEGER,
+    momento     TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS tareas_por_inicio ON tareas(inicio);
 CREATE INDEX IF NOT EXISTS pasos_por_tarea ON pasos(tarea);
 """
@@ -300,6 +308,24 @@ def novedades(limite: int = 2, max_caracteres: int = 220) -> str:
         partes.append(_frase_interrumpidas([f["descripcion"] for f in cortadas]))
     _marcar_leidas([f["id"] for f in hechas] + [f["id"] for f in cortadas])
     return "Por cierto, " + " ".join(partes)
+
+
+# ---------------------------------------------------------------------------
+# Lo que se habla por el chat (Fase 6): el historial de la barra lateral
+# ---------------------------------------------------------------------------
+def guardar_chat(identificador: str, texto: str, respuesta: str, origen: str = "", ms: int = 0) -> None:
+    _ejecutar("INSERT OR REPLACE INTO chat (id, texto, respuesta, origen, ms, momento) VALUES (?, ?, ?, ?, ?, ?)",
+              (identificador, texto[:2000], (respuesta or "")[:20000], origen, int(ms or 0), _ahora()))
+
+
+def historial_chat(limite: int = 300) -> list[dict]:
+    """Lo ultimo hablado por el chat, de lo mas viejo a lo mas nuevo."""
+    filas = _consulta("SELECT * FROM chat ORDER BY momento DESC, rowid DESC LIMIT ?", (limite,))
+    return [dict(f) for f in reversed(filas)]
+
+
+def borrar_chat(identificador: str) -> bool:
+    return _ejecutar("DELETE FROM chat WHERE id = ?", (identificador,)) > 0
 
 
 def historial(limite: int = 10) -> list[dict]:

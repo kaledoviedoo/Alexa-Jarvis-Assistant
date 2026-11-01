@@ -3,185 +3,385 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#161615">
+<meta name="theme-color" content="#0b0910">
 <title>Jarvis</title>
 <style>
 :root {
-  color-scheme: light dark;
-  --fondo: #f6f5f2;
-  --panel: #ffffff;
-  --texto: #1d1d1b;
-  --suave: #6b6a66;
-  --tenue: #9a988f;
-  --borde: #e2e0d9;
-  --acento: #2f6f5e;
-  --acento-texto: #ffffff;
-  --yo: #e6efe9;
-  --freno: #9a5b00;
-  --freno-fondo: #fdf3e2;
-  --mal: #b4342b;
-  --mal-fondo: #fbeceb;
-  --bien: #2f7a45;
-  --codigo: #f0efea;
-  --sombra: 0 1px 2px rgba(0,0,0,.06);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fondo: #161615;
-    --panel: #1e1e1c;
-    --texto: #ecebe7;
-    --suave: #a3a19b;
-    --tenue: #75736d;
-    --borde: #33322f;
-    --acento: #6fc2a9;
-    --acento-texto: #10201b;
-    --yo: #23332d;
-    --freno: #f0b65a;
-    --freno-fondo: #2d2414;
-    --mal: #f08a80;
-    --mal-fondo: #331c1a;
-    --bien: #7fcf95;
-    --codigo: #262624;
-    --sombra: none;
-  }
+  color-scheme: dark;
+  --fondo: #0b0910;
+  --lateral: #121016;
+  --panel: #17141d;
+  --panel-2: #1f1a27;
+  --borde: #2a2433;
+  --borde-fuerte: #3a3147;
+  --texto: #eeebf4;
+  --suave: #a9a2b6;
+  --tenue: #6f687b;
+  --morado: #8b5cf6;
+  --morado-claro: #c4b5fd;
+  --morado-oscuro: #5b21b6;
+  --morado-tinte: rgba(139, 92, 246, .14);
+  --brillo: rgba(139, 92, 246, .45);
+  --freno: #f5b45a;
+  --freno-fondo: rgba(245, 180, 90, .08);
+  --mal: #f38b82;
+  --mal-fondo: rgba(243, 139, 130, .08);
+  --bien: #86d39b;
+  --radio: 18px;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--fondo); color: var(--texto);
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  display: flex; flex-direction: column;
+  font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  display: flex; overflow: hidden;
 }
-header {
-  display: flex; align-items: center; gap: 10px; padding: 10px 16px;
-  border-bottom: 1px solid var(--borde); background: var(--panel);
-  position: sticky; top: 0; z-index: 2;
+button { font: inherit; color: inherit; }
+svg { display: block; }
+
+/* ---------- Barra lateral ---------- */
+aside {
+  width: 272px; flex: none; background: var(--lateral); border-right: 1px solid var(--borde);
+  display: flex; flex-direction: column; padding: 14px 14px 16px; gap: 14px; z-index: 5;
 }
-header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
-#estado { font-size: 13px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-.boton-sec {
-  border: 1px solid var(--borde); background: transparent; color: var(--texto);
-  border-radius: 8px; padding: 6px 10px; font: 500 13px system-ui; cursor: pointer; white-space: nowrap;
+.lat-cab { display: flex; align-items: center; gap: 4px; }
+.icono {
+  width: 34px; height: 34px; display: grid; place-items: center; border: 0; background: transparent;
+  border-radius: 10px; color: var(--suave); cursor: pointer;
 }
-.boton-sec:hover { border-color: var(--suave); }
-main { flex: 1; overflow-y: auto; padding: 16px; }
-#conversacion { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
-.vacio { color: var(--suave); text-align: center; margin-top: 18vh; }
-.vacio b { color: var(--texto); }
+.icono:hover { background: var(--panel-2); color: var(--texto); }
+.icono.morado { color: var(--morado-claro); }
+.lat-cab .espacio { flex: 1; }
+#cerrar-lateral { display: none; }
+.buscar {
+  display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid transparent;
+  border-radius: 999px; padding: 0 14px; height: 40px; color: var(--tenue);
+}
+.buscar:focus-within { border-color: var(--borde-fuerte); }
+.buscar input { flex: 1; border: 0; background: transparent; color: var(--texto); font: inherit; outline: none; min-width: 0; }
+#historial { flex: 1; overflow-y: auto; margin: 0 -6px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
+.grupo { margin: 4px 0 14px; }
+.grupo h3 { font-size: 13px; font-weight: 600; color: var(--texto); margin: 0 0 8px 4px; }
+.item {
+  display: flex; align-items: center; gap: 6px; background: var(--panel-2); border-radius: 999px;
+  padding: 0 6px 0 14px; height: 38px; margin-bottom: 6px; cursor: pointer; border: 1px solid transparent;
+}
+.item:hover { border-color: var(--borde-fuerte); }
+.item.activo { border-color: var(--morado); background: var(--morado-tinte); }
+.item .t { flex: 1; font-size: 13px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .mas { width: 28px; height: 28px; border: 0; background: transparent; color: var(--tenue); border-radius: 50%; cursor: pointer; letter-spacing: 1px; }
+.item .mas:hover { color: var(--texto); background: var(--panel); }
+.item.borrar { background: var(--mal-fondo); }
+.item.borrar .t { color: var(--mal); }
+.item.borrar button { border: 0; background: transparent; cursor: pointer; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; }
+.item.borrar .si { color: var(--mal); font-weight: 600; }
+.lat-vacio { color: var(--tenue); font-size: 13px; padding: 4px; }
+.tarjeta-lat {
+  border-radius: var(--radio); padding: 14px 14px 14px 16px; position: relative; overflow: hidden;
+  background: radial-gradient(120% 140% at 0% 100%, #6d28d9 0%, #3b1a6e 45%, #1c1328 100%);
+  border: 1px solid rgba(196, 181, 253, .18);
+}
+.tarjeta-lat b { display: block; font-size: 15px; line-height: 1.25; }
+.tarjeta-lat span { display: block; font-size: 12px; color: rgba(238, 235, 244, .65); margin-top: 4px; padding-right: 38px; }
+.tarjeta-lat .ir {
+  position: absolute; right: 12px; bottom: 12px; width: 32px; height: 32px; border-radius: 50%;
+  border: 0; background: rgba(255, 255, 255, .92); color: #2e1065; display: grid; place-items: center; cursor: pointer;
+}
+
+/* ---------- Principal ---------- */
+main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; isolation: isolate;
+  background-image:
+    linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+main::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(45% 55% at 100% 0%, rgba(124, 58, 237, .30), transparent 70%),
+    radial-gradient(40% 50% at 100% 100%, rgba(139, 92, 246, .22), transparent 70%),
+    radial-gradient(35% 40% at 0% 100%, rgba(91, 33, 182, .16), transparent 70%);
+}
+header { display: flex; align-items: center; gap: 12px; padding: 16px 24px; }
+#abrir-lateral { display: none; }
+.marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
+.logo {
+  width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  background: linear-gradient(135deg, #a78bfa, #6d28d9); color: #fff; font-size: 15px; font-weight: 800;
+  box-shadow: 0 0 18px var(--brillo);
+}
+header .espacio { flex: 1; }
+#estado {
+  font-size: 12.5px; color: var(--suave); background: rgba(23, 20, 29, .7); border: 1px solid var(--borde);
+  border-radius: 999px; padding: 5px 12px; white-space: nowrap; max-width: 44vw; overflow: hidden; text-overflow: ellipsis;
+  backdrop-filter: blur(6px);
+}
+#estado::before { content: "●"; color: var(--bien); margin-right: 6px; font-size: 10px; vertical-align: 1px; }
+#estado.sin::before { color: var(--mal); }
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  background: linear-gradient(135deg, #2e1065, #6d28d9); border: 2px solid rgba(196, 181, 253, .35);
+}
+
+#zona { flex: 1; overflow-y: auto; padding: 0 24px; scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
+#pie { flex: none; padding: 8px 24px calc(18px + env(safe-area-inset-bottom)); }
+.columna { max-width: 780px; margin: 0 auto; }
+
+/* Inicio: bienvenida y caja centradas, como en la referencia */
+main.inicio #zona { display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+main.inicio #pie { flex: 1; }
+main:not(.inicio) #bienvenida, main:not(.inicio) #sugerencias { display: none; }
+main.inicio #conversacion { display: none; }
+
+#bienvenida { text-align: center; padding: 10px 0 30px; }
+.orbe {
+  width: 128px; height: 128px; margin: 0 auto 26px; border-radius: 50%; position: relative;
+  background: radial-gradient(circle at 36% 30%, #f5f3ff 0%, #c4b5fd 14%, #8b5cf6 36%, #4c1d95 62%, #13071f 82%);
+  box-shadow: 0 0 70px rgba(139, 92, 246, .55), 0 0 0 7px rgba(139, 92, 246, .10), inset 0 0 26px rgba(255,255,255,.18);
+  animation: flotar 7s ease-in-out infinite;
+}
+.orbe::before, .orbe::after {
+  content: ""; position: absolute; inset: 14%; border-radius: 50%; mix-blend-mode: screen; filter: blur(7px);
+  background: conic-gradient(from 0deg, transparent 0 18%, rgba(237, 233, 254, .85) 26%, transparent 40% 62%, rgba(167, 139, 250, .9) 72%, transparent 86%);
+  animation: girar 9s linear infinite;
+}
+.orbe::after { inset: 24%; filter: blur(5px); animation-duration: 6s; animation-direction: reverse; opacity: .8; }
+.orbe.piensa { animation: flotar 7s ease-in-out infinite, latir 1.4s ease-in-out infinite; }
+@keyframes flotar { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+@keyframes girar { to { transform: rotate(360deg) } }
+@keyframes latir { 0%,100% { box-shadow: 0 0 70px rgba(139,92,246,.55), 0 0 0 7px rgba(139,92,246,.10), inset 0 0 26px rgba(255,255,255,.18) }
+                   50% { box-shadow: 0 0 100px rgba(167,139,250,.8), 0 0 0 12px rgba(139,92,246,.16), inset 0 0 26px rgba(255,255,255,.25) } }
+@media (prefers-reduced-motion: reduce) { .orbe, .orbe::before, .orbe::after, .punto { animation: none !important; } }
+#bienvenida h1 {
+  margin: 0; font-size: clamp(30px, 5vw, 46px); line-height: 1.1; font-weight: 750; letter-spacing: -.025em;
+  background: linear-gradient(90deg, #a78bfa 0%, #c4b5fd 35%, #f5f3ff 70%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+#bienvenida p { margin: 10px 0 0; color: var(--suave); font-size: 15.5px; }
+
+/* Caja de escribir */
+.caja {
+  background: rgba(10, 8, 14, .92); border: 1px solid var(--borde); border-radius: 22px;
+  padding: 14px 14px 12px 20px; box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+.caja:focus-within { border-color: rgba(139, 92, 246, .55); box-shadow: 0 0 0 4px rgba(139,92,246,.10), 0 10px 40px rgba(0,0,0,.35); }
+textarea {
+  width: 100%; resize: none; border: 0; outline: none; background: transparent; color: var(--texto);
+  font: inherit; font-size: 15.5px; line-height: 1.45; min-height: 26px; max-height: 180px; padding: 4px 0;
+}
+textarea::placeholder { color: var(--tenue); }
+.caja-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.chip-modelo {
+  display: flex; align-items: center; gap: 8px; color: var(--morado-claro); font-size: 13.5px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; min-width: 0;
+}
+.chip-modelo .mini {
+  width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #ddd6fe, #7c3aed 60%, #2e1065);
+}
+.chip-modelo span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.caja-pie .espacio { flex: 1; }
+#enviar {
+  width: 38px; height: 38px; flex: none; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed); color: #fff; box-shadow: 0 0 20px rgba(139,92,246,.45);
+}
+#enviar:disabled { opacity: .45; box-shadow: none; cursor: default; }
+
+/* Sugerencias */
+#sugerencias { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.sug {
+  display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+  background: rgba(10, 8, 14, .85); border: 1px solid var(--borde); border-radius: var(--radio); padding: 12px 14px;
+}
+.sug:hover { border-color: rgba(139, 92, 246, .5); }
+.sug .ic {
+  width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--morado-tinte); color: var(--morado-claro); border: 1px solid rgba(139,92,246,.25);
+}
+.sug b { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; }
+.sug b em { font-style: normal; color: var(--morado-claro); }
+.sug small { display: block; font-size: 11.5px; color: var(--tenue); margin-top: 3px; line-height: 1.35; }
+
+/* Conversacion */
+#conversacion { display: flex; flex-direction: column; gap: 18px; padding: 8px 0 20px; }
 .yo {
-  align-self: flex-end; max-width: 85%; background: var(--yo); padding: 9px 13px;
-  border-radius: 14px 14px 4px 14px; white-space: pre-wrap; word-wrap: break-word;
+  align-self: flex-end; max-width: 80%; background: linear-gradient(135deg, #3b1d6e, #2a1650);
+  border: 1px solid rgba(167, 139, 250, .22); padding: 10px 15px; border-radius: 18px 18px 6px 18px;
+  white-space: pre-wrap; word-wrap: break-word;
 }
-.jarvis { align-self: stretch; max-width: 100%; }
+.jarvis { display: flex; gap: 12px; align-items: flex-start; }
+.jarvis .mini {
+  width: 30px; height: 30px; flex: none; border-radius: 50%; margin-top: 2px;
+  background: radial-gradient(circle at 35% 30%, #ede9fe, #8b5cf6 45%, #2e1065 85%);
+  box-shadow: 0 0 14px rgba(139,92,246,.45);
+}
+.jarvis .cuerpo { flex: 1; min-width: 0; }
 .respuesta { white-space: pre-wrap; word-wrap: break-word; }
-.meta { font-size: 12px; color: var(--tenue); margin-top: 4px; }
-.pensando { color: var(--suave); font-size: 14px; display: flex; align-items: center; gap: 8px; }
-.punto { width: 7px; height: 7px; border-radius: 50%; background: var(--acento); animation: latir 1s infinite ease-in-out; }
-@keyframes latir { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
-@media (prefers-reduced-motion: reduce) { .punto { animation: none; } }
-details.pasos { margin: 6px 0 8px; border-left: 2px solid var(--borde); padding-left: 10px; }
-details.pasos > summary { cursor: pointer; font-size: 13px; color: var(--suave); list-style: none; }
+.meta { font-size: 12px; color: var(--tenue); margin-top: 6px; }
+.fecha-sep { text-align: center; font-size: 12px; color: var(--tenue); margin: 4px 0; }
+.pensando { color: var(--suave); font-size: 14px; display: flex; align-items: center; gap: 8px; min-height: 30px; }
+.punto { width: 7px; height: 7px; border-radius: 50%; background: var(--morado); animation: pulso 1s infinite ease-in-out; }
+@keyframes pulso { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+details.pasos { margin: 2px 0 10px; border: 1px solid var(--borde); border-radius: 14px; background: rgba(23, 20, 29, .75); padding: 8px 12px; }
+details.pasos > summary { cursor: pointer; font-size: 13px; color: var(--suave); list-style: none; display: flex; align-items: center; gap: 6px; }
 details.pasos > summary::-webkit-details-marker { display: none; }
-details.pasos > summary::before { content: "▸ "; }
-details.pasos[open] > summary::before { content: "▾ "; }
-.linea { font-size: 13px; color: var(--suave); margin: 4px 0; word-wrap: break-word; }
-.linea.freno { color: var(--freno); background: var(--freno-fondo); padding: 4px 8px; border-radius: 6px; }
-.linea.verificacion { color: var(--mal); background: var(--mal-fondo); padding: 4px 8px; border-radius: 6px; }
+details.pasos > summary::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+details.pasos[open] > summary::before { transform: rotate(45deg); }
+details.pasos[open] > summary { margin-bottom: 6px; }
+.linea { font-size: 13px; color: var(--tenue); margin: 4px 0; word-wrap: break-word; }
+.linea.freno { color: var(--freno); background: var(--freno-fondo); padding: 5px 9px; border-radius: 8px; }
+.linea.verificacion { color: var(--mal); background: var(--mal-fondo); padding: 5px 9px; border-radius: 8px; }
 .linea.insiste { color: var(--freno); }
-.linea.router { color: var(--acento); }
-.paso {
-  font-size: 13px; margin: 6px 0; padding: 7px 9px; border: 1px solid var(--borde);
-  border-radius: 8px; background: var(--panel); box-shadow: var(--sombra);
-}
-.paso .nombre { font-weight: 600; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
-.paso .args { color: var(--suave); font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
-.paso .res { margin-top: 4px; white-space: pre-wrap; word-wrap: break-word; max-height: 9.5em; overflow: auto; }
-.paso.vetado { border-color: var(--freno); }
-.paso.fallo { border-color: var(--mal); }
-.etiqueta { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 5px; margin-left: 6px; }
-.etiqueta.ok { color: var(--bien); border: 1px solid currentColor; }
-.etiqueta.no { color: var(--mal); border: 1px solid currentColor; }
-.etiqueta.freno { color: var(--freno); border: 1px solid currentColor; }
+.linea.router { color: var(--morado-claro); }
+.paso { font-size: 13px; margin: 8px 0; padding: 9px 11px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); }
+.paso .nombre { font-weight: 600; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px; color: var(--morado-claro); }
+.paso .args { color: var(--tenue); font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; margin-top: 2px; }
+.paso .res { margin-top: 5px; white-space: pre-wrap; word-wrap: break-word; max-height: 10em; overflow: auto; color: var(--suave); }
+.paso.vetado { border-color: rgba(245, 180, 90, .45); }
+.paso.fallo { border-color: rgba(243, 139, 130, .5); }
+.etiqueta { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 6px; margin-left: 8px; border: 1px solid currentColor; }
+.etiqueta.no { color: var(--mal); }
+.etiqueta.freno { color: var(--freno); }
 .confirmar {
-  margin-top: 8px; padding: 10px 12px; border: 1px solid var(--acento); border-radius: 10px;
-  background: var(--panel); display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 10px; padding: 12px 14px; border: 1px solid rgba(139, 92, 246, .5); border-radius: 14px;
+  background: var(--morado-tinte); display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
 }
-.confirmar .q { flex: 1 1 200px; font-size: 14px; }
-.confirmar button { border: 0; border-radius: 8px; padding: 8px 16px; font: 600 14px system-ui; cursor: pointer; }
-.si { background: var(--acento); color: var(--acento-texto); }
-.no { background: transparent; color: var(--texto); border: 1px solid var(--borde) !important; }
+.confirmar .q { flex: 1 1 220px; font-size: 14px; }
+.confirmar button { border: 0; border-radius: 999px; padding: 8px 18px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.confirmar .si { background: linear-gradient(135deg, #a78bfa, #7c3aed); color: #fff; }
+.confirmar .no { background: transparent; border: 1px solid var(--borde-fuerte); }
 .cuenta { font-size: 12px; color: var(--tenue); font-variant-numeric: tabular-nums; }
-.fondo { margin-top: 8px; font-size: 14px; padding: 8px 10px; border-radius: 8px; background: var(--codigo); }
+.fondo { margin-top: 10px; font-size: 14px; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--borde); }
 .fondo .res { white-space: pre-wrap; margin-top: 4px; }
 .error { color: var(--mal); }
-footer {
-  border-top: 1px solid var(--borde); background: var(--panel);
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-}
-#atajos { max-width: 760px; margin: 0 auto 8px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-#atajos::-webkit-scrollbar { display: none; }
-#atajos button {
-  flex: none; border: 1px solid var(--borde); background: transparent; color: var(--suave);
-  border-radius: 999px; padding: 5px 11px; font: 13px system-ui; cursor: pointer;
-}
-#atajos button:hover { color: var(--texto); border-color: var(--suave); }
-form { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
-textarea {
-  flex: 1; resize: none; min-height: 44px; max-height: 160px; padding: 10px 12px;
-  border: 1px solid var(--borde); border-radius: 12px; background: var(--fondo); color: inherit;
-  font: inherit; line-height: 1.4;
-}
-textarea:focus { outline: 2px solid var(--acento); outline-offset: -1px; border-color: transparent; }
-#enviar {
-  height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--acento);
-  color: var(--acento-texto); font: 600 15px system-ui; cursor: pointer;
-}
-#enviar:disabled { opacity: .5; cursor: default; }
+
+/* Dialogos */
 dialog {
-  border: 1px solid var(--borde); border-radius: 14px; background: var(--panel); color: var(--texto);
-  padding: 20px; max-width: min(440px, calc(100vw - 32px)); width: 100%;
+  border: 1px solid var(--borde); border-radius: 20px; background: var(--panel); color: var(--texto);
+  padding: 22px; max-width: min(460px, calc(100vw - 32px)); width: 100%;
 }
-dialog::backdrop { background: rgba(0,0,0,.4); }
+dialog::backdrop { background: rgba(5, 3, 9, .7); backdrop-filter: blur(3px); }
 dialog h2 { margin: 0 0 8px; font-size: 18px; }
 dialog p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
-.codigo-grande { font: 700 40px/1 ui-monospace, Consolas, monospace; letter-spacing: .25em; text-align: center; margin: 14px 0; }
-.direccion { font-family: ui-monospace, Consolas, monospace; font-size: 15px; background: var(--codigo); padding: 8px 10px; border-radius: 8px; word-break: break-all; }
-.tarea { padding: 8px 0; border-top: 1px solid var(--borde); font-size: 14px; }
-.tarea:first-child { border-top: 0; }
-.tarea .cab { display: flex; justify-content: space-between; gap: 8px; }
-.tarea .est { font-size: 12px; color: var(--tenue); white-space: nowrap; }
-.tarea .txt { color: var(--suave); font-size: 13px; margin-top: 2px; }
-.dlg-pie { display: flex; justify-content: flex-end; margin-top: 14px; }
-@media (max-width: 520px) {
-  header { padding: 8px 12px; }
-  main { padding: 12px; }
-  footer { padding-left: 12px; padding-right: 12px; }
-  .yo { max-width: 92%; }
-  #estado { display: none; }
+.codigo-grande {
+  font: 700 42px/1 ui-monospace, Consolas, monospace; letter-spacing: .25em; text-align: center; margin: 16px 0;
+  background: linear-gradient(90deg, #c4b5fd, #f5f3ff); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
+.direccion { font-family: ui-monospace, Consolas, monospace; font-size: 14.5px; background: var(--fondo); border: 1px solid var(--borde); padding: 9px 12px; border-radius: 10px; word-break: break-all; }
+.tarea { padding: 10px 0; border-top: 1px solid var(--borde); font-size: 14px; }
+.tarea:first-child { border-top: 0; }
+.tarea .cab { display: flex; justify-content: space-between; gap: 10px; }
+.tarea .est { font-size: 12px; color: var(--tenue); white-space: nowrap; }
+.tarea .txt { color: var(--suave); font-size: 13px; margin-top: 3px; }
+#lista-tareas { max-height: 60vh; overflow-y: auto; }
+.dlg-pie { display: flex; justify-content: flex-end; margin-top: 16px; }
+.boton-sec { border: 1px solid var(--borde-fuerte); background: transparent; border-radius: 999px; padding: 7px 16px; cursor: pointer; }
+.boton-sec:hover { border-color: var(--morado); }
+#velo { display: none; }
+
+/* Celular */
+@media (max-width: 860px) {
+  aside {
+    position: fixed; inset: 0 auto 0 0; width: min(300px, 86vw); transform: translateX(-102%);
+    transition: transform .2s ease; box-shadow: 20px 0 50px rgba(0,0,0,.5);
+  }
+  aside.abierta { transform: none; }
+  #velo.visible { display: block; position: fixed; inset: 0; background: rgba(5,3,9,.6); z-index: 4; }
+  #cerrar-lateral, #abrir-lateral { display: grid; }
+  header { padding: 12px 16px; }
+  #zona { padding: 0 16px; }
+  #pie { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
+  #sugerencias { grid-template-columns: 1fr; gap: 8px; }
+  .sug small { display: none; }
+  .sug .ic { width: 38px; height: 38px; }
+  .orbe { width: 96px; height: 96px; margin-bottom: 18px; }
+  #bienvenida { padding-bottom: 20px; }
+  .yo { max-width: 90%; }
+  #estado { max-width: 38vw; }
+}
+@media (max-width: 420px) { #estado { display: none; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Jarvis</h1>
-  <div id="estado">conectando…</div>
-  <button class="boton-sec" id="btn-tareas" type="button">Tareas</button>
-  <button class="boton-sec" id="btn-vincular" type="button" hidden>Vincular celular</button>
-</header>
 
-<main id="scroll">
-  <div id="conversacion">
-    <div class="vacio" id="vacio">Escríbele como le hablas al Echo.<br>Aquí <b>no hay límite de 8 segundos</b> y ves cada paso que da.</div>
+<aside id="lateral" aria-label="Historial">
+  <div class="lat-cab">
+    <button class="icono morado" id="btn-nuevo" title="Chat nuevo" aria-label="Chat nuevo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </button>
+    <button class="icono" id="btn-tareas" title="Tareas y rutinas" aria-label="Tareas y rutinas">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/></svg>
+    </button>
+    <span class="espacio"></span>
+    <button class="icono" id="cerrar-lateral" aria-label="Cerrar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <label class="buscar">
+    <input id="buscar" type="search" placeholder="Buscar" aria-label="Buscar en el historial">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+  </label>
+  <div id="historial"></div>
+  <div class="tarjeta-lat" id="tarjeta-lat" hidden>
+    <b>Vincula tu celular</b>
+    <span>Habla con Jarvis desde cualquier lugar de tu red de Tailscale.</span>
+    <button class="ir" id="btn-vincular" aria-label="Vincular celular">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+</aside>
+<div id="velo"></div>
+
+<main id="principal" class="inicio">
+  <header>
+    <button class="icono" id="abrir-lateral" aria-label="Abrir historial">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+    </button>
+    <div class="marca"><div class="logo">J</div>Jarvis</div>
+    <span class="espacio"></span>
+    <div id="estado">conectando…</div>
+    <div class="avatar" id="avatar">K</div>
+  </header>
+
+  <section id="zona">
+    <div class="columna" id="bienvenida">
+      <div class="orbe" id="orbe"></div>
+      <h1 id="saludo">¡Bienvenido de nuevo!</h1>
+      <p>¿Qué hacemos hoy en tu PC?</p>
+    </div>
+    <div class="columna" id="conversacion"></div>
+  </section>
+
+  <div id="pie">
+    <div class="columna">
+      <form class="caja" id="formulario" autocomplete="off">
+        <textarea id="entrada" rows="1" placeholder="Pídele algo a Jarvis…" aria-label="Orden para Jarvis"></textarea>
+        <div class="caja-pie">
+          <div class="chip-modelo"><span class="mini"></span><span id="chip-modelo">Jarvis</span></div>
+          <span class="espacio"></span>
+          <button id="enviar" type="submit" aria-label="Enviar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>
+          </button>
+        </div>
+      </form>
+      <div id="sugerencias">
+        <button class="sug" data-orden="cómo está el equipo">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+          <span><b>Estado <em>del equipo</em></b><small>CPU, memoria y gráfica en este momento</small></span>
+        </button>
+        <button class="sug" data-orden="qué ventanas tengo abiertas">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 21h11a2 2 0 0 0 2-2V8"/></svg></span>
+          <span><b>Ventanas <em>abiertas</em></b><small>Qué tienes abierto y en primer plano</small></span>
+        </button>
+        <button class="sug" data-orden="cómo quedó lo último">
+          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <span><b>Cómo quedó <em>lo último</em></b><small>El resultado de lo que dejaste trabajando</small></span>
+        </button>
+      </div>
+    </div>
   </div>
 </main>
-
-<footer>
-  <div id="atajos"></div>
-  <form id="formulario" autocomplete="off">
-    <textarea id="entrada" rows="1" placeholder="Pídele algo a Jarvis…" aria-label="Orden para Jarvis"></textarea>
-    <button id="enviar" type="submit">Enviar</button>
-  </form>
-</footer>
 
 <dialog id="dlg-vincular">
   <h2>Vincular el celular</h2>
@@ -201,19 +401,11 @@ dialog p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
 <script>
 "use strict";
 const $ = (s) => document.querySelector(s);
+const principal = $("#principal");
 const conversacion = $("#conversacion");
-const scroll = $("#scroll");
+const zona = $("#zona");
 const entrada = $("#entrada");
-const enviar = $("#enviar");
-
-const ATAJOS = ["cómo quedó lo último", "qué ventanas tengo abiertas", "cómo está el equipo",
-                "qué rutinas tengo", "en qué modo estás", "pon el modo dedicado", "pon el modo normal"];
-for (const a of ATAJOS) {
-  const b = document.createElement("button");
-  b.type = "button"; b.textContent = a;
-  b.onclick = () => mandar(a);
-  $("#atajos").append(b);
-}
+const orbe = $("#orbe");
 
 function el(tag, clase, texto) {
   const e = document.createElement(tag);
@@ -221,8 +413,9 @@ function el(tag, clase, texto) {
   if (texto !== undefined) e.textContent = texto;
   return e;
 }
-
-function abajo() { scroll.scrollTop = scroll.scrollHeight; }
+function abajo() { zona.scrollTop = zona.scrollHeight; }
+function modoChat() { principal.classList.remove("inicio"); }
+function modoInicio() { principal.classList.add("inicio"); conversacion.replaceChildren(); }
 
 async function api(ruta, opciones = {}) {
   const r = await fetch(ruta, {
@@ -242,12 +435,22 @@ function corto(obj) {
   } catch { return ""; }
 }
 
-const ORIGEN = { router: "router", modelo: "modelo", semantica: "capa semántica" };
+const ORIGEN = { router: "router", modelo: "modelo", semantica: "capa semántica", error: "error" };
+
+function burbujaYo(texto) { conversacion.append(el("div", "yo", texto)); }
+
+function cajaJarvis() {
+  const fila = el("div", "jarvis");
+  const cuerpo = el("div", "cuerpo");
+  fila.append(el("div", "mini"), cuerpo);
+  conversacion.append(fila);
+  return cuerpo;
+}
 
 function nuevaRespuesta(texto) {
-  $("#vacio")?.remove();
-  conversacion.append(el("div", "yo", texto));
-  const caja = el("div", "jarvis");
+  modoChat();
+  burbujaYo(texto);
+  const caja = cajaJarvis();
   const pasos = el("details", "pasos");
   pasos.open = true;
   const resumen = el("summary", "", "Pasos");
@@ -256,9 +459,8 @@ function nuevaRespuesta(texto) {
   const pensando = el("div", "pensando");
   pensando.append(el("span", "punto"), el("span", "", "Pensando…"));
   caja.append(pasos, pensando);
-  conversacion.append(caja);
   abajo();
-  return { caja, pasos, resumen, pensando, nPasos: 0, ultimoEjecutando: null };
+  return { caja, pasos, resumen, pensando, nPasos: 0 };
 }
 
 function anotar(v, ev) {
@@ -290,7 +492,7 @@ function anotar(v, ev) {
     p.append(cab);
     const args = corto(ev.argumentos);
     if (args) p.append(el("div", "args", args));
-    p.append(el("div", "res", r.replace(/\nVERIFICACION FALLIDA:[\s\S]*/, "\n⚠ La comprobación falló.")));
+    p.append(el("div", "res", r.replace(/\nVERIFICACION FALLIDA:[\s\S]*/, "\nLa comprobación falló.")));
     v.pasos.append(p);
     v.resumen.textContent = `Pasos (${v.nPasos})`;
     v.pensando.lastChild.textContent = "Pensando…";
@@ -298,8 +500,7 @@ function anotar(v, ev) {
     v.pensando.remove();
     v.caja.append(el("div", "respuesta" + (ev.tipo === "error" ? " error" : ""), ev.texto));
     if (ev.tipo === "respuesta") {
-      const quien = ORIGEN[ev.origen] || ev.origen;
-      v.caja.append(el("div", "meta", `${quien} · ${(ev.ms / 1000).toFixed(1)} s`));
+      v.caja.append(el("div", "meta", `${ORIGEN[ev.origen] || ev.origen} · ${(ev.ms / 1000).toFixed(1)} s`));
       if (v.nPasos === 0 && v.pasos.childElementCount <= 1) v.pasos.remove();
       else v.pasos.open = false;
       if (ev.confirmacion) confirmar(v.caja, ev.confirmacion);
@@ -328,21 +529,25 @@ function confirmar(caja, c) {
   box.append(si, no, cuenta);
   caja.append(box);
   let quedan = Math.max(0, Math.floor(c.segundos));
-  const reloj = setInterval(() => {
+  const tic = () => {
     cuenta.textContent = `${quedan} s`;
     if (quedan-- <= 0) { clearInterval(reloj); box.replaceChildren(el("div", "meta", "La confirmación caducó.")); }
-  }, 1000);
+  };
+  const reloj = setInterval(tic, 1000);
+  tic();
   const responder = (t) => { clearInterval(reloj); box.remove(); mandar(t); };
   si.onclick = () => responder("sí");
   no.onclick = () => responder("no");
 }
 
 let ocupados = 0;
+function pensandoGlobal() { orbe.classList.toggle("piensa", ocupados > 0); $("#enviar").disabled = false; }
+
 async function mandar(texto) {
   texto = (texto || "").trim();
   if (!texto) return;
   const v = nuevaRespuesta(texto);
-  ocupados++;
+  ocupados++; pensandoGlobal();
   try {
     const { id } = await api("/chat/orden", { method: "POST", body: JSON.stringify({ texto }) });
     let desde = 0, terminado = false, fallosRed = 0;
@@ -362,7 +567,7 @@ async function mandar(texto) {
     v.pensando.remove();
     v.caja.append(el("div", "respuesta error", `No pude hablar con Jarvis (${e.message}). ¿Está encendido?`));
   } finally {
-    ocupados--;
+    ocupados--; pensandoGlobal();
     refrescarEstado();
   }
 }
@@ -377,17 +582,116 @@ $("#formulario").onsubmit = (e) => {
 entrada.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#formulario").requestSubmit(); }
 });
-function ajustar() { entrada.style.height = "auto"; entrada.style.height = Math.min(entrada.scrollHeight, 160) + "px"; }
+function ajustar() { entrada.style.height = "auto"; entrada.style.height = Math.min(entrada.scrollHeight, 180) + "px"; }
 entrada.addEventListener("input", ajustar);
+document.querySelectorAll(".sug").forEach((b) => (b.onclick = () => mandar(b.dataset.orden)));
 
+/* ---------- Historial ---------- */
+let historial = [];
 let estadoActual = null;
+
+function grupoDe(momento) {
+  const d = new Date(momento);
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const dia = new Date(d); dia.setHours(0, 0, 0, 0);
+  const n = Math.round((hoy - dia) / 86400000);
+  if (n <= 0) return "Hoy";
+  if (n === 1) return "Ayer";
+  if (n < 7) return `Hace ${n} días`;
+  if (n < 30) return "Últimos 30 días";
+  return "Más antiguos";
+}
+
+function pintarHistorial() {
+  const caja = $("#historial");
+  caja.replaceChildren();
+  const q = $("#buscar").value.trim().toLowerCase();
+  const items = historial.filter((c) => !q || (c.texto + " " + (c.respuesta || "")).toLowerCase().includes(q))
+                         .slice().reverse();
+  if (!items.length) {
+    caja.append(el("div", "lat-vacio", q ? "Nada coincide con la búsqueda." : "Aquí aparecerá lo que hables con Jarvis."));
+    return;
+  }
+  let actual = null, grupo = null;
+  for (const c of items) {
+    const g = grupoDe(c.momento);
+    if (g !== actual) {
+      actual = g;
+      grupo = el("div", "grupo");
+      grupo.append(el("h3", "", g));
+      caja.append(grupo);
+    }
+    const it = el("div", "item");
+    it.dataset.id = c.id;
+    it.append(el("span", "t", c.texto));
+    const mas = el("button", "mas", "•••");
+    mas.title = "Opciones";
+    mas.onclick = (e) => { e.stopPropagation(); preguntarBorrar(it, c); };
+    it.append(mas);
+    it.onclick = () => abrirDelHistorial(c, it);
+    grupo.append(it);
+  }
+}
+
+function preguntarBorrar(it, c) {
+  it.classList.add("borrar");
+  it.onclick = null;
+  const si = el("button", "si", "Borrar");
+  const no = el("button", "", "Cancelar");
+  it.replaceChildren(el("span", "t", "¿Borrar del historial?"), si, no);
+  no.onclick = (e) => { e.stopPropagation(); pintarHistorial(); };
+  si.onclick = async (e) => {
+    e.stopPropagation();
+    try { await api(`/chat/historial/${c.id}`, { method: "DELETE" }); } catch {}
+    historial = historial.filter((x) => x.id !== c.id);
+    pintarHistorial();
+  };
+}
+
+function abrirDelHistorial(c, it) {
+  document.querySelectorAll(".item.activo").forEach((x) => x.classList.remove("activo"));
+  it.classList.add("activo");
+  conversacion.replaceChildren();
+  modoChat();
+  const f = new Date(c.momento);
+  conversacion.append(el("div", "fecha-sep", f.toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })));
+  burbujaYo(c.texto);
+  const caja = cajaJarvis();
+  caja.append(el("div", "respuesta" + (c.origen === "error" ? " error" : ""), c.respuesta || ""));
+  if (c.origen) caja.append(el("div", "meta", ORIGEN[c.origen] || c.origen));
+  cerrarLateral();
+  abajo();
+  entrada.focus();
+}
+
+$("#buscar").addEventListener("input", pintarHistorial);
+
+$("#btn-nuevo").onclick = async () => {
+  try { await api("/chat/nuevo", { method: "POST" }); } catch {}
+  document.querySelectorAll(".item.activo").forEach((x) => x.classList.remove("activo"));
+  modoInicio();
+  cerrarLateral();
+  entrada.focus();
+};
+
+/* ---------- Estado ---------- */
 async function refrescarEstado() {
   try {
     const s = await api("/chat/estado");
     estadoActual = s;
-    $("#estado").textContent = `modo ${s.modo} · ${s.modelo}`;
-    $("#btn-vincular").hidden = s.lugar !== "local";
+    $("#estado").classList.remove("sin");
+    $("#estado").textContent = `modo ${s.modo}`;
+    $("#chip-modelo").textContent = `${s.modelo} · ${s.modo}`;
+    $("#tarjeta-lat").hidden = s.lugar !== "local";
+    if (s.nombre) {
+      $("#saludo").textContent = `¡Bienvenido de nuevo, ${s.nombre}!`;
+      $("#avatar").textContent = s.nombre.trim().charAt(0).toUpperCase();
+    }
+    const ids = historial.map((c) => c.id).join();
+    historial = s.conversacion || [];
+    if (historial.map((c) => c.id).join() !== ids) pintarHistorial();
   } catch {
+    $("#estado").classList.add("sin");
     $("#estado").textContent = "sin conexión";
   }
 }
@@ -407,12 +711,10 @@ function mostrarTareas() {
     lista.append(d);
   }
 }
-
 $("#btn-tareas").onclick = async () => { await refrescarEstado(); mostrarTareas(); $("#dlg-tareas").showModal(); };
 
 let relojCodigo = null;
 $("#btn-vincular").onclick = async () => {
-  const dlg = $("#dlg-vincular");
   try {
     const r = await api("/chat/codigo", { method: "POST" });
     $("#v-codigo").textContent = r.codigo;
@@ -425,26 +727,24 @@ $("#btn-vincular").onclick = async () => {
       if (quedan-- <= 0) clearInterval(relojCodigo);
     };
     tic(); relojCodigo = setInterval(tic, 1000);
-    dlg.showModal();
+    $("#dlg-vincular").showModal();
   } catch (e) {
-    alert("No pude pedir el código: " + e.message);
+    $("#v-direccion").textContent = "No pude pedir el código: " + e.message;
+    $("#dlg-vincular").showModal();
   }
 };
-
 document.querySelectorAll("[data-cerrar]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
+
+/* ---------- Barra lateral en el celular ---------- */
+function abrirLateral() { $("#lateral").classList.add("abierta"); $("#velo").classList.add("visible"); }
+function cerrarLateral() { $("#lateral").classList.remove("abierta"); $("#velo").classList.remove("visible"); }
+$("#abrir-lateral").onclick = abrirLateral;
+$("#cerrar-lateral").onclick = cerrarLateral;
+$("#velo").onclick = cerrarLateral;
 
 (async () => {
   await refrescarEstado();
-  const previas = (estadoActual && estadoActual.conversacion) || [];
-  for (const c of previas) {
-    if (!c.terminado || !c.respuesta) continue;
-    $("#vacio")?.remove();
-    conversacion.append(el("div", "yo", c.texto));
-    const caja = el("div", "jarvis");
-    caja.append(el("div", "respuesta", c.respuesta));
-    conversacion.append(caja);
-  }
-  abajo();
+  pintarHistorial();
   entrada.focus();
   setInterval(() => { if (!ocupados) refrescarEstado(); }, 30000);
 })();

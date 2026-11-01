@@ -37,7 +37,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 import confirmaciones
 import modes
 import tareas
-from config import TOKEN_LOCAL
+from config import NOMBRE_USUARIO, TOKEN_LOCAL
 
 log = logging.getLogger("jarvis.chat")
 router = APIRouter()
@@ -258,12 +258,15 @@ def _correr(corrida: _Corrida) -> None:
         respuesta, origen = ollama_client.en_canal(
             "chat", _procesar, corrida.texto, None, PRESUPUESTO_CHAT, en_este_hilo=True)
         corrida.respuesta = respuesta
-        corrida.emitir("respuesta", texto=respuesta, origen=origen,
-                       ms=round((time.time() - inicio) * 1000), confirmacion=confirmaciones.pendiente())
+        ms = round((time.time() - inicio) * 1000)
+        corrida.emitir("respuesta", texto=respuesta, origen=origen, ms=ms,
+                       confirmacion=confirmaciones.pendiente(), momento=datetime.now().isoformat(timespec="seconds"))
+        tareas.guardar_chat(corrida.id, corrida.texto, respuesta, origen, ms)
     except Exception as e:
         log.exception("Fallo la orden del chat")
         corrida.respuesta = f"Tuve un problema con esa orden: {e}"
         corrida.emitir("error", texto=corrida.respuesta)
+        tareas.guardar_chat(corrida.id, corrida.texto, corrida.respuesta, "error", 0)
     finally:
         tareas.observar_hilo(None)
         raiz.removeHandler(captura)
@@ -410,8 +413,28 @@ def estado(request: Request):
     for t in tareas.historial(8):
         recientes.append({"descripcion": t["descripcion"], "estado": t["estado"], "origen": t["origen"],
                           "inicio": t["inicio"], "resultado": (t.get("resultado") or "")[:300]})
-    with _lock:
-        conversacion = [{"id": c.id, "texto": c.texto, "respuesta": c.respuesta, "terminado": c.terminado}
-                        for c in sorted(_corridas.values(), key=lambda c: c.creado)][-30:]
+    conversacion = [{"id": c["id"], "texto": c["texto"], "respuesta": c["respuesta"], "origen": c["origen"],
+                     "momento": c["momento"]} for c in tareas.historial_chat(300)]
     return {"modo": modes.modo_actual(), "modelo": perfil["modelo"], "lugar": lugar,
-            "tareas": recientes, "confirmacion": confirmaciones.pendiente(), "conversacion": conversacion}
+            "nombre": NOMBRE_USUARIO or "", "tareas": recientes,
+            "confirmacion": confirmaciones.pendiente(), "conversacion": conversacion}
+
+
+@router.post("/chat/nuevo")
+def nuevo(request: Request):
+    """Chat nuevo: Jarvis olvida de que se estaba hablando (tambien por voz)."""
+    _exigir(request, escribir=True)
+    try:
+        import sesion
+        sesion.olvidar()
+    except Exception as e:
+        log.debug("No pude olvidar la sesion: %s", e)
+    return {"ok": True}
+
+
+@router.delete("/chat/historial/{ident}")
+def borrar(request: Request, ident: str):
+    _exigir(request, escribir=True)
+    if not tareas.borrar_chat(ident):
+        raise HTTPException(status_code=404)
+    return {"ok": True}

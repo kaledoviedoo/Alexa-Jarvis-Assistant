@@ -213,6 +213,23 @@ def main() -> int:
     comprobar(any(t["descripcion"] == "investigar BGP" for t in s["tareas"]), "y las tareas recientes")
     comprobar(celular.get("/chat/estado").json()["lugar"] == "tailnet", "el celular sabe que es el celular")
 
+    print("\nEL HISTORIAL SOBREVIVE A UN REINICIO Y SE PUEDE BORRAR")
+    tareas.usar_base(TMP / "jarvis.db")              # como si Jarvis se reiniciara
+    s = pc.get("/chat/estado").json()
+    textos = [c["texto"] for c in s["conversacion"]]
+    comprobar(textos[-1] == "investiga bgp" and "mira mis ventanas y apúntalas" in textos,
+              f"la conversacion sigue ahi tras reiniciar ({len(textos)} mensajes)")
+    comprobar(all(c["momento"] and c["respuesta"] for c in s["conversacion"]), "cada una con su fecha y su respuesta")
+    comprobar(s["nombre"] == (config.NOMBRE_USUARIO or ""), "y el nombre para el saludo")
+    borrar = s["conversacion"][0]["id"]
+    comprobar(pc.delete(f"/chat/historial/{borrar}").status_code == 403, "borrar sin la cabecera del chat no vale")
+    comprobar(pc.delete(f"/chat/historial/{borrar}", headers=h).status_code == 200, "con ella, se borra")
+    comprobar(borrar not in [c["id"] for c in pc.get("/chat/estado").json()["conversacion"]], "y desaparece")
+    import sesion
+    sesion.agregar("abre spotify", "Abrí Spotify.", "router")
+    comprobar(pc.post("/chat/nuevo", headers=h).status_code == 200, "chat nuevo")
+    comprobar(sesion.turnos() == [], "y Jarvis olvida de que se hablaba")
+
     print("\nEL MODELO SE EXTIENDE EN EL CHAT Y NO EN LA VOZ")
     voz_prompt = ollama_client.construir_prompt_sistema()
     chat_prompt = ollama_client.en_canal("chat", ollama_client.construir_prompt_sistema)
