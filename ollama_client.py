@@ -423,6 +423,7 @@ def _conversar(comando: str) -> str:
 
     ofrecidas = herramientas_para(comando)
     log.info("Ofrezco %d herramientas al modelo", len(ofrecidas))
+    insistido = False
 
     for paso in range(MAX_PASOS_TOOLS):
         try:
@@ -450,6 +451,17 @@ def _conversar(comando: str) -> str:
 
         if not llamadas:
             contenido = (mensaje.get("content") or "").strip()
+
+            # Un modelo pequeño a veces explica que herramienta usaria, o
+            # pregunta si la usa, en vez de llamarla. Se le insiste una vez.
+            if not insistido and describe_en_vez_de_actuar(contenido, ofrecidas):
+                insistido = True
+                log.warning("El modelo describió en vez de actuar: %r. Insisto una vez.",
+                            contenido[:120])
+                mensajes.append({"role": "assistant", "content": contenido})
+                mensajes.append({"role": "user", "content": INSISTIR})
+                continue
+
             log.info("Ollama respondió sin herramientas (paso %d)", paso)
             return limpiar_respuesta_modelo(contenido)
 
@@ -469,6 +481,29 @@ def _conversar(comando: str) -> str:
             })
 
     return "Di demasiadas vueltas con esa orden y preferí parar."
+
+
+INSISTIR = ("No me expliques qué función usar ni me preguntes si la uso: llama tú "
+            "ahora mismo a la herramienta adecuada con el mecanismo de herramientas. "
+            "Si de verdad te falta un dato, pregunta solo ese dato.")
+
+_SENALES_DE_DESCRIBIR = re.compile(
+    r"\b(?:usar|utilizar|llamar a|ejecutar|invocar)\s+(?:la\s+)?(?:funci[oó]n|herramienta)\b"
+    r"|\bcon el siguiente comando\b"
+    r"|\bquieres que (?:busque|lo busque|abra|revise|mire|lo haga|use|lea)\b",
+    re.IGNORECASE,
+)
+
+
+def describe_en_vez_de_actuar(contenido: str, ofrecidas: list[dict]) -> bool:
+    """¿El modelo habla de una herramienta en vez de llamarla?"""
+    texto = contenido or ""
+    if not texto.strip():
+        return False
+    nombres = {e.get("function", {}).get("name", "") for e in ofrecidas}
+    if any(n and n in texto for n in nombres):
+        return True
+    return bool(_SENALES_DE_DESCRIBIR.search(texto))
 
 
 _inicio_peticion = threading.local()

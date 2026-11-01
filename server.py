@@ -481,13 +481,15 @@ async def probar(request: Request, cuerpo: dict):
     inicio = time.perf_counter()
     respuesta = await asyncio.to_thread(procesar_comando, comando)
 
-    return {
+    # charset explicito: sin el, PowerShell 5 lee el JSON como Latin-1 y
+    # las tildes salen rotas ("funciÃ³n").
+    return JSONResponse({
         "comando": comando,
         "respuesta": respuesta,
         "voz": limpiar_para_voz(respuesta),
         "milisegundos": round((time.perf_counter() - inicio) * 1000),
         "resuelto_por": "router" if nlu.enrutar(comando) is not None else "modelo",
-    }
+    }, media_type="application/json; charset=utf-8")
 
 
 @app.post("/")

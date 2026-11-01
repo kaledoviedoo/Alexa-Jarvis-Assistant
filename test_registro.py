@@ -124,6 +124,20 @@ def main() -> int:
               "las pistas del freno salen del registro")
 
     print()
+    print("SE LE INSISTE AL MODELO QUE DESCRIBE EN VEZ DE ACTUAR")
+    ofrecidas = ollama_client.herramientas_para("tengo algun programa de steam en las ventanas")
+    casos = [
+        ("Puedes utilizar la función `cambiar_a_ventana` con el siguiente comando:", True),
+        ("Puedo ayudarte a encontrar una nota. ¿Quieres que busque en todas tus notas?", True),
+        ("Una función derivada mide cómo cambia una magnitud.", False),
+        ("Hola, todo bien por aquí.", False),
+        ("Listo, Steam está abierto en una de tus ventanas.", False),
+    ]
+    for texto, esperado in casos:
+        comprobar(ollama_client.describe_en_vez_de_actuar(texto, ofrecidas) == esperado,
+                  f"{'insiste' if esperado else 'no insiste'}: '{texto[:45]}'")
+
+    print()
     print("EL PLANIFICADOR PARTE EL TEXTO POR LA FIRMA")
     vistos = {}
     h = registro.Herramienta(
