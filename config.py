@@ -130,6 +130,7 @@ PERFILES = {
         "num_ctx": 8192,
         "keep_alive": "30m",
         "temperatura": 0.3,
+        "max_pasos": 4,
         "descripcion": "Modelo ligero siempre caliente. Respuestas casi instantáneas.",
     },
     MODO_DEDICADO: {
@@ -140,6 +141,7 @@ PERFILES = {
         # ~4.7 GB en VRAM: entra en 6 GB con margen si no hay un juego abierto.
         "keep_alive": "60m",
         "temperatura": 0.4,
+        "max_pasos": 8,
         "descripcion": "Modelo grande en la RTX 3050. Razona mejor, tarda más.",
     },
     MODO_GAMING: {
@@ -151,6 +153,7 @@ PERFILES = {
         "num_ctx": 6144,
         "keep_alive": "10m",
         "temperatura": 0.3,
+        "max_pasos": 4,
         "descripcion": "Suelta la RTX 3050 por completo. Jarvis corre en CPU.",
     },
 }

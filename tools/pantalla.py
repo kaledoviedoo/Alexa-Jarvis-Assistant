@@ -24,6 +24,12 @@ log = logging.getLogger("jarvis.pantalla")
 _BASURA = re.compile(r"^[\W_]+$")
 
 
+
+def _chat(**kwargs):
+    """Habla con el modelo por el mismo sitio que el resto de Jarvis."""
+    import ollama_client
+    return ollama_client.chat_modelo(**kwargs)
+
 def _captura(zona: tuple[float, float, float, float] | None = None, ventana=None):
     """Imagen de la pantalla principal, o de una ventana si se da, o None.
 
@@ -322,7 +328,7 @@ def describir_pantalla(pregunta: str = "") -> str:
     instruccion = (pregunta or "").strip() or "Describe brevemente qué se ve en esta pantalla."
 
     try:
-        respuesta = ollama.chat(
+        respuesta = _chat(
             model=MODELO_VISION,
             messages=[{
                 "role": "user",

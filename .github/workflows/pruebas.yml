@@ -68,6 +68,9 @@ jobs:
       - name: Actua en lo que se deshace y pregunta en lo que no
         run: python test_riesgo.py
 
+      - name: Comprueba lo que hace y dice lo que no le salio
+        run: python test_cerebro.py
+
       - name: El servidor contesta en formato Alexa
         run: python test_alexa.py
 

@@ -96,7 +96,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-11-01-fase3-riesgo"
+SELLO_CODIGO = "2026-11-01-fase4-cerebro"
 
 
 @app.on_event("startup")

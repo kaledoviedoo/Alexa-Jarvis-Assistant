@@ -23,6 +23,7 @@ import tareas
 from config import MAX_PASOS_TOOLS, NOMBRE_USUARIO, PRESUPUESTO_SEGUNDOS
 import registro
 import sesion
+import verificar
 from tools import avanzado, obsidian
 
 log = logging.getLogger("jarvis.ollama")
@@ -627,6 +628,11 @@ def _empezar_turno() -> None:
     _turno.resultado_envio = ""
     _turno.insistido_envio = False
     _turno.lecturas = []
+    _turno.fallos = {}            # herramienta -> verificaciones fallidas
+    _turno.abortar = ""           # motivo para parar la orden entera
+    _turno.hechos = []            # (herramienta, resultado) comprobados
+    _turno.verificacion_fallida = False
+    _turno.insistido_pasos = False
 
 
 _DESTINATARIO = re.compile(
@@ -736,6 +742,50 @@ def _tras_preparar_envio(resultado: str) -> str:
     return resultado
 
 
+def _verificar(nombre: str, argumentos: dict, resultado: str) -> str:
+    """Mira que lo hecho este hecho. Al segundo fallo de la misma herramienta,
+    la orden se para y se dice que fallo."""
+    _turno.verificacion_fallida = False
+    motivo = verificar.comprobar(nombre, argumentos, resultado)
+    if not motivo:
+        return resultado
+    _turno.verificacion_fallida = True
+    fallos = getattr(_turno, "fallos", {})
+    fallos[nombre] = fallos.get(nombre, 0) + 1
+    _turno.fallos = fallos
+    if fallos[nombre] >= 2:
+        _turno.abortar = f"{nombre.replace('_', ' ')}: {motivo}"
+    return (f"{resultado}\nVERIFICACION FALLIDA: {motivo}. Intentalo una vez de otra "
+            "forma; si no se puede, dile al usuario que fallo y por que.")
+
+
+def pasos_sin_hacer(frase: str, hechas: list[str]) -> list[str]:
+    """Las partes de la orden que piden cambiar algo y no tienen una
+    herramienta hecha que encaje. "...y apuntalo en el diario" sin haber
+    apuntado nada sale aqui."""
+    herramientas = [h for h in registro.cargar().values()
+                    if h.riesgo == "escritura" and h.corroboran]
+    hechas_h = [registro.obtener(n) for n in hechas]
+    faltan = []
+    for parte in clausulas(frase)[1:]:
+        piden = [h for h in herramientas if pide_la_accion(parte, h.corroboran)]
+        if not piden:
+            continue
+        hecha = any(hh is not None and hh.corroboran and pide_la_accion(parte, hh.corroboran)
+                    for hh in hechas_h)
+        if not hecha:
+            faltan.append(parte)
+    return faltan
+
+
+def informe_de_parada(motivo: str, hechos: list) -> str:
+    """Lo que se dice cuando la orden se para a medias: que salio y que no."""
+    if hechos:
+        hechos_txt = "; ".join(r.split("\n")[0][:80] for _, r in hechos)
+        return f"Hice esto: {hechos_txt}. Pero paré en {motivo}."
+    return f"No lo conseguí: {motivo}."
+
+
 def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
     h = registro.obtener(nombre)
     if h is None:
@@ -796,6 +846,8 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
         _anotar_foco(argumentos, resultado)
         if h.riesgo == "externa":
             resultado = _tras_preparar_envio(resultado)
+        elif h.riesgo == "escritura":
+            resultado = _verificar(nombre, argumentos, resultado)
         return resultado
     except TypeError as e:
         # El modelo mandó argumentos que no encajan con la firma.
@@ -804,6 +856,27 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
     except Exception as e:
         log.exception("Fallo en la herramienta %s", nombre)
         return f"La herramienta {nombre} falló: {e}"
+
+
+# Modelos que "piensan" en voz alta antes de contestar. Sin desactivarlo
+# tardan varias veces mas y el razonamiento se cuela en la respuesta.
+_PIENSAN = re.compile(r"^(?:qwen3|deepseek-r1|gpt-oss|magistral|phi4-reasoning)", re.IGNORECASE)
+
+
+def chat_modelo(**kwargs):
+    """ollama.chat con lo que cada familia de modelo necesita.
+
+    Todo lo que habla con un modelo de chat pasa por aqui, asi cambiar de
+    modelo (por ejemplo a qwen3) no obliga a tocar cada herramienta.
+    """
+    import ollama
+    if _PIENSAN.match(str(kwargs.get("model", ""))) and "think" not in kwargs:
+        try:
+            return ollama.chat(think=False, **kwargs)
+        except TypeError:
+            # Cliente de ollama antiguo, sin el parametro.
+            log.debug("El cliente de ollama no conoce 'think': actualizalo con pip.")
+    return ollama.chat(**kwargs)
 
 
 def _conversar(comando: str) -> str:
@@ -827,9 +900,9 @@ def _conversar(comando: str) -> str:
     insistido = False
     ultimo_resultado = ""
 
-    for paso in range(MAX_PASOS_TOOLS):
+    for paso in range(int(perfil.get("max_pasos", MAX_PASOS_TOOLS))):
         try:
-            respuesta = ollama.chat(
+            respuesta = chat_modelo(
                 model=perfil["modelo"],
                 messages=mensajes,
                 tools=ofrecidas,
@@ -903,6 +976,17 @@ def _conversar(comando: str) -> str:
                 return _ejecutar_herramienta(herramienta_envio,
                                              argumentos_de_envio(herramienta_envio, destinatario, texto))
 
+            # Partes de la orden que piden cambiar algo y no se hicieron.
+            faltan = pasos_sin_hacer(comando, [n for n, _ in getattr(_turno, "hechos", [])])
+            if faltan and not getattr(_turno, "insistido_pasos", False) and not _turno.vetos:
+                _turno.insistido_pasos = True
+                log.warning("Quedan partes sin hacer: %s. Insisto.", faltan)
+                mensajes.append({"role": "assistant", "content": contenido})
+                mensajes.append({"role": "user", "content":
+                    "Te falta hacer esto de la orden: " + "; ".join(faltan) +
+                    ". Hazlo ahora con la herramienta que toque, usando lo que ya encontraste."})
+                continue
+
             # Si el freno paro lo que se pedia y nada se hizo, "listo, ya esta"
             # es mentira: se dice lo que paso.
             honesta = respuesta_honesta(contenido, getattr(_turno, "vetos", []),
@@ -936,11 +1020,16 @@ def _conversar(comando: str) -> str:
                 if h.riesgo == "lectura":
                     lecturas.append(str(resultado))
                     _turno.lecturas.append(str(resultado))
-                else:
+                elif not getattr(_turno, "verificacion_fallida", False):
                     _turno.hechas += 1
+                    _turno.hechos.append((nombre, str(resultado)))
                 if h.fuente_externa:
                     _turno.contaminado = True
                     contenido_para_el_modelo = envolver_dato_externo(nombre, str(resultado))
+
+            # Dos verificaciones fallidas de la misma herramienta: se para.
+            if getattr(_turno, "abortar", ""):
+                return informe_de_parada(_turno.abortar, _turno.hechos)
 
             # Queda una confirmacion para el usuario: se le dice tal cual, sin
             # que el modelo la reescriba ni siga haciendo cosas.
@@ -959,7 +1048,8 @@ def _conversar(comando: str) -> str:
             log.info("Pregunta respondida con lo que leyó la herramienta, sin otra vuelta al modelo.")
             return directa
 
-    return "Di demasiadas vueltas con esa orden y preferí parar."
+    log.warning("Se acabaron los pasos (%s).", perfil.get("max_pasos", MAX_PASOS_TOOLS))
+    return informe_de_parada("se me acabaron los pasos antes de terminar", getattr(_turno, "hechos", []))
 
 
 # Caracteres por token en español, tirando a la baja para no quedarse corto.

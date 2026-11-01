@@ -18,6 +18,12 @@ log = logging.getLogger("jarvis.plan")
 MAX_PASOS = 5
 
 
+
+def _chat(**kwargs):
+    """Habla con el modelo por el mismo sitio que el resto de Jarvis."""
+    import ollama_client
+    return ollama_client.chat_modelo(**kwargs)
+
 @herramienta(
     descripcion="Busca notas de la bóveda relacionadas con un tema y dice sus títulos.",
     en_plan=True, args={"tema": "El tema de las notas"},
@@ -78,7 +84,7 @@ def _pedir_plan(orden: str) -> list[dict]:
     catalogo = "\n".join(_descripcion_para_plan(h) for h in acciones.values())
 
     try:
-        respuesta = ollama.chat(
+        respuesta = _chat(
             model=_modelo(),
             messages=[
                 {"role": "system", "content":
@@ -173,7 +179,7 @@ def _resumir(orden: str, resultados: list[dict], fallos: int) -> str:
 
     try:
         import ollama
-        respuesta = ollama.chat(
+        respuesta = _chat(
             model=_modelo(),
             messages=[
                 {"role": "system", "content":

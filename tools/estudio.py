@@ -31,6 +31,12 @@ _VACIAS = {
 }
 
 
+
+def _chat(**kwargs):
+    """Habla con el modelo por el mismo sitio que el resto de Jarvis."""
+    import ollama_client
+    return ollama_client.chat_modelo(**kwargs)
+
 def _palabras_clave(tema: str) -> list[str]:
     piezas = [p for p in re.split(r"\W+", (tema or "").lower()) if len(p) > 2]
     return [p for p in piezas if p not in _VACIAS]
@@ -110,7 +116,7 @@ def _preguntar_al_modelo(instruccion: str, material: str) -> str:
         modelo = modes.perfil_actual()["modelo"]
 
     try:
-        respuesta = ollama.chat(
+        respuesta = _chat(
             model=modelo,
             messages=[
                 {"role": "system", "content":

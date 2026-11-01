@@ -33,6 +33,12 @@ EXTENSIONES = {
 }
 
 
+
+def _chat(**kwargs):
+    """Habla con el modelo por el mismo sitio que el resto de Jarvis."""
+    import ollama_client
+    return ollama_client.chat_modelo(**kwargs)
+
 def buscar_archivo(descripcion: str) -> list[Path]:
     """Archivos que encajan con lo que se dijo, los recientes primero."""
     import difflib
@@ -169,7 +175,7 @@ def _clasificar_con_modelo(nombre: str, texto: str) -> str:
     catalogo = "\n".join(f"- {t}  ->  carpeta {carpetas[t].name}/" for t in posibles)
 
     try:
-        respuesta = ollama.chat(
+        respuesta = _chat(
             model=modelo,
             messages=[
                 {"role": "system", "content":
@@ -353,7 +359,7 @@ def _resumir(titulo: str, texto: str) -> str:
         modelo = modes.perfil_actual()["modelo"]
 
     try:
-        respuesta = ollama.chat(
+        respuesta = _chat(
             model=modelo,
             messages=[
                 {"role": "system", "content":

@@ -5,6 +5,7 @@ soltar una lista de enlaces. Corre en segundo plano porque implica varias
 busquedas y una pasada del modelo.
 """
 
+from datetime import datetime
 import html
 import json
 import logging
@@ -37,6 +38,12 @@ _RESULTADO = re.compile(
     re.DOTALL,
 )
 
+
+
+def _chat(**kwargs):
+    """Habla con el modelo por el mismo sitio que el resto de Jarvis."""
+    import ollama_client
+    return ollama_client.chat_modelo(**kwargs)
 
 def _texto_limpio(crudo: str) -> str:
     return html.unescape(_ETIQUETA.sub("", crudo or "")).strip()
@@ -141,7 +148,7 @@ def _razonar(instruccion: str, material: str) -> str:
         modelo = modes.perfil_actual()["modelo"]
 
     try:
-        respuesta = ollama.chat(
+        respuesta = _chat(
             model=modelo,
             messages=[
                 {"role": "system", "content":
@@ -166,6 +173,66 @@ def _sin_resultados(consulta: str) -> str:
             "Puede que no haya conexión, o prueba a decirlo de otra forma.")
 
 
+
+def _palabras_de(texto: str) -> list[str]:
+    import unicodedata
+    t = unicodedata.normalize("NFD", (texto or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return [w for w in re.split(r"\W+", t) if len(w) > 2]
+
+
+def afinar_consulta(consulta: str) -> str:
+    """Aclara una consulta ambigua con lo que se sabe del usuario.
+
+    "como funciona un transformer" trajo el transformador electrico; el
+    usuario estudia Ingenieria de Sistemas y queria el de inteligencia
+    artificial. El modelo puede añadir una o dos palabras que lo aclaren,
+    pero la consulta nueva tiene que conservar todas las palabras de la
+    original y no crecer mas de cuatro: si no, se usa la original.
+    """
+    consulta = (consulta or "").strip()
+    originales = _palabras_de(consulta)
+    if not originales or len(originales) > 7:
+        return consulta              # una consulta larga ya es especifica
+
+    try:
+        from tools import avanzado
+        contexto = (avanzado.leer_contexto() or "")[:700]
+    except Exception:
+        contexto = ""
+    if not contexto:
+        return consulta
+
+    try:
+        import modes
+        respuesta = _chat(
+            model=modes.perfil_actual()["modelo"],
+            messages=[
+                {"role": "system", "content":
+                    "Ajustas consultas para un buscador web. Si un termino tiene varios "
+                    "significados (por ejemplo 'transformer': electrico o de inteligencia "
+                    "artificial; 'python': serpiente o lenguaje) y lo que sabes del usuario "
+                    "indica cual busca, añade una o dos palabras que lo aclaren. Si no hace "
+                    "falta, devuelve la consulta igual. Responde SOLO la consulta, sin comillas."},
+                {"role": "user", "content": f"Sobre el usuario:\n{contexto}\n\nConsulta: {consulta}"},
+            ],
+            options={"temperature": 0, "num_predict": 40},
+        )
+        mensaje = respuesta.get("message", {}) if isinstance(respuesta, dict) else respuesta.message
+        nueva = ((mensaje.get("content") if isinstance(mensaje, dict) else mensaje.content) or "")
+    except Exception as e:
+        log.debug("No pude afinar la consulta: %s", e)
+        return consulta
+
+    nueva = nueva.strip().splitlines()[0].strip(" \"'`.") if nueva.strip() else ""
+    nuevas = _palabras_de(nueva)
+    if not nueva or any(p not in nuevas for p in originales) or len(nuevas) > len(originales) + 4:
+        return consulta
+    if nueva.lower() != consulta.lower():
+        log.info("Consulta afinada: %r -> %r", consulta, nueva)
+    return nueva
+
+
 @herramienta(
     descripcion="Busca en internet y resume lo que se dice sobre un tema.",
     en_plan=True, args={"consulta": "Qué investigar"},
@@ -174,7 +241,7 @@ def _sin_resultados(consulta: str) -> str:
 )
 def investigar(consulta: str) -> str:
     """Busca y resume lo que dice internet."""
-    resultados = buscar(consulta)
+    resultados = buscar(afinar_consulta(consulta))
     if not resultados:
         return _sin_resultados(consulta)
 
@@ -192,7 +259,7 @@ def investigar(consulta: str) -> str:
 )
 def comparar(consulta: str) -> str:
     """Compara opciones o precios y recomienda."""
-    resultados = buscar(f"{consulta} precio comparativa opiniones")
+    resultados = buscar(f"{afinar_consulta(consulta)} precio comparativa opiniones")
     if not resultados:
         return _sin_resultados(consulta)
 
@@ -212,7 +279,7 @@ def comparar(consulta: str) -> str:
 )
 def mejor_opcion(consulta: str) -> str:
     """Cual es la mejor opcion, sin rodeos."""
-    resultados = buscar(f"{consulta} mejor recomendado 2026")
+    resultados = buscar(f"{afinar_consulta(consulta)} mejor recomendado {datetime.now().year}")
     if not resultados:
         return _sin_resultados(consulta)
 
