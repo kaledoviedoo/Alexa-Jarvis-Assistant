@@ -18,6 +18,7 @@ from config import (
     ESCRITORIO,
     MAX_CARACTERES_ESCRITURA,
 )
+from registro import herramienta
 
 log = logging.getLogger("jarvis.entrada")
 
@@ -75,6 +76,12 @@ TECLAS_SIMPLES = {
 }
 
 
+@herramienta(
+    descripcion="Escribe texto con el teclado en la ventana que esté activa en ese momento.",
+    riesgo="escritura", nucleo=True, args={"texto": "Texto exacto a escribir"},
+    corroboran=("escrib", "teclea", "redacta", "pon ", "ponme", "dile", "manda",
+                "mensaje", "responde", "contesta"),
+)
 def escribir_texto(texto: str, pulsar_enter: bool = False) -> str:
     """Escribe texto en la ventana que esté activa."""
     pyautogui = _obtener_pyautogui()
@@ -137,6 +144,13 @@ def _escribir_via_portapapeles(texto: str, pyautogui) -> None:
         pyautogui.write(texto, interval=0.01)
 
 
+@herramienta(
+    descripcion="Ejecuta un atajo de teclado permitido.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre_atajo": "copiar, pegar, guardar, minimizar todo, cambiar ventana, subir volumen..."},
+    corroboran=("atajo", "pulsa", "presiona", "tecla", "copia", "pega", "guarda",
+                "minimiza", "maximiza", "volumen"),
+)
 def ejecutar_atajo(nombre_atajo: str) -> str:
     """Ejecuta un atajo de teclado de la lista blanca."""
     pyautogui = _obtener_pyautogui()
@@ -234,6 +248,10 @@ def _siguiente_nombre_captura() -> str:
     return f"captura{numero}.png"
 
 
+@herramienta(
+    descripcion="Toma una captura de pantalla y la guarda en el escritorio.",
+    riesgo="escritura", nucleo=True, args={"nombre": "Nombre opcional del archivo PNG"},
+)
 def captura_pantalla(nombre: str = "") -> str:
     """Toma una captura de pantalla y la guarda en el Escritorio."""
     pyautogui = _obtener_pyautogui()

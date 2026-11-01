@@ -10,6 +10,7 @@ import time
 import urllib.parse
 
 from tools import pantalla
+from registro import herramienta
 
 log = logging.getLogger("jarvis.teams")
 
@@ -37,6 +38,12 @@ def _lanzar(url: str) -> bool:
         return False
 
 
+@herramienta(
+    "abrir_teams",
+    descripcion="Abre Microsoft Teams, opcionalmente en una sección (chat, actividad, calendario).",
+    riesgo="escritura", necesita=("windows",), args={"seccion": "Sección opcional"},
+    corroboran=("abre", "teams"), palabras=("teams",),
+)
 def abrir(seccion: str = "") -> str:
     """Abre Teams, opcionalmente en una seccion concreta."""
     clave = (seccion or "").strip().lower()
@@ -59,6 +66,12 @@ def abrir(seccion: str = "") -> str:
     return abrir_canal(clave)
 
 
+@herramienta(
+    "abrir_canal_teams",
+    descripcion="Busca y abre un canal de Teams por su nombre.",
+    riesgo="escritura", necesita=("windows",), args={"nombre": "Nombre del canal"},
+    corroboran=("abre", "canal", "teams"), palabras=("teams", "canal"),
+)
 def abrir_canal(nombre: str) -> str:
     """Abre la busqueda de Teams con el nombre del canal escrito."""
     texto = (nombre or "").strip()
@@ -73,6 +86,11 @@ def abrir_canal(nombre: str) -> str:
             "Dime 'lee la pantalla' cuando cargue y te cuento lo que hay.")
 
 
+@herramienta(
+    "leer_teams",
+    descripcion="Lee los mensajes que estén a la vista en Teams.",
+    necesita=("windows", "tesseract"), palabras=("teams",),
+)
 def leer_lo_visible(cuantas_lineas: int = 10) -> str:
     """Lee los mensajes que esten a la vista en Teams."""
     time.sleep(1.2)
@@ -85,6 +103,11 @@ def leer_lo_visible(cuantas_lineas: int = 10) -> str:
     return texto.replace("En la pantalla leo:", "En Teams veo:", 1)
 
 
+@herramienta(
+    "actividad_teams",
+    descripcion="Abre la pestaña de Actividad de Teams y lee lo que aparezca.",
+    necesita=("windows", "tesseract"), palabras=("teams", "actividad"),
+)
 def resumen_actividad() -> str:
     """Abre la pestaña de Actividad y lee lo que aparezca."""
     if not _lanzar(SECCIONES["actividad"]):

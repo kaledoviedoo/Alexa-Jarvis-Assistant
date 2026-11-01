@@ -12,6 +12,7 @@ import re
 
 from config import MODO_DEDICADO
 from tools import obsidian
+from registro import herramienta
 
 log = logging.getLogger("jarvis.estudio")
 
@@ -132,6 +133,11 @@ def _sin_notas(tema: str) -> str:
             "Si lo tienes apuntado con otro nombre, dime cuál.")
 
 
+@herramienta(
+    descripcion="Resumen de lo que hay que repasar para un examen, a partir de las notas. Es lento.",
+    args={"tema": "Materia o tema del examen", "cuando": "Cuándo es, si lo dijo"},
+    palabras=("examen", "parcial", "quiz", "prepara"),
+)
 def preparar_examen(tema: str, cuando: str = "") -> str:
     """Resumen de lo que hay que repasar. Lento: va en segundo plano."""
     notas = _notas_relacionadas(tema)
@@ -152,6 +158,11 @@ def preparar_examen(tema: str, cuando: str = "") -> str:
     return (f"Encontré {len(notas)} notas sobre eso: {titulos}. {resumen}")
 
 
+@herramienta(
+    descripcion="Genera preguntas de repaso de un tema, sacadas de las notas propias.",
+    en_plan=True, args={"tema": "El tema a repasar"},
+    palabras=("preguntas", "repaso", "repasar", "evaluame", "quiz"),
+)
 def preguntas_de_repaso(tema: str, cuantas: int = 5) -> str:
     """Preguntas para autoevaluarse, sacadas de las notas propias."""
     notas = _notas_relacionadas(tema)
@@ -167,6 +178,11 @@ def preguntas_de_repaso(tema: str, cuantas: int = 5) -> str:
     return preguntas
 
 
+@herramienta(
+    descripcion="Explica un concepto usando lo que el usuario tiene escrito en su bóveda de Obsidian.",
+    en_plan=True, args={"tema": "El tema o concepto"},
+    palabras=("mis notas", "mis apuntes", "segun mis", "boveda"),
+)
 def explicar_desde_notas(tema: str) -> str:
     """Explica un concepto usando lo que hay escrito en la boveda."""
     notas = _notas_relacionadas(tema)
@@ -180,6 +196,10 @@ def explicar_desde_notas(tema: str) -> str:
     )
 
 
+@herramienta(
+    descripcion="Qué notas hay sobre un tema en la bóveda. Rápido y sin modelo.",
+    args={"tema": "El tema"}, palabras=("que tengo de", "notas de", "apuntes de"),
+)
 def que_tengo_de(tema: str) -> str:
     """Rapido y sin modelo: que notas hay sobre algo."""
     notas = _notas_relacionadas(tema)
@@ -270,6 +290,11 @@ def buscar_por_relacion(descripcion: str, cuantas: int = 5) -> list[dict]:
     return encontradas[:cuantas]
 
 
+@herramienta(
+    descripcion="Dice qué notas de la bóveda tratan de algo. Instantáneo, sin modelo.",
+    args={"descripcion": "De qué trata la nota que se busca"},
+    palabras=("nota", "notas", "apuntes"),
+)
 def encontrar_nota(descripcion: str) -> str:
     """Dice que notas tratan de eso, sin llamar al modelo. Instantaneo."""
     notas = buscar_por_relacion(descripcion)
@@ -310,6 +335,11 @@ def abrir_nota_relacionada(descripcion: str) -> str:
     return f"Abriendo {mejor['titulo']}."
 
 
+@herramienta(
+    descripcion="Lee las notas relacionadas con algo y explica qué tienen que ver entre sí.",
+    args={"descripcion": "El tema que conecta las notas"},
+    palabras=("relaciona", "que tienen que ver", "conecta"),
+)
 def relacionar(descripcion: str) -> str:
     """Lee las notas relacionadas y explica que tienen que ver entre si."""
     notas = buscar_por_relacion(descripcion, cuantas=MAX_NOTAS)

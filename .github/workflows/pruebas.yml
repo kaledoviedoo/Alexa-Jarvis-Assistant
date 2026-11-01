@@ -59,6 +59,9 @@ jobs:
       - name: Los archivos y la seleccion hacen lo que dicen
         run: python test_archivos.py
 
+      - name: Cada herramienta esta en el registro y bien declarada
+        run: python test_registro.py
+
       - name: El servidor contesta en formato Alexa
         run: python test_alexa.py
 

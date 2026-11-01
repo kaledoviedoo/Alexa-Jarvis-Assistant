@@ -17,6 +17,7 @@ from pathlib import Path
 
 from config import CARPETAS_PERMITIDAS, MODO_DEDICADO
 from tools import convenciones, memoria, obsidian
+from registro import herramienta
 
 log = logging.getLogger("jarvis.archivar")
 
@@ -252,6 +253,12 @@ origen: archivado por Jarvis
 """
 
 
+@herramienta(
+    "archivar_en_boveda",
+    descripcion="Archiva en la bóveda de Obsidian el archivo que encaje con una descripción.",
+    riesgo="escritura", args={"descripcion": "Qué archivo es"},
+    corroboran=("archiva", "boveda", "guarda"), palabras=("archiva", "boveda"),
+)
 def archivar(descripcion: str) -> str:
     """Archiva en la boveda el archivo que encaje con la descripcion."""
     vault = obsidian.vault()

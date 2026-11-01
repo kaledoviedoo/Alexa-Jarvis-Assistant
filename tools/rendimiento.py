@@ -10,6 +10,7 @@ import logging
 import psutil
 
 from config import PROCESOS_PROTEGIDOS
+from registro import herramienta
 
 log = logging.getLogger("jarvis.rendimiento")
 
@@ -87,6 +88,11 @@ def candidatos_a_cerrar() -> list[dict]:
             if _es_prescindible(p["nombre"]) and (p["cpu"] > 1.5 or p["ram"] > 0.35)]
 
 
+@herramienta(
+    "diagnostico_rendimiento",
+    descripcion="Explica en una frase por qué va lento el equipo.",
+    en_plan=True, palabras=("lento", "rendimiento", "se traba", "se pega", "por que va"),
+)
 def diagnostico() -> str:
     """Por que va lento el equipo, en una frase."""
     from tools import sistema
@@ -158,6 +164,10 @@ def diagnostico() -> str:
     return " ".join(partes)
 
 
+@herramienta(
+    descripcion="Cierra los programas que sobran para liberar memoria.",
+    riesgo="irreversible", palabras=("cierra lo que sobra", "libera memoria"),
+)
 def cerrar_prescindibles() -> str:
     """Cierra lo que sobra. Solo se llama tras una confirmacion."""
     from tools import sistema
@@ -179,6 +189,10 @@ def cerrar_prescindibles() -> str:
     return f"Cerré {', '.join(cerrados)}. Liberé unos {liberado:.1f} gigas."
 
 
+@herramienta(
+    descripcion="Estado del equipo pensado para antes de una partida: qué ocupa la gráfica y la memoria.",
+    palabras=("jugar", "partida", "antes de jugar"),
+)
 def informe_para_jugar() -> str:
     """Estado del equipo pensado para antes de una partida."""
     from tools import sistema

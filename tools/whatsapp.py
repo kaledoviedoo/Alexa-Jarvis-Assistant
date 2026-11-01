@@ -15,6 +15,7 @@ import time
 
 from config import detectar_comet
 from tools import pantalla, ventanas
+from registro import herramienta
 
 log = logging.getLogger("jarvis.whatsapp")
 
@@ -199,6 +200,12 @@ def _buscar_y_abrir_chat(pg, nombre: str) -> None:
     time.sleep(ESPERA_CHAT)
 
 
+@herramienta(
+    descripcion="Envía un mensaje por WhatsApp Web, tras confirmar el nombre real del chat.",
+    riesgo="externa", necesita=("windows",),
+    args={"destinatario": "Contacto o grupo", "mensaje": "Texto a enviar"},
+    palabras=("whatsapp", "mensaje", "manda", "dile", "escribele"),
+)
 def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     """Prepara el mensaje y pide confirmacion con el nombre REAL del chat."""
     import confirmaciones
@@ -258,6 +265,13 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     )
 
 
+@herramienta(
+    descripcion="Abre una conversación de WhatsApp Web sin escribir nada.",
+    riesgo="escritura", necesita=("windows",),
+    args={"nombre": "Nombre del contacto o del grupo"},
+    corroboran=("abre", "chat", "whatsapp", "entra", "conversacion"),
+    palabras=("whatsapp", "chat", "conversacion"),
+)
 def abrir_chat(nombre: str) -> str:
     """Solo abre la conversacion, sin escribir nada."""
     nombre = (nombre or "").strip()
@@ -281,6 +295,11 @@ def abrir_chat(nombre: str) -> str:
     return f"Abrí el chat de {real}." if real else f"Busqué {nombre} en WhatsApp."
 
 
+@herramienta(
+    descripcion="Lee los últimos mensajes visibles del chat de WhatsApp Web que esté abierto.",
+    necesita=("windows", "tesseract"),
+    palabras=("whatsapp", "chat", "mensajes", "que me escribieron", "que dicen"),
+)
 def leer_chat() -> str:
     """Lee los ultimos mensajes visibles del chat abierto."""
     if not _enfocar():
@@ -298,6 +317,11 @@ def leer_chat() -> str:
     return f"En el chat de {quien}: {cuerpo}" if quien else f"En WhatsApp veo: {cuerpo}"
 
 
+@herramienta(
+    descripcion="Abre WhatsApp Web.",
+    riesgo="escritura", necesita=("windows",),
+    corroboran=("abre", "whatsapp"), palabras=("whatsapp",),
+)
 def abrir_whatsapp() -> str:
     """Abre WhatsApp Web sin mas."""
     if _enfocar():

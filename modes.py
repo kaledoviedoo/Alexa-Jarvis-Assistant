@@ -22,6 +22,7 @@ from config import (
     PERFILES,
 )
 from tools import sistema
+from registro import herramienta
 
 log = logging.getLogger("jarvis.modos")
 
@@ -130,6 +131,11 @@ def precalentar_en_segundo_plano() -> None:
     hilo.start()
 
 
+@herramienta(
+    descripcion="Cambia el modo de Jarvis: normal (ligero), dedicado (modelo grande en GPU) o gaming (libera la gráfica).",
+    riesgo="escritura", nucleo=True, args={"nuevo_modo": "normal, dedicado o gaming"},
+    corroboran=("modo", "gaming", "dedicado", "normal", "juego"),
+)
 def cambiar_modo(nuevo_modo: str) -> str:
     """Cambia de modo y devuelve la frase que dirá Alexa."""
     global _modo_actual

@@ -21,6 +21,7 @@ from config import (
     DOCUMENTOS,
     ESCRITORIO,
 )
+from registro import herramienta
 
 log = logging.getLogger("jarvis.avanzado")
 
@@ -116,6 +117,13 @@ def leer_contexto() -> str:
     return texto[:2500]
 
 
+@herramienta(
+    "recordar_en_contexto",
+    descripcion="Apunta un dato permanente sobre el usuario o su forma de trabajar en el contexto de Jarvis, para tenerlo en cuenta siempre.",
+    riesgo="escritura", nucleo=True, args={"contenido": "El dato a recordar"},
+    corroboran=("recuerda", "acuerdate", "ten en cuenta", "contexto", "apunta que",
+                "no olvides", "que sepas"),
+)
 def editar_contexto(contenido: str, accion: str = "agregar") -> str:
     """Permite a Jarvis añadir cosas a su propio contexto por voz."""
     asegurar_contexto()
@@ -176,6 +184,10 @@ def info_equipo_dict() -> dict:
     }
 
 
+@herramienta(
+    descripcion="Describe este equipo: sistema, procesador, memoria, gráfica y tiempo encendido.",
+    nucleo=True,
+)
 def info_equipo() -> str:
     """Descripcion hablada del equipo."""
     d = info_equipo_dict()
@@ -200,6 +212,11 @@ def resumen_equipo_para_modelo() -> str:
     )
 
 
+@herramienta(
+    descripcion="Informe detallado del equipo: CPU, memoria, discos, gráfica, red y procesos. Con guardar=true lo escribe como archivo.",
+    riesgo="escritura", nucleo=True,
+    args={"guardar": "true para guardarlo como archivo markdown"},
+)
 def informe_completo(guardar: bool = False) -> str:
     """Informe detallado del equipo."""
     from tools import sistema as _sistema
@@ -330,6 +347,12 @@ _CARPETAS_IGNORADAS = {
 }
 
 
+@herramienta(
+    descripcion="Busca una frase DENTRO de los archivos, no solo en sus nombres. Úsalo cuando el usuario no recuerde dónde guardó algo.",
+    nucleo=True,
+    args={"texto": "La frase o palabra a buscar dentro de los archivos",
+          "carpeta": "Opcional: limitar a escritorio, descargas o documentos"},
+)
 def buscar_en_contenido(texto: str, carpeta: str = "", limite: int = 10) -> str:
     """Busca una frase DENTRO de los archivos, no solo en sus nombres."""
     texto = (texto or "").strip()
@@ -383,6 +406,10 @@ def buscar_en_contenido(texto: str, carpeta: str = "", limite: int = 10) -> str:
     return f"Encontré '{texto}' en {len(encontrados)} archivos: {nombres}."
 
 
+@herramienta(
+    descripcion="Recorre una carpeta y sus subcarpetas y resume qué hay: cuántos archivos, de qué tipo y qué subcarpetas.",
+    nucleo=True, args={"carpeta": "escritorio, descargas o documentos"},
+)
 def explorar_carpeta(carpeta: str = "escritorio", profundidad: int = 2) -> str:
     """Recorre una carpeta y sus subcarpetas, y resume que hay dentro."""
     from tools.archivos import _base_desde_alias
@@ -426,6 +453,10 @@ def explorar_carpeta(carpeta: str = "escritorio", profundidad: int = 2) -> str:
     return ". ".join(partes) + "."
 
 
+@herramienta(
+    descripcion="Lista lo que se ha modificado últimamente. Útil para '¿en qué estaba trabajando?'.",
+    nucleo=True, args={"dias": "Cuántos días atrás mirar. Por defecto 7."},
+)
 def archivos_recientes(dias: int = 7, carpeta: str = "", limite: int = 10) -> str:
     """Lista lo modificado ultimamente. Util para 'en que estaba trabajando'."""
     from tools.archivos import _base_desde_alias

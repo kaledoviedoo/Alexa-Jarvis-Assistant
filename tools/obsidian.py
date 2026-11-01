@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from config import DOCUMENTOS, HOME, _env
+from registro import herramienta
 
 log = logging.getLogger("jarvis.obsidian")
 
@@ -101,6 +102,15 @@ def _frontmatter(etiquetas: str = "") -> str:
     return "\n".join(lineas)
 
 
+@herramienta(
+    "obsidian_crear_nota",
+    descripcion="Crea una nota nueva en el vault de Obsidian del usuario, con frontmatter y etiquetas.",
+    riesgo="escritura", nucleo=True, en_plan=True,
+    args={"titulo": "Título de la nota", "contenido": "Cuerpo de la nota en markdown",
+          "etiquetas": "Etiquetas separadas por comas, sin almohadilla",
+          "carpeta": "Subcarpeta del vault, opcional"},
+    corroboran=("nota", "apunta", "anota", "crea", "guarda", "escrib", "boveda", "obsidian"),
+)
 def crear_nota(titulo: str, contenido: str = "", etiquetas: str = "", carpeta: str = "") -> str:
     """Crea una nota nueva en el vault."""
     v = vault()
@@ -140,6 +150,13 @@ def crear_nota(titulo: str, contenido: str = "", etiquetas: str = "", carpeta: s
     return f"Creé la nota {ruta.stem} en tu vault de Obsidian."
 
 
+@herramienta(
+    "obsidian_agregar_a_nota",
+    descripcion="Añade texto al final de una nota existente de Obsidian. Si no existe, la crea.",
+    riesgo="escritura", nucleo=True,
+    args={"titulo": "Título de la nota", "contenido": "Texto a añadir"},
+    corroboran=("agrega", "agregue", "añade", "anade", "suma", "apunta", "anota", "mete", "nota"),
+)
 def agregar_a_nota(titulo: str, contenido: str) -> str:
     """Añade texto al final de una nota existente. Si no existe, la crea."""
     v = vault()
@@ -172,6 +189,13 @@ def agregar_a_nota(titulo: str, contenido: str) -> str:
     return f"Añadido a {encontrada.stem}."
 
 
+@herramienta(
+    "obsidian_agregar_al_diario",
+    descripcion="Añade una línea a la nota diaria de hoy en Obsidian. Úsalo para apuntes rápidos e ideas.",
+    riesgo="escritura", nucleo=True, en_plan=True,
+    args={"contenido": "Lo que hay que apuntar"},
+    corroboran=("diario", "apunta", "anota", "registra", "guarda", "bitacora"),
+)
 def agregar_al_diario(contenido: str) -> str:
     """Añade una linea a la nota diaria de hoy, creandola si hace falta."""
     v = vault()
@@ -215,6 +239,11 @@ def agregar_al_diario(contenido: str) -> str:
     return f"{accion} tu nota de hoy en Obsidian."
 
 
+@herramienta(
+    "obsidian_buscar",
+    descripcion="Busca una frase dentro de todas las notas de Obsidian.",
+    nucleo=True, args={"texto": "Qué buscar en las notas"},
+)
 def buscar_en_vault(texto: str, limite: int = 8) -> str:
     """Busca una frase dentro de todas las notas del vault."""
     v = vault()

@@ -1,8 +1,8 @@
 """Planificador de ordenes que necesitan varios pasos.
 
 El modelo propone una secuencia y aqui se filtra: solo se ejecutan pasos de
-un catalogo cerrado de acciones no destructivas, con un maximo de cinco. Los
-pasos inventados se descartan, y si uno falla se dice cuantos salieron de
+un catalogo cerrado (lo marcado en_plan en el registro, nunca externo ni
+irreversible), con un maximo de cinco. Los pasos inventados se descartan, y si uno falla se dice cuantos salieron de
 verdad en vez de cantar exito.
 """
 
@@ -11,73 +11,50 @@ import logging
 import re
 
 from config import MODO_DEDICADO
+from registro import herramienta
 
 log = logging.getLogger("jarvis.plan")
 
 MAX_PASOS = 5
 
 
-def _accion_buscar_notas(argumento: str) -> str:
+@herramienta(
+    descripcion="Busca notas de la bóveda relacionadas con un tema y dice sus títulos.",
+    en_plan=True, args={"tema": "El tema de las notas"},
+    palabras=("notas sobre", "apuntes sobre", "notas de"),
+)
+def buscar_notas(tema: str) -> str:
     from tools import estudio
-    notas = estudio.buscar_por_relacion(argumento, cuantas=5)
+    notas = estudio.buscar_por_relacion(tema, cuantas=5)
     if not notas:
-        return f"No encontré notas sobre {argumento}."
+        return f"No encontré notas sobre {tema}."
     return "Notas encontradas: " + ", ".join(n["titulo"] for n in notas)
 
 
-def _accion_buscar_significado(argumento: str) -> str:
+@herramienta(
+    descripcion="Busca en la memoria semántica (bóveda indexada) por significado, no por palabras exactas.",
+    en_plan=True, args={"consulta": "Lo que se busca, dicho como sea"},
+    palabras=("parecido a", "algo sobre", "lo que escribi", "por significado"),
+)
+def buscar_significado(consulta: str) -> str:
     from tools import memoria
-    encontradas = memoria.buscar(argumento, cuantos=5)
+    encontradas = memoria.buscar(consulta, cuantos=5)
     if not encontradas:
-        return f"La memoria no tiene nada sobre {argumento}."
+        return f"La memoria no tiene nada sobre {consulta}."
     return "Por significado: " + ", ".join(n["titulo"] for n in encontradas)
 
 
-def _accion_resumir_tema(argumento: str) -> str:
-    from tools import estudio
-    return estudio.explicar_desde_notas(argumento)
+def _acciones() -> dict:
+    """Lo que puede usar el planificador: lo marcado en_plan en el registro."""
+    import registro
+    return registro.para_el_plan()
 
 
-def _accion_preguntas(argumento: str) -> str:
-    from tools import estudio
-    return estudio.preguntas_de_repaso(argumento)
-
-
-def _accion_investigar(argumento: str) -> str:
-    from tools import investigar
-    return investigar.investigar(argumento)
-
-
-def _accion_apuntar(argumento: str) -> str:
-    from tools import obsidian
-    return obsidian.agregar_al_diario(argumento)
-
-
-def _accion_crear_nota(argumento: str) -> str:
-    from tools import obsidian
-    # "titulo | contenido", o solo el titulo.
-    if "|" in argumento:
-        titulo, contenido = argumento.split("|", 1)
-        return obsidian.crear_nota(titulo.strip(), contenido.strip())
-    return obsidian.crear_nota(argumento.strip(), "")
-
-
-def _accion_estado_equipo(argumento: str) -> str:
-    from tools import rendimiento
-    return rendimiento.diagnostico()
-
-
-ACCIONES = {
-    "buscar_notas": (_accion_buscar_notas, "busca notas del vault sobre un tema"),
-    "buscar_significado": (_accion_buscar_significado,
-                           "busca en la memoria semantica por significado"),
-    "resumir_tema": (_accion_resumir_tema, "resume un tema con las notas propias"),
-    "preguntas": (_accion_preguntas, "genera preguntas de repaso de un tema"),
-    "investigar": (_accion_investigar, "busca en internet y resume"),
-    "apuntar": (_accion_apuntar, "apunta una linea en el diario de Obsidian"),
-    "crear_nota": (_accion_crear_nota, "crea una nota nueva: titulo | contenido"),
-    "estado_equipo": (_accion_estado_equipo, "diagnostico de rendimiento del PC"),
-}
+def _descripcion_para_plan(h) -> str:
+    if not h.parametros:
+        return f"- {h.nombre}: {h.descripcion} (argumento: vacío)"
+    partes = " | ".join(p for p, _, _ in h.parametros)
+    return f"- {h.nombre}: {h.descripcion} (argumento: {partes})"
 
 
 def _modelo():
@@ -97,7 +74,8 @@ def _pedir_plan(orden: str) -> list[dict]:
     except ImportError:
         return []
 
-    catalogo = "\n".join(f"- {nombre}: {desc}" for nombre, (_, desc) in ACCIONES.items())
+    acciones = _acciones()
+    catalogo = "\n".join(_descripcion_para_plan(h) for h in acciones.values())
 
     try:
         respuesta = ollama.chat(
@@ -142,7 +120,8 @@ def _pedir_plan(orden: str) -> list[dict]:
             continue
         accion = str(paso.get("accion", "")).strip()
         argumento = str(paso.get("argumento", "")).strip()
-        if accion in ACCIONES and argumento:
+        h = acciones.get(accion)
+        if h is not None and (argumento or not h.requeridos):
             validos.append({"accion": accion, "argumento": argumento})
         else:
             log.info("Paso descartado: %r", paso)
@@ -166,10 +145,12 @@ def ejecutar(orden: str) -> str:
 
     resultados, fallos = [], 0
 
+    import registro
+    acciones = _acciones()
+
     for numero, paso in enumerate(pasos, 1):
-        funcion = ACCIONES[paso["accion"]][0]
         try:
-            salida = funcion(paso["argumento"])
+            salida = registro.llamar_con_texto(acciones[paso["accion"]], paso["argumento"])
         except Exception as e:
             log.exception("Falló el paso %d", numero)
             salida = f"falló: {e}"

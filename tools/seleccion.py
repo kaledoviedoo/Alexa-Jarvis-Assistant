@@ -17,6 +17,7 @@ from pathlib import Path
 
 from config import DESCARGAS, DOCUMENTOS, ESCRITORIO
 from tools import archivos
+from registro import herramienta
 
 log = logging.getLogger("jarvis.seleccion")
 
@@ -117,6 +118,12 @@ def _listar(carpeta: Path) -> list[Path]:
     return sorted(entradas, key=lambda r: r.name.lower())
 
 
+@herramienta(
+    "entrar_en_carpeta",
+    descripcion="Se coloca en una carpeta permitida y dice qué hay dentro, para luego seleccionar archivos.",
+    args={"nombre_carpeta": "Nombre de la carpeta"},
+    palabras=("entra a", "entra en", "carpeta", "ve a"),
+)
 def entrar_en(nombre_carpeta: str) -> str:
     """Se planta en una carpeta y te dice que hay dentro."""
     global _carpeta
@@ -191,6 +198,13 @@ def _describir(elegidos: list[Path], que_hice: str) -> str:
     return f"{que_hice} {cuantos}. Los primeros: {primeros}."
 
 
+@herramienta(
+    "seleccionar_archivos",
+    descripcion="Coge archivos de la carpeta actual por tipo, nombre, cantidad o los más recientes.",
+    args={"criterio": "Tipo o parte del nombre: pdf, fotos, informe...",
+          "cantidad": "Cuántos, 0 para todos", "recientes": "true para los más recientes"},
+    palabras=("selecciona", "coge", "escoge", "los primeros", "los ultimos"),
+)
 def seleccionar(criterio: str = "", cantidad: int = 0, recientes: bool = False) -> str:
     """Coge archivos de la carpeta actual."""
     global _elegidos, _caduco
@@ -252,6 +266,11 @@ def _sin_tildes(texto: str) -> str:
                    if unicodedata.category(c) != "Mn")
 
 
+@herramienta(
+    "que_hay_seleccionado",
+    descripcion="Dice qué archivos están seleccionados ahora mismo.",
+    palabras=("seleccion", "seleccionado", "que tengo cogido"),
+)
 def que_hay() -> str:
     """Lee lo que tienes cogido ahora mismo."""
     vivos = seleccionados()
@@ -276,6 +295,13 @@ def leer_titulos() -> str:
     return "; ".join(r.name for r in vivos) + "."
 
 
+@herramienta(
+    "mover_seleccion",
+    descripcion="Mueve los archivos seleccionados a otra carpeta permitida.",
+    riesgo="escritura", args={"destino": "Carpeta destino"},
+    corroboran=("mueve", "mover", "pasa", "lleva", "manda a"),
+    palabras=("muevelos", "mueve los", "seleccion"),
+)
 def mover_a(destino: str) -> str:
     """Mueve lo seleccionado a otra carpeta permitida."""
     vivos = seleccionados()
@@ -329,6 +355,12 @@ def contar() -> int:
     return len(seleccionados())
 
 
+@herramienta(
+    "archivar_seleccion",
+    descripcion="Reparte los archivos seleccionados por la bóveda de Obsidian, carpeta por carpeta.",
+    riesgo="escritura", corroboran=("archiva", "boveda", "guarda"),
+    palabras=("archivalos", "archiva", "boveda"),
+)
 def archivar_en_boveda() -> str:
     """Reparte lo seleccionado por la boveda, razonando carpeta por carpeta."""
     from tools import archivar as archivador

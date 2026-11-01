@@ -311,6 +311,7 @@ def refrescar_en_segundo_plano() -> None:
 
 
 import difflib  # noqa: E402
+from registro import herramienta
 
 
 def _puntuar(consulta: str, clave: str, nombre: str) -> float:
@@ -386,6 +387,11 @@ def lanzar(entrada: dict) -> bool:
         return False
 
 
+@herramienta(
+    "aplicaciones_conocidas",
+    descripcion="Cuántas aplicaciones conoce Jarvis en este equipo y de dónde salieron.",
+    palabras=("aplicaciones", "programas instalados", "que apps"),
+)
 def resumen() -> str:
     """Cuantas aplicaciones conoce y de donde salieron."""
     catalogo = cargar()

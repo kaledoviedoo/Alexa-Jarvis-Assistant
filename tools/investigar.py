@@ -13,6 +13,7 @@ import urllib.parse
 import urllib.request
 
 from config import MODO_DEDICADO
+from registro import herramienta
 
 log = logging.getLogger("jarvis.investigar")
 
@@ -165,6 +166,11 @@ def _sin_resultados(consulta: str) -> str:
             "Puede que no haya conexión, o prueba a decirlo de otra forma.")
 
 
+@herramienta(
+    descripcion="Busca en internet y resume lo que se dice sobre un tema.",
+    en_plan=True, args={"consulta": "Qué investigar"},
+    palabras=("investiga", "internet", "averigua", "que se sabe", "noticias", "busca informacion"),
+)
 def investigar(consulta: str) -> str:
     """Busca y resume lo que dice internet."""
     resultados = buscar(consulta)
@@ -177,6 +183,11 @@ def investigar(consulta: str) -> str:
     )
 
 
+@herramienta(
+    descripcion="Compara opciones o precios buscando en internet y recomienda una.",
+    args={"consulta": "Qué comparar, por ejemplo 'rtx 4060 vs rx 7600'"},
+    palabras=("compara", "precio", "precios", "diferencia entre", " vs ", "versus"),
+)
 def comparar(consulta: str) -> str:
     """Compara opciones o precios y recomienda."""
     resultados = buscar(f"{consulta} precio comparativa opiniones")
@@ -191,6 +202,11 @@ def comparar(consulta: str) -> str:
     )
 
 
+@herramienta(
+    descripcion="Busca en internet cuál es la mejor opción para algo y la dice sin rodeos.",
+    args={"consulta": "Para qué se busca la mejor opción"},
+    palabras=("mejor opcion", "cual es mejor", "recomienda", "me conviene"),
+)
 def mejor_opcion(consulta: str) -> str:
     """Cual es la mejor opcion, sin rodeos."""
     resultados = buscar(f"{consulta} mejor recomendado 2026")

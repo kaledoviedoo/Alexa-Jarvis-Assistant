@@ -9,6 +9,7 @@ restaura, que consigue el mismo efecto.
 import difflib
 import logging
 import time
+from registro import herramienta
 
 log = logging.getLogger("jarvis.ventanas")
 
@@ -45,6 +46,11 @@ def _ventanas_reales(gw) -> list:
     return salida
 
 
+@herramienta(
+    "listar_ventanas",
+    descripcion="Qué ventanas hay abiertas.",
+    necesita=("windows",), palabras=("ventana", "ventanas", "que tengo abierto", "abierto"),
+)
 def listar() -> str:
     """Que ventanas hay abiertas."""
     gw = _pygetwindow()
@@ -86,6 +92,14 @@ def _buscar(gw, nombre: str):
     return None
 
 
+@herramienta(
+    "cambiar_a_ventana",
+    descripcion="Pone una ventana abierta en primer plano.",
+    riesgo="escritura", necesita=("windows",),
+    args={"nombre": "Nombre o parte del título de la ventana"},
+    corroboran=("cambia", "pon", "ve a", "pasa a", "muestra", "trae"),
+    palabras=("ventana", "cambia a", "pasa a", "trae"),
+)
 def cambiar_a(nombre: str) -> str:
     """Pone una ventana en primer plano."""
     gw = _pygetwindow()
@@ -126,6 +140,11 @@ def cambiar_a(nombre: str) -> str:
     return f"Ahí tienes {titulo}."
 
 
+@herramienta(
+    descripcion="Minimiza todo y enseña el escritorio.",
+    riesgo="escritura", necesita=("windows",),
+    corroboran=("minimiza", "escritorio"), palabras=("minimiza", "ensena el escritorio"),
+)
 def minimizar_todo() -> str:
     """Enseña el escritorio."""
     try:
@@ -136,6 +155,12 @@ def minimizar_todo() -> str:
         return f"No pude minimizar: {e}"
 
 
+@herramienta(
+    "maximizar_ventana",
+    descripcion="Maximiza la ventana activa.",
+    riesgo="escritura", necesita=("windows",),
+    corroboran=("maximiza",), palabras=("maximiza",),
+)
 def maximizar_actual() -> str:
     gw = _pygetwindow()
     if gw is None:

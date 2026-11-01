@@ -12,6 +12,7 @@ import urllib.parse
 import webbrowser
 
 from config import MOTOR_BUSQUEDA, detectar_comet
+from registro import herramienta
 
 log = logging.getLogger("jarvis.navegador")
 
@@ -72,6 +73,10 @@ def _abrir_url(url: str) -> bool:
         return False
 
 
+@herramienta(
+    descripcion="Hace una búsqueda web en el navegador Comet.",
+    riesgo="escritura", nucleo=True, args={"consulta": "Lo que hay que buscar"},
+)
 def buscar_en_navegador(consulta: str) -> str:
     """Hace una búsqueda web en Comet."""
     consulta = (consulta or "").strip()
@@ -86,6 +91,11 @@ def buscar_en_navegador(consulta: str) -> str:
     return "No pude abrir el navegador."
 
 
+@herramienta(
+    descripcion="Abre una página web concreta en Comet.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre": "Nombre conocido (youtube, gmail, github) o dominio (ejemplo.com)"},
+)
 def abrir_sitio(nombre: str) -> str:
     """Abre una página web por nombre ('youtube') o por dominio ('ejemplo.com')."""
     limpio = (nombre or "").strip().lower()

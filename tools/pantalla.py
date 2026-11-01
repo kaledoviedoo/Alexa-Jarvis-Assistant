@@ -16,6 +16,7 @@ import re
 import time
 
 from config import IDIOMA_OCR, MODELO_VISION, TESSERACT_EXE
+from registro import herramienta
 
 log = logging.getLogger("jarvis.pantalla")
 
@@ -167,6 +168,11 @@ def _lineas(palabras: list[dict]) -> list[str]:
     return lineas
 
 
+@herramienta(
+    descripcion="Lee con OCR el texto que se ve ahora en la pantalla.",
+    necesita=("tesseract",),
+    palabras=("pantalla", "que dice", "que pone", "lee lo que", "que se ve"),
+)
 def leer_pantalla(maximo_lineas: int = 12, zona=None) -> str:
     """Lee en voz alta lo que pone en la pantalla."""
     palabras = _palabras(zona)
@@ -207,6 +213,11 @@ def leer_primera_linea(zona=None) -> str:
     return lineas[0][1] if lineas else ""
 
 
+@herramienta(
+    descripcion="Dice si un texto aparece en la pantalla ahora mismo.",
+    necesita=("tesseract",), args={"texto": "El texto a encontrar"},
+    palabras=("pantalla", "aparece", "sale en", "ves"),
+)
 def buscar_en_pantalla(texto: str) -> str:
     """¿Esta ese texto en la pantalla?"""
     objetivo = (texto or "").strip().lower()
@@ -273,6 +284,11 @@ def clic_en(texto: str) -> str:
     return f"Hecho, hice clic en {encontrado['texto']}."
 
 
+@herramienta(
+    descripcion="Describe la pantalla con un modelo de visión, o responde una pregunta sobre lo que se ve.",
+    necesita=("ollama",), args={"pregunta": "Qué quiere saber de la pantalla. Opcional."},
+    palabras=("pantalla", "que ves", "describe", "que hay en"),
+)
 def describir_pantalla(pregunta: str = "") -> str:
     """Describe la pantalla con un modelo de vision."""
     imagen = _captura()
@@ -482,6 +498,13 @@ def encontrar_por_intencion(intencion: str, palabras=None) -> dict | None:
     return None
 
 
+@herramienta(
+    descripcion="Pulsa en pantalla el botón que sirva para algo (jugar, aceptar, enviar), se llame como se llame.",
+    riesgo="escritura", necesita=("windows", "tesseract"),
+    args={"intencion": "Para qué es el botón: jugar, aceptar, siguiente..."},
+    corroboran=("pulsa", "clic", "click", "dale a", "presiona", "toca"),
+    palabras=("pulsa", "clic", "click", "boton", "dale a", "presiona"),
+)
 def clic_por_intencion(intencion: str) -> str:
     """Pincha lo que sirva para eso, se llame como se llame."""
     palabras = _palabras(confianza_minima=40.0)

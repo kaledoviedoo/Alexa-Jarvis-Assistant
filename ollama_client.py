@@ -10,7 +10,6 @@ Incluye el freno de mano: las herramientas que tocan el equipo solo se
 ejecutan si la frase original de verdad las pedia.
 """
 
-import inspect
 import json
 import logging
 import re
@@ -22,7 +21,8 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as TimeoutFuturo
 import modes
 import tareas
 from config import MAX_PASOS_TOOLS, NOMBRE_USUARIO, PRESUPUESTO_SEGUNDOS
-from tools import archivos, avanzado, entrada, navegador, obsidian, sistema
+import registro
+from tools import avanzado, obsidian
 
 log = logging.getLogger("jarvis.ollama")
 
@@ -157,273 +157,28 @@ def limpiar_respuesta_modelo(texto: str) -> str:
     return texto or "No supe qué hacer con esa orden."
 
 
-def _herramienta(nombre: str, descripcion: str, propiedades: dict, requeridos: list[str]) -> dict:
-    return {
-        "type": "function",
-        "function": {
-            "name": nombre,
-            "description": descripcion,
-            "parameters": {
-                "type": "object",
-                "properties": propiedades,
-                "required": requeridos,
-            },
-        },
-    }
+# Las herramientas ya no se listan aqui: cada una se declara con @herramienta
+# junto a su funcion (registro.py). Estas son vistas generadas, para el codigo
+# que las sigue leyendo.
+registro.cargar()
+DESPACHADOR = registro.despachador()
+HERRAMIENTAS = registro.esquemas(registro.para_el_modelo(""))   # solo el nucleo
 
 
-def _texto(descripcion: str) -> dict:
-    return {"type": "string", "description": descripcion}
+def _extras_para(num_ctx: int) -> int:
+    """Cuantas herramientas fuera del nucleo caben segun el contexto del modo."""
+    if num_ctx <= 2048:
+        return 2
+    if num_ctx <= 4096:
+        return 4
+    return 8
 
 
-HERRAMIENTAS = [
-    _herramienta(
-        "crear_archivo",
-        "Crea un archivo nuevo en el equipo. Soporta .py, .txt, .md, .json, .csv, .docx y .xlsx.",
-        {
-            "nombre_archivo": _texto("Nombre con extensión, por ejemplo script.py o informe.docx"),
-            "contenido": _texto("Contenido completo que va dentro del archivo"),
-            "carpeta": _texto("Carpeta destino: escritorio, descargas o documentos. Por defecto escritorio."),
-        },
-        ["nombre_archivo"],
-    ),
-    _herramienta(
-        "leer_archivo",
-        "Lee el contenido de un archivo de texto existente.",
-        {"nombre_archivo": _texto("Nombre del archivo con su extensión")},
-        ["nombre_archivo"],
-    ),
-    _herramienta(
-        "editar_archivo",
-        "Edita un archivo de texto existente: agregar al final, anteponer, reemplazar texto o sobrescribir.",
-        {
-            "nombre_archivo": _texto("Nombre del archivo con su extensión"),
-            "accion": _texto("Una de: agregar, anteponer, reemplazar, sobrescribir"),
-            "contenido": _texto("Texto a agregar o con el que sobrescribir"),
-            "buscar": _texto("Solo para accion=reemplazar: el texto que hay que encontrar"),
-            "reemplazar": _texto("Solo para accion=reemplazar: el texto nuevo"),
-        },
-        ["nombre_archivo", "accion"],
-    ),
-    _herramienta(
-        "mover_archivo",
-        "Mueve un archivo a otra carpeta.",
-        {
-            "origen": _texto("Nombre del archivo a mover"),
-            "destino": _texto("Carpeta destino: escritorio, descargas, documentos o el nombre de una subcarpeta"),
-        },
-        ["origen", "destino"],
-    ),
-    _herramienta(
-        "buscar_archivo",
-        "Busca archivos por nombre en el escritorio, descargas y documentos.",
-        {"patron": _texto("Parte del nombre del archivo a buscar")},
-        ["patron"],
-    ),
-    _herramienta(
-        "listar_archivos",
-        "Lista los archivos de una carpeta.",
-        {"carpeta": _texto("escritorio, descargas o documentos")},
-        [],
-    ),
-    _herramienta(
-        "abrir_aplicacion",
-        "Abre un programa instalado en Windows.",
-        {"nombre_app": _texto("Nombre del programa: spotify, chrome, comet, steam, calculadora, vs code...")},
-        ["nombre_app"],
-    ),
-    _herramienta(
-        "cerrar_aplicacion",
-        "Cierra un programa que esté en ejecución.",
-        {"nombre_app": _texto("Nombre del programa a cerrar")},
-        ["nombre_app"],
-    ),
-    _herramienta(
-        "buscar_en_navegador",
-        "Hace una búsqueda web en el navegador Comet.",
-        {"consulta": _texto("Lo que hay que buscar")},
-        ["consulta"],
-    ),
-    _herramienta(
-        "abrir_sitio",
-        "Abre una página web concreta en Comet.",
-        {"nombre": _texto("Nombre conocido (youtube, gmail, github) o dominio (ejemplo.com)")},
-        ["nombre"],
-    ),
-    _herramienta(
-        "escribir_texto",
-        "Escribe texto con el teclado en la ventana que esté activa en ese momento.",
-        {"texto": _texto("Texto exacto a escribir")},
-        ["texto"],
-    ),
-    _herramienta(
-        "ejecutar_atajo",
-        "Ejecuta un atajo de teclado permitido.",
-        {"nombre_atajo": _texto("copiar, pegar, guardar, minimizar todo, cambiar ventana, subir volumen...")},
-        ["nombre_atajo"],
-    ),
-    _herramienta(
-        "captura_pantalla",
-        "Toma una captura de pantalla y la guarda en el escritorio.",
-        {"nombre": _texto("Nombre opcional del archivo PNG")},
-        [],
-    ),
-    _herramienta(
-        "estado_sistema",
-        "Devuelve el estado de CPU, memoria y tarjeta gráfica.",
-        {},
-        [],
-    ),
-    _herramienta(
-        "cambiar_modo",
-        "Cambia el modo de Jarvis: normal (ligero), dedicado (modelo grande en GPU) o gaming (libera la gráfica).",
-        {"modo": _texto("normal, dedicado o gaming")},
-        ["modo"],
-    ),
-
-    # ---- Archivos: lo que faltaba ----
-    _herramienta(
-        "eliminar_archivo",
-        "Manda un archivo a la papelera de Jarvis. No borra de forma definitiva: se puede recuperar.",
-        {"nombre_archivo": _texto("Nombre del archivo con su extensión")},
-        ["nombre_archivo"],
-    ),
-    _herramienta(
-        "eliminar_varios",
-        "Manda a la papelera todos los archivos de una carpeta cuyo nombre contenga un patrón.",
-        {
-            "patron": _texto("Parte del nombre, por ejemplo 'captura' para borrar todas las capturas"),
-            "carpeta": _texto("escritorio, descargas o documentos"),
-        },
-        ["patron"],
-    ),
-    _herramienta(
-        "copiar_archivo",
-        "Copia un archivo a otra carpeta dejando el original.",
-        {"origen": _texto("Archivo a copiar"), "destino": _texto("Carpeta destino")},
-        ["origen", "destino"],
-    ),
-    _herramienta(
-        "crear_carpeta",
-        "Crea una carpeta nueva.",
-        {"nombre": _texto("Nombre de la carpeta"), "carpeta": _texto("Dónde crearla")},
-        ["nombre"],
-    ),
-
-    # ---- Busqueda profunda ----
-    _herramienta(
-        "buscar_en_contenido",
-        "Busca una frase DENTRO de los archivos, no solo en sus nombres. Úsalo cuando el usuario no recuerde dónde guardó algo.",
-        {
-            "texto": _texto("La frase o palabra a buscar dentro de los archivos"),
-            "carpeta": _texto("Opcional: limitar a escritorio, descargas o documentos"),
-        },
-        ["texto"],
-    ),
-    _herramienta(
-        "explorar_carpeta",
-        "Recorre una carpeta y sus subcarpetas y resume qué hay: cuántos archivos, de qué tipo y qué subcarpetas.",
-        {"carpeta": _texto("escritorio, descargas o documentos")},
-        [],
-    ),
-    _herramienta(
-        "archivos_recientes",
-        "Lista lo que se ha modificado últimamente. Útil para '¿en qué estaba trabajando?'.",
-        {"dias": {"type": "integer", "description": "Cuántos días atrás mirar. Por defecto 7."}},
-        [],
-    ),
-
-    # ---- Estado del equipo ----
-    _herramienta(
-        "informe_completo",
-        "Informe detallado del equipo: CPU, memoria, discos por unidad, gráfica, red y procesos. Con guardar=true lo escribe como archivo.",
-        {"guardar": {"type": "boolean", "description": "true para guardarlo como archivo markdown"}},
-        [],
-    ),
-    _herramienta(
-        "info_equipo",
-        "Describe este equipo: sistema, procesador, memoria, gráfica y tiempo encendido.",
-        {},
-        [],
-    ),
-
-    # ---- Obsidian ----
-    _herramienta(
-        "obsidian_crear_nota",
-        "Crea una nota nueva en el vault de Obsidian del usuario, con frontmatter y etiquetas.",
-        {
-            "titulo": _texto("Título de la nota"),
-            "contenido": _texto("Cuerpo de la nota en markdown"),
-            "etiquetas": _texto("Etiquetas separadas por comas, sin almohadilla"),
-            "carpeta": _texto("Subcarpeta del vault, opcional"),
-        },
-        ["titulo"],
-    ),
-    _herramienta(
-        "obsidian_agregar_a_nota",
-        "Añade texto al final de una nota existente de Obsidian. Si no existe, la crea.",
-        {"titulo": _texto("Título de la nota"), "contenido": _texto("Texto a añadir")},
-        ["titulo", "contenido"],
-    ),
-    _herramienta(
-        "obsidian_agregar_al_diario",
-        "Añade una línea a la nota diaria de hoy en Obsidian. Úsalo para apuntes rápidos e ideas.",
-        {"contenido": _texto("Lo que hay que apuntar")},
-        ["contenido"],
-    ),
-    _herramienta(
-        "obsidian_buscar",
-        "Busca una frase dentro de todas las notas de Obsidian.",
-        {"texto": _texto("Qué buscar en las notas")},
-        ["texto"],
-    ),
-
-    # ---- Contexto personal ----
-    _herramienta(
-        "recordar_en_contexto",
-        "Apunta un dato permanente sobre el usuario o su forma de trabajar en el contexto de Jarvis, para tenerlo en cuenta siempre.",
-        {"contenido": _texto("El dato a recordar")},
-        ["contenido"],
-    ),
-]
-
-
-# Mapa nombre-de-herramienta -> función real.
-DESPACHADOR = {
-    "crear_archivo": archivos.crear_archivo,
-    "leer_archivo": archivos.leer_archivo,
-    "editar_archivo": archivos.editar_archivo,
-    "mover_archivo": archivos.mover_archivo,
-    "buscar_archivo": archivos.buscar_archivo,
-    "listar_archivos": archivos.listar_archivos,
-    "abrir_aplicacion": sistema.abrir_aplicacion,
-    "cerrar_aplicacion": sistema.cerrar_aplicacion,
-    "buscar_en_navegador": navegador.buscar_en_navegador,
-    "abrir_sitio": navegador.abrir_sitio,
-    "escribir_texto": entrada.escribir_texto,
-    "ejecutar_atajo": entrada.ejecutar_atajo,
-    "captura_pantalla": entrada.captura_pantalla,
-    "estado_sistema": lambda: sistema.estado_general(),
-    "cambiar_modo": lambda modo: modes.cambiar_modo(modo),
-
-    "eliminar_archivo": archivos.eliminar_archivo,
-    "eliminar_varios": archivos.eliminar_varios,
-    "copiar_archivo": archivos.copiar_archivo,
-    "crear_carpeta": archivos.crear_carpeta,
-
-    "buscar_en_contenido": avanzado.buscar_en_contenido,
-    "explorar_carpeta": avanzado.explorar_carpeta,
-    "archivos_recientes": avanzado.archivos_recientes,
-    "informe_completo": avanzado.informe_completo,
-    "info_equipo": avanzado.info_equipo,
-
-    "obsidian_crear_nota": obsidian.crear_nota,
-    "obsidian_agregar_a_nota": obsidian.agregar_a_nota,
-    "obsidian_agregar_al_diario": obsidian.agregar_al_diario,
-    "obsidian_buscar": obsidian.buscar_en_vault,
-
-    "recordar_en_contexto": avanzado.editar_contexto,
-}
+def herramientas_para(comando: str) -> list[dict]:
+    """Los esquemas que se le ofrecen al modelo para esta orden."""
+    perfil = modes.perfil_actual()
+    extras = _extras_para(int(perfil.get("num_ctx", 4096)))
+    return registro.esquemas(registro.para_el_modelo(comando, extras))
 
 
 PROMPT_BASE = """Eres Jarvis, el asistente local que controla este equipo con Windows.
@@ -522,36 +277,9 @@ def _desenvolver_argumentos(argumentos) -> dict:
             if k not in ("type", "function", "name", "tool", "tool_name", "recipient_name")}
 
 
-HERRAMIENTAS_QUE_TOCAN = {
-    "escribir_texto":    ("escrib", "teclea", "redacta", "pon ", "ponme",
-                          "dile", "manda", "mensaje", "responde", "contesta"),
-    "ejecutar_atajo":    ("atajo", "pulsa", "presiona", "tecla", "copia",
-                          "pega", "guarda", "minimiza", "maximiza", "volumen"),
-    "cerrar_aplicacion": ("cierra", "cerrar", "cierre", "quita", "mata",
-                          "apaga", "termina", "sal de"),
-    "eliminar_archivo":  ("elimina", "borra", "quita", "eliminar", "borrar"),
-    "eliminar_varios":   ("elimina", "borra", "quita", "eliminar", "borrar"),
-    "mover_archivo":     ("mueve", "mover", "mueva", "pasa", "lleva", "manda a"),
-    "copiar_archivo":    ("copia", "copiar", "duplica"),
-    "editar_archivo":    ("edita", "agrega", "añade", "reemplaza", "cambia",
-                          "escrib", "modifica"),
-    "crear_archivo":     ("crea", "crear", "cree", "hazme", "haz un", "nuevo"),
-    "crear_carpeta":     ("crea", "crear", "cree", "carpeta", "nueva"),
-    "cambiar_modo":      ("modo", "gaming", "dedicado", "normal", "juego"),
-
-    # Estas cuatro escriben en la boveda y en el contexto. Estaban fuera del
-    # freno por descuido mio: el modelo podia garabatear en las notas desde una
-    # conversacion normal, que es justo el fallo para el que existe esto.
-    "obsidian_crear_nota":       ("nota", "apunta", "anota", "crea", "guarda",
-                                  "escrib", "boveda", "obsidian"),
-    "obsidian_agregar_a_nota":   ("agrega", "agregue", "añade", "anade", "suma",
-                                  "apunta", "anota", "mete", "nota"),
-    "obsidian_agregar_al_diario": ("diario", "apunta", "anota", "registra",
-                                   "guarda", "bitacora"),
-    "recordar_en_contexto":      ("recuerda", "acuerdate", "ten en cuenta",
-                                  "contexto", "apunta que", "no olvides",
-                                  "que sepas"),
-}
+# Pistas que el freno busca en la frase, sacadas del registro. Desaparece en
+# la Fase 3, cuando el freno pase a decidir por riesgo.
+HERRAMIENTAS_QUE_TOCAN = registro.corroboracion()
 
 LARGO_MAXIMO_DE_UNA_ORDEN = 70
 
@@ -627,9 +355,21 @@ def _por_que_no(nombre: str, argumentos: dict) -> str:
 
 
 def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
-    funcion = DESPACHADOR.get(nombre)
-    if funcion is None:
+    h = registro.obtener(nombre)
+    if h is None:
         return f"No existe la herramienta {nombre}."
+
+    # Lo externo y lo irreversible no se ejecuta desde aqui aunque el modelo
+    # lo pida por su nombre: ni siquiera se le ofrece (registro.OFRECIBLES).
+    if h.riesgo not in registro.OFRECIBLES:
+        log.warning("FRENO: %s es de riesgo %s; el modelo no lo ejecuta.", nombre, h.riesgo)
+        return (f"No ejecuto {nombre} por mi cuenta: es de riesgo {h.riesgo}. "
+                "Dile que me lo pida directamente.")
+
+    if not registro.disponible(h):
+        return f"{nombre} no está disponible en este equipo ahora mismo."
+
+    funcion = h.funcion
 
     if isinstance(argumentos, str):
         try:
@@ -646,19 +386,17 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
 
     log.info("Ejecutando herramienta %s con %s", nombre, argumentos)
 
-    try:
-        validas = set(inspect.signature(funcion).parameters)
-        sobran = [k for k in argumentos if k not in validas]
-        if sobran:
-            log.info("Descarto argumentos que %s no acepta: %s", nombre, sobran)
-            argumentos = {k: v for k, v in argumentos.items() if k in validas}
-    except (TypeError, ValueError) as e:
-        # Sin poder mirar la firma no se filtra nada, y el fallo aparece mas
-        # tarde como un TypeError dentro de la herramienta.
-        log.debug("No pude leer la firma de %s: %s", nombre, e)
+    # Solo pasan los parametros que la herramienta declara para el modelo: el
+    # resto (limites, zonas de pantalla) se queda con su valor por defecto.
+    validas = set(h.nombres_parametros)
+    sobran = [k for k in argumentos if k not in validas]
+    if sobran:
+        log.info("Descarto argumentos que %s no acepta: %s", nombre, sobran)
+        argumentos = {k: v for k, v in argumentos.items() if k in validas}
 
     try:
-        return funcion(**argumentos)
+        resultado = funcion(**argumentos)
+        return resultado if isinstance(resultado, str) else str(resultado)
     except TypeError as e:
         # El modelo mandó argumentos que no encajan con la firma.
         log.warning("Argumentos inválidos para %s: %s", nombre, e)
@@ -683,12 +421,15 @@ def _conversar(comando: str) -> str:
         {"role": "user", "content": comando},
     ]
 
+    ofrecidas = herramientas_para(comando)
+    log.info("Ofrezco %d herramientas al modelo", len(ofrecidas))
+
     for paso in range(MAX_PASOS_TOOLS):
         try:
             respuesta = ollama.chat(
                 model=perfil["modelo"],
                 messages=mensajes,
-                tools=HERRAMIENTAS,
+                tools=ofrecidas,
                 keep_alive=perfil["keep_alive"],
                 options=modes.opciones_ollama(),
             )

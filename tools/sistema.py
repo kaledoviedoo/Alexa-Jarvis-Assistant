@@ -19,6 +19,7 @@ import time
 import psutil
 
 from config import PROCESOS_PROTEGIDOS, localizar_ejecutable
+from registro import herramienta
 
 log = logging.getLogger("jarvis.sistema")
 
@@ -124,6 +125,11 @@ def uso_gpu() -> str:
     )
 
 
+@herramienta(
+    "estado_sistema",
+    descripcion="Devuelve el estado de CPU, memoria y tarjeta gráfica.",
+    nucleo=True,
+)
 def estado_general() -> str:
     """Resumen corto de todo el equipo, pensado para decirse en voz alta."""
     cpu = psutil.cpu_percent(interval=0.3)
@@ -441,6 +447,11 @@ def _ventana_al_frente() -> str:
         return ""
 
 
+@herramienta(
+    descripcion="Abre un programa instalado en Windows.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre_app": "Nombre del programa: spotify, chrome, comet, steam, calculadora, vs code..."},
+)
 def abrir_aplicacion(nombre_app: str) -> str:
     """Abre una aplicacion por su nombre hablado."""
     from tools import catalogo
@@ -521,6 +532,12 @@ def abrir_aplicacion(nombre_app: str) -> str:
             "rastreado lo que tienes instalado. Dime actualiza las aplicaciones.")
 
 
+@herramienta(
+    descripcion="Cierra un programa que esté en ejecución.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre_app": "Nombre del programa a cerrar"},
+    corroboran=("cierra", "cerrar", "cierre", "quita", "mata", "apaga", "termina", "sal de"),
+)
 def cerrar_aplicacion(nombre_app: str) -> str:
     """Cierra una aplicacion por su nombre, tolerando la transcripcion de voz."""
     crudo = (nombre_app or "").strip().lower()

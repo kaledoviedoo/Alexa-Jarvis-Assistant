@@ -21,6 +21,7 @@ from config import (
     ESCRITORIO,
     PAPELERA,
 )
+from registro import herramienta
 
 log = logging.getLogger("jarvis.archivos")
 
@@ -102,6 +103,14 @@ def _base_desde_alias(carpeta: str | None) -> Path:
     return ALIAS_CARPETAS.get(clave, ESCRITORIO / carpeta)
 
 
+@herramienta(
+    descripcion="Crea un archivo nuevo en el equipo. Soporta .py, .txt, .md, .json, .csv, .docx y .xlsx.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre_archivo": "Nombre con extensión, por ejemplo script.py o informe.docx",
+          "contenido": "Contenido completo que va dentro del archivo",
+          "carpeta": "Carpeta destino: escritorio, descargas o documentos. Por defecto escritorio."},
+    corroboran=("crea", "crear", "cree", "hazme", "haz un", "nuevo"),
+)
 def crear_archivo(nombre_archivo: str, contenido: str = "", carpeta: str = "") -> str:
     """Crea un archivo (.py, .txt, .md, .json, .csv, .docx, .xlsx) en el equipo."""
     try:
@@ -151,6 +160,10 @@ def crear_archivo(nombre_archivo: str, contenido: str = "", carpeta: str = "") -
         return f"Hubo un error al crear {ruta.name}: {e}"
 
 
+@herramienta(
+    descripcion="Lee el contenido de un archivo de texto existente.",
+    nucleo=True, args={"nombre_archivo": "Nombre del archivo con su extensión"},
+)
 def leer_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     """Lee el contenido de un archivo de texto."""
     try:
@@ -181,6 +194,16 @@ def leer_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     return f"Contenido de {ruta.name}:\n{texto[:2000]}"
 
 
+@herramienta(
+    descripcion="Edita un archivo de texto existente: agregar al final, anteponer, reemplazar texto o sobrescribir.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre_archivo": "Nombre del archivo con su extensión",
+          "accion": "Una de: agregar, anteponer, reemplazar, sobrescribir",
+          "contenido": "Texto a agregar o con el que sobrescribir",
+          "buscar": "Solo para accion=reemplazar: el texto que hay que encontrar",
+          "reemplazar": "Solo para accion=reemplazar: el texto nuevo"},
+    corroboran=("edita", "agrega", "añade", "reemplaza", "cambia", "escrib", "modifica"),
+)
 def editar_archivo(
     nombre_archivo: str,
     accion: str = "agregar",
@@ -246,6 +269,13 @@ def editar_archivo(
     return resumen
 
 
+@herramienta(
+    descripcion="Mueve un archivo a otra carpeta.",
+    riesgo="escritura", nucleo=True,
+    args={"origen": "Nombre del archivo a mover",
+          "destino": "Carpeta destino: escritorio, descargas, documentos o el nombre de una subcarpeta"},
+    corroboran=("mueve", "mover", "mueva", "pasa", "lleva", "manda a"),
+)
 def mover_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     """Mueve un archivo a otra carpeta."""
     try:
@@ -284,6 +314,12 @@ def mover_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     return f"Moví {ruta_origen.name} a {carpeta_destino.name}."
 
 
+@herramienta(
+    descripcion="Copia un archivo a otra carpeta dejando el original.",
+    riesgo="escritura", nucleo=True,
+    args={"origen": "Archivo a copiar", "destino": "Carpeta destino"},
+    corroboran=("copia", "copiar", "duplica"),
+)
 def copiar_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     """Copia un archivo a otra carpeta."""
     try:
@@ -311,6 +347,12 @@ def copiar_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     return f"Copié {ruta_origen.name} a {carpeta_destino.name}."
 
 
+@herramienta(
+    descripcion="Manda un archivo a la papelera de Jarvis. No borra de forma definitiva: se puede recuperar.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre_archivo": "Nombre del archivo con su extensión"},
+    corroboran=("elimina", "borra", "quita", "eliminar", "borrar"),
+)
 def eliminar_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     """Manda un archivo a la papelera interna de Jarvis."""
     try:
@@ -331,6 +373,10 @@ def eliminar_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     return f"Mandé {ruta.name} a la papelera de Jarvis. Se puede recuperar."
 
 
+@herramienta(
+    descripcion="Lista los archivos de una carpeta.",
+    nucleo=True, args={"carpeta": "escritorio, descargas o documentos"},
+)
 def listar_archivos(carpeta: str = "escritorio", limite: int = 15) -> str:
     """Lista los archivos de una carpeta."""
     base = _base_desde_alias(carpeta)
@@ -363,6 +409,10 @@ def listar_archivos(carpeta: str = "escritorio", limite: int = 15) -> str:
     return f"En {base.name} hay {total}: {resumen}."
 
 
+@herramienta(
+    descripcion="Busca archivos por nombre en el escritorio, descargas y documentos.",
+    nucleo=True, args={"patron": "Parte del nombre del archivo a buscar"},
+)
 def buscar_archivo(patron: str, carpeta: str = "", limite: int = 10) -> str:
     """Busca archivos por nombre dentro de las carpetas permitidas."""
     patron = (patron or "").strip().lower()
@@ -405,6 +455,12 @@ def buscar_archivo(patron: str, carpeta: str = "", limite: int = 10) -> str:
     return f"Encontré {len(encontrados)} archivos: {nombres}."
 
 
+@herramienta(
+    descripcion="Crea una carpeta nueva.",
+    riesgo="escritura", nucleo=True,
+    args={"nombre": "Nombre de la carpeta", "carpeta": "Dónde crearla"},
+    corroboran=("crea", "crear", "cree", "carpeta", "nueva"),
+)
 def crear_carpeta(nombre: str, carpeta: str = "") -> str:
     """Crea una carpeta nueva."""
     try:
@@ -420,6 +476,13 @@ def crear_carpeta(nombre: str, carpeta: str = "") -> str:
     return f"Creé la carpeta {ruta.name}."
 
 
+@herramienta(
+    descripcion="Manda a la papelera todos los archivos de una carpeta cuyo nombre contenga un patrón.",
+    riesgo="escritura", nucleo=True,
+    args={"patron": "Parte del nombre, por ejemplo 'captura' para borrar todas las capturas",
+          "carpeta": "escritorio, descargas o documentos"},
+    corroboran=("elimina", "borra", "quita", "eliminar", "borrar"),
+)
 def eliminar_varios(patron: str, carpeta: str = "", limite: int = 20) -> str:
     """Manda a la papelera todos los archivos cuyo nombre contenga el patron."""
     patron = (patron or "").strip().lower()
