@@ -198,6 +198,22 @@ def _extras_para(num_ctx: int) -> int:
     return 8 if num_ctx >= 8192 else 2
 
 
+_PREGUNTA = re.compile(
+    r"^\s*(?:¿|"
+    r"(?:qu[eé]|cu[aá]l(?:es)?|cu[aá]nt[oa]s?|c[oó]mo|d[oó]nde|cu[aá]ndo|qui[eé]n(?:es)?|"
+    r"por\s*qu[eé]|tengo|tienes|hay|est[aá]n?|existe|sabes|dime|me\s+dices|es\s+cierto)\b)",
+    re.IGNORECASE,
+)
+
+
+def es_pregunta(frase: str) -> bool:
+    """¿La orden pide saber algo en vez de cambiar algo?"""
+    f = (frase or "").strip()
+    # "segun mis apuntes, que es..." sigue siendo una pregunta.
+    f = re.sub(r"^\s*(?:seg[uú]n|en)\s+mis\s+\w+\s*,?\s*", "", f, flags=re.IGNORECASE)
+    return f.endswith("?") or bool(_PREGUNTA.match(f))
+
+
 def herramientas_para(comando: str) -> list[dict]:
     """Los esquemas que se le ofrecen al modelo para esta orden.
 
@@ -212,6 +228,14 @@ def herramientas_para(comando: str) -> list[dict]:
         como = "nucleo + palabras"
     else:
         como = "por significado"
+
+    # Una pregunta se contesta mirando. Si no se le ofrece nada que cambie el
+    # equipo, el modelo no puede "contestar" cerrando Steam.
+    if es_pregunta(comando):
+        solo_miran = [h for h in elegidas if h.riesgo == "lectura"]
+        if solo_miran:
+            elegidas = solo_miran
+            como += ", solo lectura por ser pregunta"
     log.info("Ofrezco %d herramientas (%s): %s", len(elegidas), como,
              ", ".join(h.nombre for h in elegidas))
     return registro.esquemas(elegidas)
@@ -322,6 +346,13 @@ HERRAMIENTAS_QUE_TOCAN = registro.corroboracion()
 
 LARGO_MAXIMO_DE_UNA_ORDEN = 70
 
+# Lo que se le dice al modelo cuando el freno le para una accion. Antes era
+# "contesta con palabras", y el modelo contestaba lo primero que se le ocurria
+# ("si, Steam esta abierto") sin haber mirado.
+_SIN_INVENTAR = ("Si te pregunto algo, usa una herramienta que solo mire (listar, "
+                 "leer, buscar) y responde con lo que devuelva. Si no tienes el dato, "
+                 "dilo. No inventes.")
+
 # Argumentos que no son un valor: son el hueco sin rellenar. Si el modelo
 # manda esto es que copio el ejemplo del esquema.
 ARGUMENTOS_VACIOS = {
@@ -384,11 +415,11 @@ def _por_que_no(nombre: str, argumentos: dict) -> str:
     # 4. La frase no pide esto por ninguna parte.
     if not any(pista in frase for pista in corroboran):
         return (f"No ejecuto {nombre}: en lo que dijo no hay nada que lo pida. "
-                "Contesta con palabras a lo que te esta contando.")
+                + _SIN_INVENTAR)
 
     if len(frase) > LARGO_MAXIMO_DE_UNA_ORDEN:
         return (f"No ejecuto {nombre}: eso parece conversacion, no una orden. "
-                "Si de verdad la quiere, que la diga corta y directa.")
+                + _SIN_INVENTAR)
 
     return ""
 

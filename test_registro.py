@@ -196,6 +196,37 @@ def main() -> int:
         registro._archivo_vectores = original_archivo
 
     print()
+    print("UNA PREGUNTA SOLO RECIBE HERRAMIENTAS QUE MIRAN")
+    preguntas = ["tengo algun programa de steam en primer plano o en las ventanas",
+                 "segun mis apuntes que es una integral por partes",
+                 "hay alguna ventana de discord por ahi", "cual es el archivo mas pesado",
+                 "dime que correos tengo sin leer", "spotify esta abierto?"]
+    ordenes = ["abre spotify", "cierra steam", "crea un archivo notas.txt",
+               "apunta en el diario que mañana hay parcial", "mueve el informe a documentos"]
+    for f in preguntas:
+        comprobar(ollama_client.es_pregunta(f), f"es pregunta: '{f[:45]}'")
+    for f in ordenes:
+        comprobar(not ollama_client.es_pregunta(f), f"es orden: '{f[:45]}'")
+
+    original_embeber = registro._embeber
+    registro._embeber = lambda t: None
+    registro._vectores = None
+    try:
+        ofrecidas = ollama_client.herramientas_para(preguntas[0])
+        riesgos = {registro.obtener(e["function"]["name"]).riesgo for e in ofrecidas}
+        comprobar(riesgos == {"lectura"}, f"a una pregunta solo se le ofrece lectura ({sorted(riesgos)})")
+        ofrecidas = ollama_client.herramientas_para("cierra steam")
+        comprobar(any(e["function"]["name"] == "cerrar_aplicacion" for e in ofrecidas),
+                  "a una orden se le sigue ofreciendo cerrar_aplicacion")
+    finally:
+        registro._embeber = original_embeber
+
+    ollama_client.recordar_peticion("tengo steam abierto")
+    salida = ollama_client._ejecutar_herramienta("cerrar_aplicacion", {"nombre_app": "steam"})
+    comprobar("No inventes" in salida and "Contesta con palabras" not in salida,
+              "el freno pide mirar en vez de inventar")
+
+    print()
     print("LATEX DICHO CON PALABRAS")
     dicho = ollama_client.latex_a_palabras(r"Se usa \(\int u \, dv = uv - \int v \, du\).")
     comprobar("\\" not in dicho and "la integral de" in dicho, f"'{dicho}'")
