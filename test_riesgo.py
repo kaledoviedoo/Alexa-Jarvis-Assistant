@@ -225,9 +225,20 @@ def main() -> int:
         def hotkey(self, *a): pass
 
     teclado = TecladoFalso()
-    guardado = (whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep)
+    guardado = (whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep,
+                whatsapp._ventana_activa_es_whatsapp)
     try:
         whatsapp._pyautogui = lambda: teclado
+        whatsapp.time.sleep = lambda s: None
+        whatsapp._ventana_activa_es_whatsapp = lambda: False
+        whatsapp._enfocar = lambda: False
+        salida = whatsapp.enviar_mensaje("familia", "hola")
+        comprobar(not teclado.escrito and "No escribí nada" in salida,
+                  "si el teclado no es de WhatsApp, no teclea ni la busqueda")
+        comprobar(whatsapp._enviar_ahora().startswith("No lo envié") and
+                  whatsapp._borrar_caja().startswith("Cancelado. No envié"),
+                  "ni el Enter del si ni el borrado del no van a otra ventana")
+        whatsapp._ventana_activa_es_whatsapp = lambda: True
         whatsapp._enfocar = lambda: True
         whatsapp.time.sleep = lambda s: None
         whatsapp._quien_esta_abierto = lambda: "ua esta activa"
@@ -248,7 +259,8 @@ def main() -> int:
                   f"y pregunta con el nombre real ('{salida[:60]}')")
         confirmaciones.olvidar()
     finally:
-        whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep = guardado
+        (whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep,
+         whatsapp._ventana_activa_es_whatsapp) = guardado
 
     print("\nSI EL ENVIO NO LLEGA A PREGUNTAR, SE DICE LO QUE PASO")
     confirmaciones.olvidar()

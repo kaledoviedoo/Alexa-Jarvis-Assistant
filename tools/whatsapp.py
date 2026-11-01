@@ -130,15 +130,53 @@ def lanzar_en_segundo_plano() -> None:
     threading.Timer(20, _abriendo.clear).start()
 
 
+def _ventana_activa_es_whatsapp() -> bool:
+    """¿Las teclas que se manden ahora llegan a WhatsApp?"""
+    try:
+        import pygetwindow as gw
+        activa = gw.getActiveWindow()
+        return activa is not None and "whatsapp" in (activa.title or "").lower()
+    except Exception:
+        return False
+
+
 def _enfocar() -> bool:
-    """Trae al frente la ventana que ya tiene WhatsApp Web."""
+    """Trae al frente WhatsApp Web y comprueba que de verdad tiene el teclado.
+
+    Windows no siempre deja que un programa quite el foco a otro: la ventana
+    sube pero las teclas siguen yendo a la de antes. Asi se escribio
+    "familia" en otra aplicacion. Si tras los intentos el foco no es de
+    WhatsApp, se devuelve False y nadie teclea nada.
+    """
     ventana = _ventana_de_whatsapp()
     if ventana is None:
         return False
 
-    resultado = ventanas.cambiar_a(ventana.title[:30])
+    ventanas.cambiar_a(ventana.title[:30])
     time.sleep(0.35)
-    return "Ahí tienes" in resultado or _ventana_de_whatsapp() is not None
+    if not _ventana_activa_es_whatsapp():
+        # Minimizar y restaurar es lo que Windows si respeta como "el usuario
+        # quiere esta ventana".
+        try:
+            ventana.minimize()
+            time.sleep(0.25)
+            ventana.restore()
+            time.sleep(0.2)
+            ventana.activate()
+            time.sleep(0.35)
+        except Exception as e:
+            log.debug("No pude reactivar WhatsApp: %s", e)
+    try:
+        if not ventana.isMaximized:
+            ventana.maximize()
+            time.sleep(0.3)
+    except Exception as e:
+        log.debug("No pude maximizar WhatsApp: %s", e)
+
+    if not _ventana_activa_es_whatsapp():
+        log.warning("WhatsApp esta al frente pero el teclado no es suyo: no tecleo nada.")
+        return False
+    return True
 
 
 _RUIDO_CABECERA = (
@@ -173,7 +211,9 @@ def _quien_esta_abierto() -> str:
     """Lee de la pantalla el nombre del chat abierto."""
     # La primera linea, no la mas larga: el nombre va arriba y el subtitulo
     # debajo. Ordenar por longitud devolvia el subtitulo.
-    crudo = pantalla.leer_primera_linea(ZONA_CABECERA)
+    # Dentro de la ventana de WhatsApp: con una zona fija de la pantalla se
+    # leia lo que hubiera ahi ("Calculando", de otra aplicacion).
+    crudo = pantalla.leer_primera_linea(ZONA_CABECERA, ventana=_ventana_de_whatsapp())
     return _limpiar_nombre(crudo)
 
 
@@ -182,6 +222,9 @@ def _borrar_caja() -> str:
     pg = _pyautogui()
     if pg is None:
         return "Cancelado, pero no pude borrar el texto: revísalo en WhatsApp."
+    # Ctrl+A y borrar en otra ventana destrozaria lo que hubiera ahi.
+    if not _enfocar():
+        return "Cancelado. No envié nada, pero el texto sigue escrito en WhatsApp: bórralo tú."
     try:
         pg.hotkey("ctrl", "a")
         time.sleep(0.12)
@@ -196,6 +239,9 @@ def _enviar_ahora() -> str:
     pg = _pyautogui()
     if pg is None:
         return "No pude enviar, falta pyautogui."
+    # El "si" puede llegar desde PowerShell: el Enter tiene que ir a WhatsApp.
+    if not _enfocar():
+        return "No lo envié: no pude poner WhatsApp al frente. El mensaje sigue escrito, envíalo tú."
     try:
         pg.press("enter")
         log.info("Mensaje enviado.")
@@ -230,8 +276,14 @@ def abrir_y_comprobar(pg, destinatario: str) -> str:
     return _quien_esta_abierto()
 
 
+class SinFoco(RuntimeError):
+    """El teclado no es de WhatsApp: no se teclea."""
+
+
 def _buscar_y_abrir_chat(pg, nombre: str, lento: bool = False) -> None:
     """Busca el chat y lo abre. El cursor queda en la caja de mensaje."""
+    if not _ventana_activa_es_whatsapp() and not _enfocar():
+        raise SinFoco("el teclado no es de WhatsApp")
     pg.press("escape")
     time.sleep(0.15)
     pg.press("escape")
@@ -281,6 +333,9 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     # cargar el texto quedaba en el chat que estuviera abierto.
     try:
         nombre_real = abrir_y_comprobar(pg, destinatario)
+    except SinFoco:
+        return ("No pude poner WhatsApp al frente: el teclado seguía en otra ventana. "
+                "No escribí nada. Haz clic en WhatsApp y repítemelo.")
     except Exception as e:
         log.exception("Falló abriendo el chat")
         return f"Algo falló manejando WhatsApp: {e}"
@@ -289,6 +344,10 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
         log.warning("Pedi %r y el chat abierto es %r: no escribo nada.", destinatario, nombre_real)
         return (f"No encontré el chat {destinatario}: el que quedó abierto es {nombre_real}. "
                 "No escribí nada. Dime el nombre del chat tal como sale en WhatsApp.")
+
+    if not _ventana_activa_es_whatsapp():
+        return ("El foco se fue de WhatsApp antes de escribir. No escribí nada. "
+                "Repítemelo con WhatsApp al frente.")
 
     try:
         pg.write(mensaje, interval=0.008)

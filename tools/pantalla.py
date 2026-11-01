@@ -24,8 +24,13 @@ log = logging.getLogger("jarvis.pantalla")
 _BASURA = re.compile(r"^[\W_]+$")
 
 
-def _captura(zona: tuple[float, float, float, float] | None = None):
-    """Imagen de la pantalla principal, o None."""
+def _captura(zona: tuple[float, float, float, float] | None = None, ventana=None):
+    """Imagen de la pantalla principal, o de una ventana si se da, o None.
+
+    Con `ventana` la zona es relativa a esa ventana y se captura donde este,
+    aunque no este maximizada o este en otro monitor. Sin ella, la zona era un
+    porcentaje fijo de la pantalla principal y caia sobre lo que hubiera ahi.
+    """
     try:
         import mss
         from PIL import Image
@@ -35,8 +40,12 @@ def _captura(zona: tuple[float, float, float, float] | None = None):
 
     try:
         with mss.mss() as sct:
-            monitor = sct.monitors[1]        # 1 = pantalla principal
-            crudo = sct.grab(monitor)
+            if ventana is not None:
+                caja = {"left": int(ventana.left), "top": int(ventana.top),
+                        "width": max(1, int(ventana.width)), "height": max(1, int(ventana.height))}
+            else:
+                caja = sct.monitors[1]        # 1 = pantalla principal
+            crudo = sct.grab(caja)
         imagen = Image.frombytes("RGB", crudo.size, crudo.bgra, "raw", "BGRX")
     except Exception as e:
         log.warning("No pude capturar la pantalla: %s", e)
@@ -112,9 +121,9 @@ def _es_basura(palabra: str) -> bool:
     return letras < len(palabra) / 2
 
 
-def _palabras(zona=None, confianza_minima: float = 55.0) -> list[dict]:
+def _palabras(zona=None, confianza_minima: float = 55.0, ventana=None) -> list[dict]:
     """Cada palabra visible con su posicion y su confianza."""
-    imagen = _captura(zona)
+    imagen = _captura(zona, ventana)
     if imagen is None:
         return []
 
@@ -194,9 +203,9 @@ def leer_pantalla(maximo_lineas: int = 12, zona=None) -> str:
     return "En la pantalla leo: " + ". ".join(utiles)
 
 
-def leer_primera_linea(zona=None) -> str:
+def leer_primera_linea(zona=None, ventana=None) -> str:
     """La linea de MAS ARRIBA de una zona, no la mas larga."""
-    palabras = _palabras(zona, confianza_minima=45.0)
+    palabras = _palabras(zona, confianza_minima=45.0, ventana=ventana)
     if not palabras:
         return ""
 
