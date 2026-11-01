@@ -251,6 +251,18 @@ def main() -> int:
     comprobar(limpio == "No lo tengo en mis apuntes.", f"comillas fuera aunque el punto quede afuera ('{limpio}')")
 
     print()
+    print("UNA PREGUNTA YA RESPONDIDA NO VUELVE AL MODELO")
+    rd = ollama_client.respuesta_directa
+    ventanas = "Tienes 7 ventanas. Las principales: PowerShell, Claude, Steam."
+    comprobar(rd("tengo steam abierto", [ventanas]) == ventanas, "la lista de ventanas se dice tal cual")
+    comprobar(rd("cierra steam", [ventanas]) == "", "una orden sigue su curso con el modelo")
+    nada = "Tus apuntes no cubren integral por partes. Lo más cercano que tienes es calculo-integral."
+    comprobar(rd("segun mis apuntes que es una integral por partes", [nada]) == nada,
+              "si pregunto por sus apuntes y no estan, se le dice")
+    comprobar(rd("que es la oferta y la demanda", ["No encontré nada sobre oferta en tu bóveda."]) == "",
+              "cultura general sin notas: el modelo contesta con lo que sabe")
+
+    print()
     print("LATEX DICHO CON PALABRAS")
     dicho = ollama_client.latex_a_palabras(r"Se usa \(\int u \, dv = uv - \int v \, du\).")
     comprobar("\\" not in dicho and "la integral de" in dicho, f"'{dicho}'")

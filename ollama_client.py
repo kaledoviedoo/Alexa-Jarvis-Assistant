@@ -542,7 +542,8 @@ def _conversar(comando: str) -> str:
 
             # "Listo, hecha" despues de mirar las ventanas no dice nada: se
             # lee lo que devolvio la herramienta, que ya viene para la voz.
-            if ultimo_resultado and es_relleno(contenido):
+            if ultimo_resultado and (es_relleno(contenido)
+                                     or describe_en_vez_de_actuar(contenido, ofrecidas)):
                 log.info("Respuesta de relleno %r: leo el resultado de la herramienta.", contenido)
                 return ultimo_resultado
 
@@ -550,6 +551,7 @@ def _conversar(comando: str) -> str:
             return limpiar_respuesta_modelo(contenido)
 
         mensajes.append(mensaje)
+        lecturas = []
 
         for llamada in llamadas:
             funcion = llamada.get("function", {}) or {}
@@ -559,12 +561,20 @@ def _conversar(comando: str) -> str:
             resultado = _ejecutar_herramienta(nombre, argumentos)
             if not str(resultado).startswith(("No ejecuto", "No existe")):
                 ultimo_resultado = str(resultado)
+                h = registro.obtener(nombre)
+                if h is not None and h.riesgo == "lectura":
+                    lecturas.append(str(resultado))
 
             mensajes.append({
                 "role": "tool",
                 "content": str(resultado),
                 "name": nombre,
             })
+
+        directa = respuesta_directa(comando, lecturas)
+        if directa:
+            log.info("Pregunta respondida con lo que leyó la herramienta, sin otra vuelta al modelo.")
+            return directa
 
     return "Di demasiadas vueltas con esa orden y preferí parar."
 
@@ -594,6 +604,34 @@ _RELLENO = re.compile(
     r"de\s+acuerdo|ok|okay|vale|claro|entendido|completado|terminado)\b[\W\w]{0,20}$",
     re.IGNORECASE,
 )
+
+
+_NADA = re.compile(r"^\s*(?:no\s+(?:encontr|hay|tengo|veo|pude)|tus\s+apuntes\s+no|"
+                   r"la\s+memoria\s+no\s+tiene|sin\s+resultados)", re.IGNORECASE)
+_PIDE_SUS_NOTAS = re.compile(r"\b(?:mis|tus)\s+(?:apuntes|notas)\b|\bb[oó]veda\b|\bobsidian\b",
+                             re.IGNORECASE)
+
+
+def respuesta_directa(comando: str, lecturas: list[str]) -> str:
+    """Lo que se dice tal cual cuando una pregunta ya tiene respuesta.
+
+    Las herramientas de lectura devuelven frases hechas para la voz. Volver a
+    pasarlas por un modelo de 3B solo sirve para que las estropee ("Listo,
+    hecha") o las ignore y conteste de memoria. Si la herramienta no encontro
+    nada y no se pregunto por sus notas, se deja seguir al modelo: puede que
+    sea una pregunta de cultura general.
+    """
+    if not lecturas or not es_pregunta(comando):
+        return ""
+    utiles = [r for r in lecturas if not _NADA.match(r)]
+    if utiles:
+        return " ".join(utiles)[:MAX_CARACTERES_DIRECTA]
+    if _PIDE_SUS_NOTAS.search(comando):
+        return lecturas[-1]
+    return ""
+
+
+MAX_CARACTERES_DIRECTA = 900
 
 
 def es_relleno(texto: str) -> bool:

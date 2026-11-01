@@ -394,14 +394,19 @@ _CABECERAS_DE_TUNEL = (
 )
 
 
-def es_peticion_local_autorizada(request: Request) -> bool:
-    """Solo pasa quien esta en este equipo Y trae la llave del .env."""
+def es_peticion_local_autorizada(request: Request, avisar: bool = False) -> bool:
+    """Solo pasa quien esta en este equipo Y trae la llave del .env.
+
+    `avisar` solo en /probar: GET /jarvis llega por el tunel cada 90 s con el
+    ping de mantener caliente, y avisar ahi llenaria el log de falsas alarmas.
+    """
     if not TOKEN_LOCAL:
         return False
 
     for cabecera in _CABECERAS_DE_TUNEL:
         if cabecera in request.headers:
-            log.warning("Ruta local pedida desde el tunel (%s). Rechazada.", cabecera)
+            if avisar:
+                log.warning("Alguien pidio /probar desde el tunel (%s). Rechazado.", cabecera)
             return False
 
     recibido = request.headers.get("x-jarvis-token", "")
@@ -410,7 +415,7 @@ def es_peticion_local_autorizada(request: Request) -> bool:
 
 def _exigir_local(request: Request) -> None:
     # 404 y no 401: desde fuera no se confirma ni que la ruta exista.
-    if not es_peticion_local_autorizada(request):
+    if not es_peticion_local_autorizada(request, avisar=True):
         raise HTTPException(status_code=404)
 
 
