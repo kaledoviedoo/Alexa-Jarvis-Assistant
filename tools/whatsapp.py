@@ -368,6 +368,23 @@ def pegar(pg, texto: str) -> None:
             log.debug("No pude devolver el portapapeles: %s", e)
 
 
+# La caja de busqueda esta a esta altura desde arriba de la ventana (a escala
+# 100 %), centrada en el panel de chats.
+BUSCADOR_PX = 178
+
+
+def _ir_al_buscador(pg) -> bool:
+    ventana = _ventana_de_whatsapp()
+    if ventana is None:
+        return False
+    izquierda_del_chat = zona_cabecera(ventana.width, ventana.height)[0]
+    x = int(ventana.left + ventana.width * izquierda_del_chat * 0.55)
+    y = int(ventana.top + BUSCADOR_PX)
+    pg.click(x, y)
+    time.sleep(0.2)
+    return _ventana_activa_es_whatsapp()
+
+
 def _ir_a_la_caja_de_mensaje(pg) -> bool:
     """Clic en la caja de escribir, abajo en el panel del chat.
 
@@ -393,9 +410,11 @@ def _buscar_y_abrir_chat(pg, nombre: str, lento: bool = False) -> None:
     pg.press("escape")
     time.sleep(0.2)
 
-    # Atajo de busqueda de WhatsApp Web.
-    pg.hotkey("ctrl", "alt", "/")
-    time.sleep(0.45)
+    # Clic en la caja de busqueda. El atajo Ctrl+Alt+/ no sirve con teclado
+    # en español: la barra es Mayus+7 y Ctrl+Alt hace de AltGr.
+    if not _ir_al_buscador(pg):
+        raise SinFoco("no encuentro el buscador de WhatsApp")
+    time.sleep(0.35)
 
     # Vaciar lo que quedara de una busqueda anterior: si no, la segunda
     # busqueda era "familiafamilia" y no encontraba nada.
@@ -435,9 +454,15 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     if pg is None:
         return "No puedo manejar WhatsApp, falta pyautogui."
 
-    if not _enfocar() and not esperar_whatsapp():
-        return ("Abrí WhatsApp Web pero no terminó de cargar a tiempo. "
-                "No escribí nada; cuando lo veas cargado, repíteme el mensaje.")
+    # Si ya hay una ventana de WhatsApp no se abre otra: antes, cada vez que
+    # el foco fallaba a la primera, se abria una pestaña nueva.
+    if _ventana_de_whatsapp() is None:
+        if not esperar_whatsapp():
+            return ("Abrí WhatsApp Web pero no terminó de cargar a tiempo. "
+                    "No escribí nada; cuando lo veas cargado, repíteme el mensaje.")
+    elif not _enfocar():
+        return ("No pude poner WhatsApp al frente: el teclado seguía en otra ventana. "
+                "No escribí nada. Haz clic en WhatsApp y repítemelo.")
 
     # Primero se abre el chat y se comprueba que es el pedido; solo despues se
     # escribe. Antes se escribia y luego se miraba, y si WhatsApp acababa de

@@ -269,6 +269,8 @@ def main() -> int:
         comprobar("Familia Pérez Gómez" in salida and confirmaciones.hay_pendiente(),
                   f"y pregunta con el nombre real ('{salida[:60]}')")
         comprobar(("ctrl", "a") in teclado.atajos, "el buscador se vacia antes de buscar")
+        comprobar(("ctrl", "alt", "/") not in teclado.atajos and any(c[1] == 178 for c in teclado.clics),
+                  "el buscador se abre con un clic, no con Ctrl+Alt+/ (falla con teclado en español)")
         comprobar(teclado.clics and teclado.clics[-1][1] > 900,
                   "antes de escribir hace clic en la caja de mensaje, abajo")
         confirmaciones.olvidar()
