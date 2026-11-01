@@ -136,6 +136,7 @@ def precalentar_en_segundo_plano() -> None:
     riesgo="escritura", nucleo=True, args={"nuevo_modo": "normal, dedicado o gaming"},
     corroboran=("modo", "activa", "cambia", "pon ", "pasa a", "entra en", "me voy a jugar",
                 "voy a jugar", "gaming", "dedicado", "normal", "juego"),
+    palabras=('modo', 'gaming', 'dedicado', 'voy a jugar',),
 )
 def cambiar_modo(nuevo_modo: str) -> str:
     """Cambia de modo y devuelve la frase que dirá Alexa."""

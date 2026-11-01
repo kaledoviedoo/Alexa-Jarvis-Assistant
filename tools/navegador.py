@@ -76,6 +76,7 @@ def _abrir_url(url: str) -> bool:
 @herramienta(
     descripcion="Hace una búsqueda web en el navegador Comet.",
     riesgo="escritura", nucleo=True, args={"consulta": "Lo que hay que buscar"},
+    palabras=('busca en internet', 'busca en google', 'buscame',),
 )
 def buscar_en_navegador(consulta: str) -> str:
     """Hace una búsqueda web en Comet."""
@@ -95,6 +96,7 @@ def buscar_en_navegador(consulta: str) -> str:
     descripcion="Abre una página web concreta en Comet.",
     riesgo="escritura", nucleo=True,
     args={"nombre": "Nombre conocido (youtube, gmail, github) o dominio (ejemplo.com)"},
+    palabras=('pagina', 'sitio', 'web', '.com',),
 )
 def abrir_sitio(nombre: str) -> str:
     """Abre una página web por nombre ('youtube') o por dominio ('ejemplo.com')."""

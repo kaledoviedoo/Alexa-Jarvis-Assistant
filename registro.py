@@ -17,6 +17,7 @@ import importlib.util
 import inspect
 import logging
 import os
+import re
 import shutil
 import sys
 import time
@@ -239,6 +240,20 @@ def obtener(nombre: str) -> Herramienta | None:
     return cargar().get(nombre)
 
 
+def casa(palabra: str, frase_n: str) -> bool:
+    """La palabra clave aparece al inicio de una palabra de la frase.
+
+    Asi "ram" casa con "ram" pero no con "programa", y "copia" sigue
+    casando con "copiado".
+    """
+    palabra = _normalizar(palabra)
+    if not palabra:
+        return False
+    if not palabra[0].isalnum():  # ".com" va pegado a lo anterior
+        return palabra in frase_n
+    return re.search(r"(?<![a-z0-9])" + re.escape(palabra), frase_n) is not None
+
+
 def _normalizar(texto: str) -> str:
     texto = unicodedata.normalize("NFD", (texto or "").lower())
     return "".join(c for c in texto if unicodedata.category(c) != "Mn")
@@ -260,7 +275,7 @@ def para_el_modelo(frase: str = "", extras: int = 4,
         if h.nucleo:
             nucleo.append(h)
             continue
-        aciertos = sum(1 for p in h.palabras if p and p in frase_n)
+        aciertos = sum(1 for p in h.palabras if casa(p, frase_n))
         if aciertos:
             candidatas.append((aciertos, h))
     candidatas.sort(key=lambda par: -par[0])
@@ -408,6 +423,6 @@ def elegir(frase: str, cuantas: int = 10, por_palabras: int = 3,
     # Las palabras clave siguen contando: si la frase dice "whatsapp", lo de
     # WhatsApp entra aunque el vector lo haya dejado fuera.
     frase_n = _normalizar(frase)
-    extra = [h for h in candidatas if h not in elegidas
-             and any(p and p in frase_n for p in h.palabras)]
+    extra = [h for h in puntuadas if h not in elegidas
+             and any(casa(p, frase_n) for p in h.palabras)]
     return elegidas + extra[:max(0, por_palabras)]

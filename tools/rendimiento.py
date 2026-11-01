@@ -91,7 +91,7 @@ def candidatos_a_cerrar() -> list[dict]:
 @herramienta(
     "diagnostico_rendimiento",
     descripcion="Explica en una frase por qué va lento el equipo.",
-    en_plan=True, palabras=("lento", "rendimiento", "se traba", "se pega", "por que va"),
+    en_plan=True, palabras=('recursos', 'consume', 'lag', "lento", "rendimiento", "se traba", "se pega", "por que va"),
 )
 def diagnostico() -> str:
     """Por que va lento el equipo, en una frase."""

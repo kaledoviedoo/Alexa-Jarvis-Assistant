@@ -81,6 +81,7 @@ TECLAS_SIMPLES = {
     riesgo="escritura", nucleo=True, args={"texto": "Texto exacto a escribir"},
     corroboran=("escrib", "teclea", "redacta", "pon ", "ponme", "dile", "manda",
                 "mensaje", "responde", "contesta"),
+    palabras=('escribe', 'teclea', 'redacta',),
 )
 def escribir_texto(texto: str, pulsar_enter: bool = False) -> str:
     """Escribe texto en la ventana que esté activa."""
@@ -150,6 +151,7 @@ def _escribir_via_portapapeles(texto: str, pyautogui) -> None:
     args={"nombre_atajo": "copiar, pegar, guardar, minimizar todo, cambiar ventana, subir volumen..."},
     corroboran=("atajo", "pulsa", "presiona", "tecla", "copia", "pega", "guarda",
                 "minimiza", "maximiza", "volumen"),
+    palabras=('pega', 'pegar', 'copia', 'copiar', 'atajo', 'volumen', 'guarda',),
 )
 def ejecutar_atajo(nombre_atajo: str) -> str:
     """Ejecuta un atajo de teclado de la lista blanca."""
@@ -251,6 +253,7 @@ def _siguiente_nombre_captura() -> str:
 @herramienta(
     descripcion="Toma una captura de pantalla y la guarda en el escritorio.",
     riesgo="escritura", nucleo=True, args={"nombre": "Nombre opcional del archivo PNG"},
+    palabras=('captura', 'pantallazo', 'screenshot',),
 )
 def captura_pantalla(nombre: str = "") -> str:
     """Toma una captura de pantalla y la guarda en el Escritorio."""

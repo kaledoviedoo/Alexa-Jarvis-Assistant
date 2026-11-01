@@ -110,6 +110,7 @@ def _frontmatter(etiquetas: str = "") -> str:
           "etiquetas": "Etiquetas separadas por comas, sin almohadilla",
           "carpeta": "Subcarpeta del vault, opcional"},
     corroboran=("nota", "apunta", "anota", "crea", "guarda", "escrib", "boveda", "obsidian"),
+    palabras=('crea una nota', 'nota nueva', 'nota llamada',),
 )
 def crear_nota(titulo: str, contenido: str = "", etiquetas: str = "", carpeta: str = "") -> str:
     """Crea una nota nueva en el vault."""
@@ -156,6 +157,7 @@ def crear_nota(titulo: str, contenido: str = "", etiquetas: str = "", carpeta: s
     riesgo="escritura", nucleo=True,
     args={"titulo": "Título de la nota", "contenido": "Texto a añadir"},
     corroboran=("agrega", "agregue", "añade", "anade", "suma", "apunta", "anota", "mete", "nota"),
+    palabras=('agrega a la nota', 'añade a la nota',),
 )
 def agregar_a_nota(titulo: str, contenido: str) -> str:
     """Añade texto al final de una nota existente. Si no existe, la crea."""
@@ -195,6 +197,7 @@ def agregar_a_nota(titulo: str, contenido: str) -> str:
     riesgo="escritura", nucleo=True, en_plan=True,
     args={"contenido": "Lo que hay que apuntar"},
     corroboran=("diario", "apunta", "anota", "registra", "guarda", "bitacora"),
+    palabras=('diario', 'apunta', 'anota',),
 )
 def agregar_al_diario(contenido: str) -> str:
     """Añade una linea a la nota diaria de hoy, creandola si hace falta."""
@@ -243,6 +246,7 @@ def agregar_al_diario(contenido: str) -> str:
     "obsidian_buscar",
     descripcion="Busca una frase dentro de todas las notas de Obsidian.",
     nucleo=True, args={"texto": "Qué buscar en las notas"},
+    palabras=('busca en mis notas', 'en mi boveda', 'en obsidian',),
 )
 def buscar_en_vault(texto: str, limite: int = 8) -> str:
     """Busca una frase dentro de todas las notas del vault."""

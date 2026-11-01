@@ -295,6 +295,21 @@ def main() -> int:
               "'titulo | contenido' llega partido en su sitio")
 
     print()
+    print("LAS DE SIEMPRE TIENEN PALABRAS CLAVE (el banco encontro 5 que se quedaban fuera)")
+    sin = sorted(n for n in DE_SIEMPRE if not registro.obtener(n).palabras)
+    comprobar(not sin, f"las 29 de siempre tienen palabras clave ({', '.join(sin) or 'todas'})")
+    nz = registro._normalizar
+    for frase, buena in [("pega el texto copiado", "ejecutar_atajo"),
+                         ("mueve el informe.docx a documentos", "mover_archivo"),
+                         ("recuerda que prefiero las respuestas cortas", "recordar_en_contexto"),
+                         ("cuanta ram me queda", "estado_sistema"),
+                         ("por que consume tantos recursos", "diagnostico_rendimiento")]:
+        comprobar(any(registro.casa(x, nz(frase)) for x in registro.obtener(buena).palabras),
+                  f"'{frase}' llega a {buena} por palabras")
+    comprobar(not registro.casa("ram", nz("abre el programa")), "'ram' no casa dentro de 'programa'")
+    comprobar(registro.casa("añade a la nota", nz("Añade a la nota")), "las tildes y la ñ no estorban")
+
+    print()
     print("=" * 70)
     if fallos:
         print(f"  {len(fallos)} FALLOS")

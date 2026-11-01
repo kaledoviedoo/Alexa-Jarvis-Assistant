@@ -123,6 +123,7 @@ def leer_contexto() -> str:
     riesgo="escritura", nucleo=True, args={"contenido": "El dato a recordar"},
     corroboran=("recuerda", "acuerdate", "ten en cuenta", "contexto", "apunta que",
                 "no olvides", "que sepas"),
+    palabras=('recuerda que', 'ten en cuenta', 'no olvides', 'acuerdate', 'prefiero',),
 )
 def editar_contexto(contenido: str, accion: str = "agregar") -> str:
     """Permite a Jarvis añadir cosas a su propio contexto por voz."""
@@ -187,6 +188,7 @@ def info_equipo_dict() -> dict:
 @herramienta(
     descripcion="Describe este equipo: sistema, procesador, memoria, gráfica y tiempo encendido.",
     nucleo=True,
+    palabras=('que equipo tengo', 'mi computador', 'especificaciones',),
 )
 def info_equipo() -> str:
     """Descripcion hablada del equipo."""
@@ -216,6 +218,7 @@ def resumen_equipo_para_modelo() -> str:
     descripcion="Informe detallado del equipo: CPU, memoria, discos, gráfica, red y procesos. Con guardar=true lo escribe como archivo.",
     riesgo="escritura", nucleo=True,
     args={"guardar": "true para guardarlo como archivo markdown"},
+    palabras=('informe', 'reporte del equipo', 'todo del equipo',),
 )
 def informe_completo(guardar: bool = False) -> str:
     """Informe detallado del equipo."""
@@ -353,6 +356,7 @@ _CARPETAS_IGNORADAS = {
     args={"texto": "La frase o palabra a buscar dentro de los archivos",
           "carpeta": "Opcional: limitar a escritorio, descargas o documentos"},
     fuente_externa=True,
+    palabras=('donde escribi', 'dentro de los archivos', 'busca en mis archivos',),
 )
 def buscar_en_contenido(texto: str, carpeta: str = "", limite: int = 10) -> str:
     """Busca una frase DENTRO de los archivos, no solo en sus nombres."""
@@ -410,6 +414,7 @@ def buscar_en_contenido(texto: str, carpeta: str = "", limite: int = 10) -> str:
 @herramienta(
     descripcion="Recorre una carpeta y sus subcarpetas y resume qué hay: cuántos archivos, de qué tipo y qué subcarpetas.",
     nucleo=True, args={"carpeta": "escritorio, descargas o documentos"},
+    palabras=('explora', 'que hay en la carpeta', 'resume la carpeta',),
 )
 def explorar_carpeta(carpeta: str = "escritorio", profundidad: int = 2) -> str:
     """Recorre una carpeta y sus subcarpetas, y resume que hay dentro."""
@@ -457,6 +462,7 @@ def explorar_carpeta(carpeta: str = "escritorio", profundidad: int = 2) -> str:
 @herramienta(
     descripcion="Lista lo que se ha modificado últimamente. Útil para '¿en qué estaba trabajando?'.",
     nucleo=True, args={"dias": "Cuántos días atrás mirar. Por defecto 7."},
+    palabras=('recientes', 'modifique', 'he tocado', 'estaba trabajando',),
 )
 def archivos_recientes(dias: int = 7, carpeta: str = "", limite: int = 10) -> str:
     """Lista lo modificado ultimamente. Util para 'en que estaba trabajando'."""

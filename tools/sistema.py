@@ -129,6 +129,7 @@ def uso_gpu() -> str:
     "estado_sistema",
     descripcion="Devuelve el estado de CPU, memoria y tarjeta gráfica.",
     nucleo=True,
+    palabras=('ram', 'memoria', 'cpu', 'procesador', 'grafica', 'vram', 'recursos', 'consume',),
 )
 def estado_general() -> str:
     """Resumen corto de todo el equipo, pensado para decirse en voz alta."""
@@ -451,6 +452,7 @@ def _ventana_al_frente() -> str:
     descripcion="Abre un programa instalado en Windows.",
     riesgo="escritura", nucleo=True,
     args={"nombre_app": "Nombre del programa: spotify, chrome, comet, steam, calculadora, vs code..."},
+    palabras=('abre', 'inicia', 'ejecuta', 'lanza',),
 )
 def abrir_aplicacion(nombre_app: str) -> str:
     """Abre una aplicacion por su nombre hablado."""
@@ -537,6 +539,7 @@ def abrir_aplicacion(nombre_app: str) -> str:
     riesgo="escritura", nucleo=True,
     args={"nombre_app": "Nombre del programa a cerrar"},
     corroboran=("cierra", "cerrar", "cierre", "quita", "mata", "apaga", "termina", "sal de"),
+    palabras=('cierra', 'cerrar', 'mata',),
 )
 def cerrar_aplicacion(nombre_app: str) -> str:
     """Cierra una aplicacion por su nombre, tolerando la transcripcion de voz."""

@@ -178,6 +178,9 @@ def probar_modelo(ollama, modelo: str, casos: list) -> dict:
                 llamadas = mensaje.get("tool_calls") or []
                 contenido = mensaje.get("content") or ""
             except Exception as e:
+                if "does not support tools" in str(e):
+                    print("   este modelo no sabe usar herramientas: se salta")
+                    return None
                 llamadas, contenido = [], f"ERROR: {e}"
             segundos = time.perf_counter() - inicio
             if i > 1:                     # la primera incluye cargar el modelo
@@ -238,8 +241,11 @@ def main() -> int:
     resultados = []
     for modelo in modelos:
         print(f"== {modelo}")
-        resultados.append(probar_modelo(ollama, modelo, casos))
-        r = resultados[-1]
+        r = probar_modelo(ollama, modelo, casos)
+        if r is None:
+            print()
+            continue
+        resultados.append(r)
         print(f"   -> {r['aciertos']}/{r['total']} completos, {r['segundos']} s/orden, {r['vram_gb']} GB\n")
         try:
             ollama.generate(model=modelo, prompt="", keep_alive=0)   # soltar la VRAM

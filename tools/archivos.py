@@ -110,6 +110,7 @@ def _base_desde_alias(carpeta: str | None) -> Path:
           "contenido": "Contenido completo que va dentro del archivo",
           "carpeta": "Carpeta destino: escritorio, descargas o documentos. Por defecto escritorio."},
     corroboran=("crea", "crear", "cree", "hazme", "haz un", "nuevo"),
+    palabras=('crea un archivo', 'crea el archivo', 'archivo llamado', 'hazme un archivo',),
 )
 def crear_archivo(nombre_archivo: str, contenido: str = "", carpeta: str = "") -> str:
     """Crea un archivo (.py, .txt, .md, .json, .csv, .docx, .xlsx) en el equipo."""
@@ -164,6 +165,7 @@ def crear_archivo(nombre_archivo: str, contenido: str = "", carpeta: str = "") -
     descripcion="Lee el contenido de un archivo de texto existente.",
     nucleo=True, args={"nombre_archivo": "Nombre del archivo con su extensión"},
     fuente_externa=True,
+    palabras=('lee el archivo', 'leeme el archivo', 'que dice el archivo', 'abre el archivo',),
 )
 def leer_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     """Lee el contenido de un archivo de texto."""
@@ -204,6 +206,7 @@ def leer_archivo(nombre_archivo: str, carpeta: str = "") -> str:
           "buscar": "Solo para accion=reemplazar: el texto que hay que encontrar",
           "reemplazar": "Solo para accion=reemplazar: el texto nuevo"},
     corroboran=("edita", "agrega", "añade", "reemplaza", "cambia", "escrib", "modifica"),
+    palabras=('edita', 'reemplaza', 'agrega al archivo', 'cambia en el archivo',),
 )
 def editar_archivo(
     nombre_archivo: str,
@@ -276,6 +279,7 @@ def editar_archivo(
     args={"origen": "Nombre del archivo a mover",
           "destino": "Carpeta destino: escritorio, descargas, documentos o el nombre de una subcarpeta"},
     corroboran=("mueve", "mover", "mueva", "pasa", "lleva", "manda a"),
+    palabras=('mueve', 'mover', 'muevelo', 'pasalo a', 'llevalo a',),
 )
 def mover_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     """Mueve un archivo a otra carpeta."""
@@ -320,6 +324,7 @@ def mover_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     riesgo="escritura", nucleo=True,
     args={"origen": "Archivo a copiar", "destino": "Carpeta destino"},
     corroboran=("copia", "copiar", "duplica"),
+    palabras=('copia el archivo', 'duplica',),
 )
 def copiar_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     """Copia un archivo a otra carpeta."""
@@ -353,6 +358,7 @@ def copiar_archivo(origen: str, destino: str, carpeta: str = "") -> str:
     riesgo="escritura", nucleo=True,
     args={"nombre_archivo": "Nombre del archivo con su extensión"},
     corroboran=("elimina", "borra", "quita", "eliminar", "borrar"),
+    palabras=('elimina', 'borra el archivo', 'borralo',),
 )
 def eliminar_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     """Manda un archivo a la papelera interna de Jarvis."""
@@ -377,6 +383,7 @@ def eliminar_archivo(nombre_archivo: str, carpeta: str = "") -> str:
 @herramienta(
     descripcion="Lista los archivos de una carpeta.",
     nucleo=True, args={"carpeta": "escritorio, descargas o documentos"},
+    palabras=('que archivos hay', 'que hay en', 'archivos de',),
 )
 def listar_archivos(carpeta: str = "escritorio", limite: int = 15) -> str:
     """Lista los archivos de una carpeta."""
@@ -413,6 +420,7 @@ def listar_archivos(carpeta: str = "escritorio", limite: int = 15) -> str:
 @herramienta(
     descripcion="Busca archivos por nombre en el escritorio, descargas y documentos.",
     nucleo=True, args={"patron": "Parte del nombre del archivo a buscar"},
+    palabras=('busca el archivo', 'donde esta el archivo', 'encuentra el archivo',),
 )
 def buscar_archivo(patron: str, carpeta: str = "", limite: int = 10) -> str:
     """Busca archivos por nombre dentro de las carpetas permitidas."""
@@ -461,6 +469,7 @@ def buscar_archivo(patron: str, carpeta: str = "", limite: int = 10) -> str:
     riesgo="escritura", nucleo=True,
     args={"nombre": "Nombre de la carpeta", "carpeta": "Dónde crearla"},
     corroboran=("crea", "crear", "cree", "carpeta", "nueva"),
+    palabras=('crea una carpeta', 'nueva carpeta',),
 )
 def crear_carpeta(nombre: str, carpeta: str = "") -> str:
     """Crea una carpeta nueva."""
@@ -483,6 +492,7 @@ def crear_carpeta(nombre: str, carpeta: str = "") -> str:
     args={"patron": "Parte del nombre, por ejemplo 'captura' para borrar todas las capturas",
           "carpeta": "escritorio, descargas o documentos"},
     corroboran=("elimina", "borra", "quita", "eliminar", "borrar"),
+    palabras=('borra todos', 'elimina todos',),
 )
 def eliminar_varios(patron: str, carpeta: str = "", limite: int = 20) -> str:
     """Manda a la papelera todos los archivos cuyo nombre contenga el patron."""
