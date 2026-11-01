@@ -581,6 +581,30 @@ def resolver_referencia(argumentos: dict, frase: str, anterior: str) -> dict:
     return nuevos
 
 
+_HUECO = re.compile(
+    r"\[[^\[\]]*(?:resultado|result|salida|output|respuesta|lista|aqui)[^\[\]]*\]"
+    r"|\{\{?[^{}]*(?:resultado|result|salida|output)[^{}]*\}?\}"
+    r"|<[^<>]*(?:resultado|result|salida|output)[^<>]*>",
+    re.IGNORECASE,
+)
+
+
+def rellenar_huecos(argumentos: dict, ultimo: str) -> tuple[dict, str]:
+    """Cambia "[resultado de X]" por el resultado real; si no lo hay, lo señala."""
+    nuevos = dict(argumentos)
+    for clave, valor in argumentos.items():
+        if not isinstance(valor, str):
+            continue
+        m = _HUECO.search(valor)
+        if not m:
+            continue
+        if not ultimo:
+            return argumentos, m.group(0)
+        nuevos[clave] = _HUECO.sub(lambda _: ultimo, valor)
+        log.info("Relleno el hueco %r de %s con el resultado real.", m.group(0), clave)
+    return nuevos, ""
+
+
 def _sin_tildes(texto: str) -> str:
     import unicodedata
     t = unicodedata.normalize("NFD", texto or "")
@@ -596,6 +620,24 @@ def _empezar_turno() -> None:
     _turno.contaminado = False
     _turno.pregunta = ""
     _turno.ultimo_resultado = ""
+    _turno.vetos = []
+    _turno.hechas = 0
+
+
+_DICE_QUE_LO_HIZO = re.compile(
+    r"\b(?:listo|hecho|ya\s+est[aá]n?|ya\s+lo|a[nñ]adid|agregad|enviad|mandad|guardad|"
+    r"apuntad|anotad|cread|movid|borrad|cerrad|abiert)", re.IGNORECASE)
+
+
+def respuesta_honesta(contenido: str, vetos: list[str], hechas: int) -> str:
+    """Si nada que cambie algo se ejecuto y el modelo dice que si, se corrige."""
+    if not vetos or hechas or not _DICE_QUE_LO_HIZO.search(contenido or ""):
+        return ""
+    motivo = vetos[0]
+    m = re.match(r"No ejecuto (\w+): (.*?)(?:\.\s|$)", motivo)
+    if m:
+        return f"No lo hice: paré {m.group(1).replace('_', ' ')} porque {m.group(2)}."
+    return "No lo hice: el freno paró la acción."
 
 
 def _contaminado() -> bool:
@@ -680,6 +722,13 @@ def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
     # en ella; si no se leyo nada, a lo ultimo que se hablo.
     anterior = getattr(_turno, "ultimo_resultado", "") or sesion.ultima_respuesta_util()
     argumentos = resolver_referencia(argumentos, _frase_original(), anterior)
+
+    # El modelo pidio dos herramientas a la vez y en la segunda dejo un hueco
+    # para el resultado de la primera: se rellena con lo que de verdad salio.
+    argumentos, hueco_sin_dato = rellenar_huecos(argumentos, getattr(_turno, "ultimo_resultado", ""))
+    if hueco_sin_dato:
+        return (f"No ejecuto {nombre}: '{hueco_sin_dato}' es un hueco, no un dato. "
+                "Primero espera el resultado de la otra herramienta y vuelve a llamarme con el texto real.")
 
     veto = _por_que_no(nombre, argumentos) or _veto_por_dato_externo(h, argumentos)
     if veto:
@@ -785,6 +834,13 @@ def _conversar(comando: str) -> str:
                 log.info("Respuesta de relleno %r: leo el resultado de la herramienta.", contenido)
                 return ultimo_resultado
 
+            # Si el freno paro lo que se pedia y nada se hizo, "listo, ya esta"
+            # es mentira: se dice lo que paso.
+            honesta = respuesta_honesta(contenido, getattr(_turno, "vetos", []),
+                                        getattr(_turno, "hechas", 0))
+            if honesta:
+                return honesta
+
             log.info("Ollama respondió sin herramientas (paso %d)", paso)
             return limpiar_respuesta_modelo(contenido)
 
@@ -798,10 +854,14 @@ def _conversar(comando: str) -> str:
 
             resultado = _ejecutar_herramienta(nombre, argumentos)
             contenido_para_el_modelo = str(resultado)
-            if not str(resultado).startswith(("No ejecuto", "No existe")):
+            if str(resultado).startswith("No ejecuto"):
+                _turno.vetos.append(str(resultado))
+            elif not str(resultado).startswith("No existe"):
                 ultimo_resultado = str(resultado)
                 _turno.ultimo_resultado = ultimo_resultado
                 h = registro.obtener(nombre)
+                if h is not None and h.riesgo != "lectura":
+                    _turno.hechas += 1
                 if h is not None and h.riesgo == "lectura":
                     lecturas.append(str(resultado))
                 if h is not None and h.fuente_externa:
@@ -915,17 +975,19 @@ def describe_en_vez_de_actuar(contenido: str, ofrecidas: list[dict]) -> bool:
 _inicio_peticion = threading.local()
 
 
-def empezar_presupuesto() -> None:
-    """Marca el instante en que entro la peticion de Alexa."""
+def empezar_presupuesto(segundos: float | None = None) -> None:
+    """Marca el instante en que entro la peticion y cuanto se puede esperar."""
     _inicio_peticion.valor = time.perf_counter()
+    _inicio_peticion.limite = segundos or PRESUPUESTO_SEGUNDOS
 
 
 def restante_del_presupuesto() -> float:
-    """Segundos que quedan antes de que Alexa se rinda."""
+    """Segundos que quedan antes de que quien pregunta se rinda."""
     inicio = getattr(_inicio_peticion, "valor", None)
+    limite = getattr(_inicio_peticion, "limite", PRESUPUESTO_SEGUNDOS)
     if inicio is None:
-        return PRESUPUESTO_SEGUNDOS
-    return max(0.0, PRESUPUESTO_SEGUNDOS - (time.perf_counter() - inicio))
+        return limite
+    return max(0.0, limite - (time.perf_counter() - inicio))
 
 
 def _terminar_en_segundo_plano(identificador: str, resumen: str, comando: str) -> None:

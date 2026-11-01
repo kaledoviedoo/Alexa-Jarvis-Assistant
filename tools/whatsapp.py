@@ -270,7 +270,10 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     descripcion="Abre una conversación de WhatsApp Web sin escribir nada.",
     riesgo="escritura", necesita=("windows",),
     args={"nombre": "Nombre del contacto o del grupo"},
-    corroboran=("abre", "chat", "whatsapp", "entra", "conversacion"),
+    # Abrir el chat es el primer paso de mandar algo: "mandale a familia"
+    # tambien lo pide.
+    corroboran=("abre", "chat", "whatsapp", "entra", "conversacion",
+                "manda", "envia", "dile", "escribele", "avisa"),
     palabras=("whatsapp", "chat", "conversacion"),
 )
 def abrir_chat(nombre: str) -> str:

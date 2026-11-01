@@ -292,11 +292,21 @@ def _segunda_oportunidad(texto: str) -> tuple[str | None, str]:
 
 def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
     """Resuelve un comando. Primero el router rápido, luego el LLM."""
+    return procesar_con_origen(texto, datos_alexa)[0]
+
+
+def procesar_con_origen(texto: str, datos_alexa: dict | None = None,
+                        presupuesto: float | None = None) -> tuple[str, str]:
+    """Como procesar_comando, pero dice tambien quien lo resolvio.
+
+    `presupuesto` es cuanto se puede esperar al modelo antes de mandarlo a
+    segundo plano: los 6,5 s de Alexa por defecto, mas desde PowerShell.
+    """
     inicio = time.perf_counter()
     log.info("Comando recibido: %r", texto)
 
     # El presupuesto empieza a contar AQUI, no cuando llamemos al modelo.
-    ollama_client.empezar_presupuesto()
+    ollama_client.empezar_presupuesto(presupuesto)
 
     # Una orden de varios pasos ("revisa mis correos y mandale un resumen a
     # juan") va entera al modelo: el router resolveria solo la primera parte.
@@ -336,7 +346,7 @@ def procesar_comando(texto: str, datos_alexa: dict | None = None) -> str:
     except Exception as e:
         log.debug("No pude registrar la orden para aprender: %s", e)
 
-    return respuesta
+    return respuesta, origen
 
 
 def limpiar_para_voz(texto: str) -> str:
@@ -502,17 +512,25 @@ async def probar(request: Request, cuerpo: dict):
         return {"error": "Falta el campo 'comando'."}
 
     inicio = time.perf_counter()
-    respuesta = await asyncio.to_thread(procesar_comando, comando)
+    # PowerShell no corta a los 8 s como Alexa: se espera al modelo hasta
+    # PRESUPUESTO_PROBAR antes de mandarlo a segundo plano.
+    respuesta, origen = await asyncio.to_thread(
+        procesar_con_origen, comando, None, PRESUPUESTO_PROBAR)
 
     # charset explicito: sin el, PowerShell 5 lee el JSON como Latin-1 y
     # las tildes salen rotas ("funciÃ³n").
+    # El origen lo dice quien lo resolvio. Antes se volvia a pasar la orden
+    # por el router para averiguarlo, y el router la EJECUTABA otra vez.
     return JSONResponse({
         "comando": comando,
         "respuesta": respuesta,
         "voz": limpiar_para_voz(respuesta),
         "milisegundos": round((time.perf_counter() - inicio) * 1000),
-        "resuelto_por": "router" if nlu.enrutar(comando) is not None else "modelo",
+        "resuelto_por": origen,
     }, media_type="application/json; charset=utf-8")
+
+
+PRESUPUESTO_PROBAR = 50.0
 
 
 @app.post("/")

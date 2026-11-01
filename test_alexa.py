@@ -419,6 +419,27 @@ def probar_rutas_locales() -> list[str]:
             fallos.append(f"{nombre}: {respuesta.status_code}, se esperaba {esperado}")
             print(f"  FALLO  {nombre} -> {respuesta.status_code}")
 
+    # /probar ejecuta la orden UNA vez y dice quien la resolvio de verdad.
+    # Antes volvia a pasarla por el router para averiguarlo, y la repetia.
+    import nlu
+    original_enrutar, llamadas = nlu.enrutar, []
+
+    def contar(texto):
+        llamadas.append(texto)
+        return original_enrutar(texto)
+
+    nlu.enrutar = contar
+    try:
+        datos = cliente.post("/probar", json={"comando": "en qué modo estás"}, headers=CON_LLAVE).json()
+    finally:
+        nlu.enrutar = original_enrutar
+    if len(llamadas) == 1 and datos.get("resuelto_por") == "router":
+        print("  OK     POST /probar ejecuta la orden una sola vez y dice que fue el router")
+    else:
+        fallos.append(f"/probar paso la orden por el router {len(llamadas)} veces "
+                      f"(resuelto_por={datos.get('resuelto_por')})")
+        print(f"  FALLO  /probar paso la orden por el router {len(llamadas)} veces")
+
     salud = cliente.get("/salud").json()
     if set(salud) == {"servidor"}:
         print("  OK     GET /salud sin llave no cuenta nada del equipo")
