@@ -338,10 +338,9 @@ dialog p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
     <button class="icono" id="abrir-lateral" aria-label="Abrir historial">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
     </button>
-    <div class="marca"><div class="logo">J</div>Jarvis</div>
+    <div class="marca">Jarvis</div>
     <span class="espacio"></span>
     <div id="estado">conectando…</div>
-    <div class="avatar" id="avatar">K</div>
   </header>
 
   <section id="zona">
@@ -685,7 +684,6 @@ async function refrescarEstado() {
     $("#tarjeta-lat").hidden = s.lugar !== "local";
     if (s.nombre) {
       $("#saludo").textContent = `¡Bienvenido de nuevo, ${s.nombre}!`;
-      $("#avatar").textContent = s.nombre.trim().charAt(0).toUpperCase();
     }
     const ids = historial.map((c) => c.id).join();
     historial = s.conversacion || [];
