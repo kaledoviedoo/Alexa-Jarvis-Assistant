@@ -155,6 +155,26 @@ def main() -> int:
               "el modelo oye que parte le falta")
     comprobar(ollama_client.pasos_sin_hacer("mira que ventanas tengo y apunta en el diario cuales son",
                                             ["prueba_diario"]) == [], "hecha la parte, no falta nada")
+
+    print("\nINSISTIDO Y SIGUE SIN HACERLO: LO HACE JARVIS O LO DICE")
+    # con dos diarios (el real y el de prueba) no elegiria: se aparta el real
+    diario_real = registro.cargar().pop("obsidian_agregar_al_diario", None)
+    apuntado.clear()
+    guion[:] = [_llamada("prueba_ventanas"),
+                {"message": {"content": "Tienes Steam y Claude abiertos."}},
+                {"message": {"content": "Ya lo hice en tu diario."}}]
+    respuesta = ollama_client._conversar("mira que ventanas tengo y apunta en el diario cuales son")
+    comprobar(apuntado == ["Tienes 2 ventanas: Steam y Claude."], f"apunta lo que se leyo ({apuntado})")
+    comprobar("Steam y Claude" in respuesta and "Apuntado" in respuesta and "Ya lo hice" not in respuesta,
+              f"dice lo que de verdad paso ('{respuesta[:80]}')")
+
+    apuntado.clear()
+    guion[:] = [{"message": {"content": "Listo."}}, {"message": {"content": "Ya lo hice en tu diario."}}]
+    respuesta = ollama_client._conversar("mira que ventanas tengo y apunta en el diario cuales son")
+    comprobar(apuntado == [] and respuesta.startswith("Me faltó esta parte: «apunta en el diario"),
+              f"sin nada leido no inventa: dice que falto ('{respuesta[:70]}')")
+    if diario_real is not None:
+        registro.cargar()["obsidian_agregar_al_diario"] = diario_real
     comprobar(ollama_client.pasos_sin_hacer("abre spotify y busca tame impala", []) == [],
               "'...y busca' no es una parte que cambie algo")
 

@@ -778,6 +778,44 @@ def pasos_sin_hacer(frase: str, hechas: list[str]) -> list[str]:
     return faltan
 
 
+def completar_o_decir(faltan: list[str]) -> str:
+    """Ya se insistio y el modelo sigue sin hacer una parte de la orden.
+
+    Si la parte es apuntar algo sencillo (una herramienta de escritura con un
+    solo dato, cuyas palabras encajan, como el diario) y ya se leyo lo que hay
+    que apuntar, lo hace Jarvis con eso. Si no, dice que parte falto: nunca
+    "ya lo hice" sin haberlo hecho.
+    """
+    lecturas = getattr(_turno, "lecturas", [])
+    hecho, falto = [], []
+    for parte in faltan:
+        n = registro._normalizar(parte)
+        candidatas = [h for h in registro.cargar().values()
+                      if h.riesgo == "escritura" and h.corroboran and len(h.requeridos) == 1
+                      and pide_la_accion(parte, h.corroboran)
+                      and any(registro.casa(p, n) for p in h.palabras)]
+        if len(candidatas) == 1 and lecturas:
+            h = candidatas[0]
+            texto = " ".join(lecturas)[:MAX_CARACTERES_DIRECTA]
+            log.warning("El modelo no hizo '%s' tras insistir: lo hago yo con %s.", parte, h.nombre)
+            resultado = str(_ejecutar_herramienta(h.nombre, {h.requeridos[0]: texto}))
+            if not resultado.startswith("No ") and "VERIFICACION FALLIDA" not in resultado:
+                _turno.hechos.append((h.nombre, resultado))
+                hecho.append(resultado.split("\n")[0][:120])
+                continue
+        falto.append(parte)
+
+    frases = []
+    if lecturas:
+        frases.append(lecturas[-1].split("\n")[0][:300].rstrip("."))
+    frases += hecho
+    if falto:
+        log.warning("Partes que el modelo no hizo: %s", falto)
+        frases.append("Me faltó esta parte: «" + "» y «".join(falto) +
+                      "». Pídemela otra vez o prueba en modo dedicado")
+    return ". ".join(f.rstrip(". ") for f in frases if f.strip(". ")) + "."
+
+
 def informe_de_parada(motivo: str, hechos: list) -> str:
     """Lo que se dice cuando la orden se para a medias: que salio y que no."""
     if hechos:
@@ -986,6 +1024,8 @@ def _conversar(comando: str) -> str:
                     "Te falta hacer esto de la orden: " + "; ".join(faltan) +
                     ". Hazlo ahora con la herramienta que toque, usando lo que ya encontraste."})
                 continue
+            if faltan and getattr(_turno, "insistido_pasos", False) and not _turno.vetos:
+                return completar_o_decir(faltan)
 
             # Si el freno paro lo que se pedia y nada se hizo, "listo, ya esta"
             # es mentira: se dice lo que paso.
