@@ -181,6 +181,38 @@ def main() -> int:
     for n in ("prueba_diario2", "prueba_ventanas"):
         registro._registro.pop(n, None)
 
+    print("\nEL DESTINATARIO SE SACA DE LA FRASE")
+    ep = ollama_client.envio_pendiente
+    for frase, esperado in [
+        ("mira que ventanas tengo abiertas y mandale a familia por whatsapp cuales son", ("enviar_mensaje", "familia")),
+        ("lee mi ultimo correo y mandale un resumen a juan", ("enviar_mensaje", "juan")),
+        ("escribele a mi mama que llego en 10", ("enviar_mensaje", "mi mama")),
+        ("revisa el informe y mandaselo por correo a la profe", ("enviar_correo", "la profe")),
+    ]:
+        comprobar(ep(frase) == esperado, f"'{frase[:45]}' -> {ep(frase)}")
+    comprobar(ep("mi hermano me manda mensajes todo el dia") is None, "una charla no pide enviar")
+
+    print("\nSI PROMETE ENVIAR Y NO LO HACE: SE INSISTE Y, SI NO, LO PREPARA JARVIS")
+    confirmaciones.olvidar(); enviados.clear()
+    original_ep = ollama_client.envio_pendiente
+    ollama_client.envio_pendiente = lambda f: ("prueba_enviar", "familia") if "mandale" in f else None
+    try:
+        @registro.herramienta("prueba_ventanas2", descripcion="Lista ventanas (prueba).", palabras=("ventanas",))
+        def _ventanas2() -> str:
+            return "Tienes 2 ventanas: Steam y Claude."
+
+        guion[:] = [_llamada("prueba_ventanas2"),
+                    {"message": {"content": "Ahora mando a Familia la lista de ventanas."}},
+                    {"message": {"content": "Ya te dije que lo mando."}}]
+        respuesta = ollama_client._conversar("mira que ventanas tengo abiertas y mandale a familia cuales son")
+        comprobar(respuesta.startswith("¿Le mando a familia: 'Tienes 2 ventanas"),
+                  f"tras insistir sin exito, Jarvis prepara el envio con lo leido ('{respuesta[:55]}')")
+        comprobar(not enviados and confirmaciones.hay_pendiente(), "y sigue sin enviar hasta el si")
+        confirmaciones.olvidar()
+    finally:
+        ollama_client.envio_pendiente = original_ep
+        registro._registro.pop("prueba_ventanas2", None)
+
     print("\nENVIAR SOLO SE OFRECE SI SE PIDE")
     r = ollama_client.riesgos_para
     comprobar("externa" in r("mandale un whatsapp a familia"), "'mandale un whatsapp' ofrece enviar")
