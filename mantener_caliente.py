@@ -289,8 +289,35 @@ def _funnel_publicado() -> str:
         log.debug("No pude consultar el Funnel: %s", e)
         return ""
 
-    encontrado = re.search(r"https://([a-z0-9-]+\.[a-z0-9.-]+\.ts\.net)", salida, re.I)
-    return encontrado.group(1) if encontrado else ""
+    publicados = nombres_publicados(salida)
+    return publicados[0] if publicados else ""
+
+
+def nombres_publicados(salida: str) -> list[str]:
+    """Todos los nombres que publica el Funnel, sin repetir.
+
+    Un equipo renombrado en Tailscale puede seguir publicandose con el nombre
+    viejo y el nuevo a la vez, y los dos llegan aqui.
+    """
+    import re
+    vistos = []
+    for nombre in re.findall(r"https://([a-z0-9-]+\.[a-z0-9.-]+\.ts\.net)", salida or "", re.I):
+        if nombre.lower() not in vistos:
+            vistos.append(nombre.lower())
+    return vistos
+
+
+def _salida_funnel() -> str:
+    import subprocess
+    try:
+        return subprocess.run(
+            ["tailscale", "funnel", "status"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=(subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0),
+        ).stdout
+    except Exception as e:
+        log.debug("No pude consultar el Funnel: %s", e)
+        return ""
 
 
 def comprobar_camino_publico() -> tuple[bool, str]:
@@ -315,11 +342,13 @@ def comprobar_camino_publico() -> tuple[bool, str]:
         return False, f"JARVIS_TUNEL_URL no parece una direccion: {TUNEL_URL}"
 
     resuelve = bool(_resolver_por_dns_publico(configurado))
-    publicado = _funnel_publicado()
+    publicados = nombres_publicados(_salida_funnel())
+    publicado = publicados[0] if publicados else ""
 
     # El caso que nos costo la tarde: el nombre del .env ya no existe, pero
-    # Tailscale esta publicando otro. Podemos decir exactamente cual.
-    if publicado and publicado.lower() != configurado.lower():
+    # Tailscale esta publicando otro. Podemos decir exactamente cual. Si el
+    # del .env esta entre los publicados, no hay nada que arreglar.
+    if publicados and configurado.lower() not in publicados:
         return False, (
             f"El .env apunta a {configurado}, pero Tailscale esta publicando "
             f"{publicado}. Cambia JARVIS_TUNEL_URL a https://{publicado} y "

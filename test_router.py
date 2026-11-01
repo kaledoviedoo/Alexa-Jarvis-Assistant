@@ -408,12 +408,14 @@ def probar_camino_publico() -> list[str]:
     print("  EL CAMINO POR EL QUE ENTRA ALEXA")
     print("-" * 70)
 
-    guardados = (mc.TUNEL_URL, mc._resolver_por_dns_publico, mc._funnel_publicado)
+    guardados = (mc.TUNEL_URL, mc._resolver_por_dns_publico, mc._salida_funnel)
     casos = [
         ("renombraste el equipo",
          "viejo.tail1.ts.net", False, "nuevo.tail1.ts.net", False, "nuevo.tail1.ts.net"),
         ("todo en orden",
          "pc.tail1.ts.net", True, "pc.tail1.ts.net", True, ""),
+        ("dos nombres publicados, el .env usa uno",
+         "mi-pc.tail1.ts.net", True, "pc-viejo.tail1.ts.net mi-pc.tail1.ts.net", True, ""),
         ("Funnel puesto, DNS sin propagar",
          "pc.tail1.ts.net", False, "pc.tail1.ts.net", False, "vuelve a lanzarlo"),
         ("Tailscale caido",
@@ -426,7 +428,8 @@ def probar_camino_publico() -> list[str]:
         for etiqueta, url, resuelve, publicado, debe_ir_bien, pista in casos:
             mc.TUNEL_URL = f"https://{url}" if url else ""
             mc._resolver_por_dns_publico = lambda h, r=resuelve: (["1.2.3.4"] if r else [])
-            mc._funnel_publicado = lambda p=publicado: p
+            mc._salida_funnel = lambda p=publicado: "\n".join(
+                f"https://{n} (Funnel on)" for n in p.split())
 
             bien, detalle = mc.comprobar_camino_publico()
 
@@ -443,7 +446,7 @@ def probar_camino_publico() -> list[str]:
             else:
                 print(f"  OK     {etiqueta:<34} -> {'sigue' if bien else 'avisa y explica'}")
     finally:
-        mc.TUNEL_URL, mc._resolver_por_dns_publico, mc._funnel_publicado = guardados
+        mc.TUNEL_URL, mc._resolver_por_dns_publico, mc._salida_funnel = guardados
 
     return fallos
 
