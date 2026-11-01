@@ -466,6 +466,13 @@ def _rutina_crear(m):
     return rutinas.crear_desde_frase(m.group("frase"))
 
 
+def _recordatorio_a_alexa(m) -> str:
+    # Sin esto la frase llegaba al modelo, que contestaba "listo" sin poder
+    # crear nada.
+    return ("Los recordatorios llévalos con Alexa, que suena en el Echo y en el celular "
+            "aunque el PC esté apagado. Di «pausa» y luego «Alexa, recuérdame…».")
+
+
 def _rutinas_listar(m) -> str:
     import rutinas
     return rutinas.listar()
@@ -1312,18 +1319,18 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         re.compile(r"\b(?P<acc>apaga|desactiva|deten|para|pausa|quita|cancela|enciende|activa|prende|"
                    r"reactiva|vuelve\s+a\s+activar|borra|elimina)\s+"
                    r"(?P<todas>todas\s+las\s+|todos\s+los\s+)?(?:la\s+|el\s+|las\s+|los\s+|mi\s+|mis\s+)?"
-                   r"(?:rutinas?|recordatorios?)\b(?:\s+(?:de|del|que|para))?\s*(?P<nombre>.*)$", _F),
+                   r"(?:rutinas?)\b(?:\s+(?:de|del|que|para))?\s*(?P<nombre>.*)$", _F),
         _rutina_estado,
     ),
     (
-        re.compile(r"\b(?:que|cuales)\s+(?:rutinas|recordatorios)\b|\b(?:mis|las)\s+(?:rutinas|recordatorios)\s*$|"
-                   r"\blista(?:me)?\s+(?:las\s+|mis\s+)?(?:rutinas|recordatorios)\b|"
+        re.compile(r"\b(?:que|cuales)\s+rutinas\b|\b(?:mis|las)\s+rutinas\s*$|"
+                   r"\blista(?:me)?\s+(?:las\s+|mis\s+)?rutinas\b|"
                    r"\bque\s+(?:tengo\s+|hay\s+)?programado\b", _F),
         _rutinas_listar,
     ),
     (
-        re.compile(r"^(?P<frase>.*\b(?:recuerdame|recordarme|recuerdeme|avisame|aviseme|recordatorio)\b.*)$", _F),
-        _rutina_crear,
+        re.compile(r"\b(?:recuerdame|recordarme|recuerdeme|recordatorios?)\b", _F),
+        _recordatorio_a_alexa,
     ),
     (
         re.compile(r"^(?P<frase>(?:todos\s+los|todas\s+las|cada|de\s+lunes\s+a\s+viernes|entre\s+semana|"

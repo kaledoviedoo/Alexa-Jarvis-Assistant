@@ -152,51 +152,54 @@ def main() -> int:
     rutinas.pc_libre = original
 
     # ------------------------------------------------------------------
-    print("\nRECORDATORIOS Y RUTINAS POR VOZ")
+    print("\nORDENES PROGRAMADAS POR VOZ")
     domingo = datetime(2026, 11, 1, 15, 0)
     casos = [
-        ("todos los lunes a las 8 recuérdame revisar GPIN", "revisar GPIN", "los lunes a las 8:00"),
-        ("recuérdame en 20 minutos sacar la ropa", "sacar la ropa", "hoy a las 15:20"),
-        ("recuérdame a las 5 llamar a mamá", "llamar a mamá", "hoy a las 17:00"),
-        ("mañana a las 7 de la mañana recuérdame el parcial de redes", "el parcial de redes", "mañana a las 7:00"),
-        ("los lunes y miércoles a las 6 y media de la tarde recuérdame ir al gimnasio",
-         "ir al gimnasio", "los lunes y miércoles a las 18:30"),
-        ("de lunes a viernes a las 9:30 recuérdame tomar agua", "tomar agua", "de lunes a viernes a las 9:30"),
-        ("el viernes a las 3 recuérdame entregar el taller", "entregar el taller", "el 6/11 a las 15:00"),
-        ("avísame en una hora que saque la pizza", "saque la pizza", "hoy a las 16:00"),
         ("cada día a las 7 investiga noticias de inteligencia artificial",
          "investiga noticias de inteligencia artificial", "todos los días a las 7:00"),
+        ("todos los lunes a las 8 revisa mis correos sin leer", "revisa mis correos sin leer",
+         "los lunes a las 8:00"),
+        ("de lunes a viernes a las 6 y media de la tarde dime cómo está el equipo",
+         "dime cómo está el equipo", "de lunes a viernes a las 18:30"),
+        ("los lunes y miércoles a las 9:30 busca ofertas de rtx 4060", "busca ofertas de rtx 4060",
+         "los lunes y miércoles a las 9:30"),
     ]
     for frase, que, cuando in casos:
         r = rutinas.interpretar(frase, domingo)
-        ok = isinstance(r, dict) and (r.get("aviso") or r.get("orden")) == que and rutinas.describir(r, domingo) == cuando
+        ok = isinstance(r, dict) and r.get("orden") == que and rutinas.describir(r, domingo) == cuando
         comprobar(ok, f"'{frase}' -> {que} | {cuando}"
-                  + ("" if ok else f"  (salio {r if isinstance(r, str) else (r.get('aviso') or r.get('orden'), rutinas.describir(r, domingo)) if r else None})"))
-    comprobar("orden" in rutinas.interpretar(casos[-1][0], domingo), "sin 'recuérdame' es una orden")
-    comprobar(rutinas.interpretar(casos[-1][0], domingo)["riesgos"] == ["lectura"],
-              "y una orden creada por voz solo puede mirar")
-    comprobar("¿A qué hora?" in rutinas.interpretar("todos los lunes recuérdame revisar GPIN", domingo),
+                  + ("" if ok else f"  (salio {r if isinstance(r, str) else (r.get('orden'), rutinas.describir(r, domingo)) if r else None})"))
+    comprobar(rutinas.interpretar(casos[0][0], domingo)["riesgos"] == ["lectura"],
+              "una orden creada por voz solo puede mirar")
+    comprobar("¿A qué hora?" in rutinas.interpretar("todos los lunes revisa mis correos", domingo),
               "sin hora, la pregunta")
-    comprobar("¿Cuándo te lo recuerdo?" in rutinas.interpretar("recuérdame comprar leche", domingo),
-              "sin cuando, la pregunta")
     for frase in ("cada vez que abro chrome va lento", "todos los archivos pdf muévelos a documentos",
-                  "recuerda que prefiero las respuestas cortas"):
+                  "recuerda que prefiero las respuestas cortas", "todos los lunes a las 8 recuérdame revisar GPIN",
+                  "recuérdame a las 5 llamar a mamá"):
         comprobar(rutinas.interpretar(frase, domingo) is None, f"'{frase}' no es una rutina")
 
+    print("\nLOS RECORDATORIOS SON COSA DE ALEXA")
+    for frase in ("recuérdame en 20 minutos sacar la ropa", "todos los lunes a las 8 recuérdame revisar GPIN",
+                  "qué recordatorios tengo"):
+        respuesta = nlu.enrutar(frase) or ""
+        comprobar("con Alexa" in respuesta and "Listo" not in respuesta,
+                  f"'{frase}' -> lo manda a Alexa, sin decir 'listo'")
+
     print("\nEL ROUTER LAS ENTIENDE")
-    respuesta = nlu.enrutar("todos los lunes a las 8 recuérdame revisar GPIN")
-    comprobar(respuesta == "Listo: los lunes a las 8:00 te recuerdo revisar GPIN.", f"crear ('{respuesta}')")
-    comprobar(any(r.get("aviso") == "revisar GPIN" for r in rutinas.cargar()), "y queda guardada")
+    respuesta = nlu.enrutar("todos los lunes a las 8 revisa mis correos sin leer")
+    comprobar(respuesta == "Listo: los lunes a las 8:00 haré esto: revisa mis correos sin leer. Te aviso con el resultado.",
+              f"crear ('{respuesta}')")
+    comprobar(any(r.get("orden") == "revisa mis correos sin leer" for r in rutinas.cargar()), "y queda guardada")
     respuesta = nlu.enrutar("qué rutinas tengo")
-    comprobar(respuesta.startswith("Tienes 6 rutinas activas") and "revisar gpin" in respuesta,
+    comprobar(respuesta.startswith("Tienes 6 rutinas activas") and "revisa mis correos" in respuesta,
               f"listar ('{respuesta[:60]}')")
     respuesta = nlu.enrutar("apaga la rutina de buenos días")
     comprobar(respuesta == "Apagué la rutina buenos dias.", f"apagar ('{respuesta}')")
     comprobar(not next(r for r in rutinas.cargar() if r["nombre"] == "buenos dias")["activa"], "y queda apagada")
     respuesta = nlu.enrutar("enciende la rutina de buenos días")
     comprobar(respuesta == "Encendí la rutina buenos dias.", f"encender ('{respuesta}')")
-    respuesta = nlu.enrutar("borra el recordatorio de GPIN")
-    comprobar(respuesta.startswith("Borré la rutina revisar gpin"), f"borrar ('{respuesta}')")
+    respuesta = nlu.enrutar("borra la rutina de correos")
+    comprobar(respuesta.startswith("Borré la rutina revisa mis correos"), f"borrar ('{respuesta}')")
     respuesta = nlu.enrutar("apaga todas las rutinas")
     comprobar(respuesta.startswith("Apagué las rutinas") and not any(r["activa"] for r in rutinas.cargar()),
               "apagar todas")
@@ -263,6 +266,10 @@ def main() -> int:
         texto = rutinas.modo_juego(r, est, nada)
         comprobar(cambios == ["gaming", "normal"] and texto == "Cerraste el juego: volví al modo normal.",
                   f"al cerrarlo, vuelve al modo de antes ('{texto}')")
+        fondo = [("wallpaper64.exe", r"C:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe")]
+        comprobar(rutinas.juego_abierto(fondo) is None, "Wallpaper Engine no es un juego")
+        comprobar(rutinas.juego_abierto([("x.exe", r"D:\steamapps\common\Mi Herramienta\x.exe")],
+                                        ignorar=["mi herramienta"]) is None, "y se puede ignorar otra desde el YAML")
         steam = [("game.exe", r"D:\SteamLibrary\steamapps\common\Hollow Knight\hollow_knight.exe")]
         comprobar(rutinas.juego_abierto(steam) == "Hollow Knight", "reconoce un juego de Steam por su carpeta")
     finally:

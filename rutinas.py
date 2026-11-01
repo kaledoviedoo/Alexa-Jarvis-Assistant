@@ -484,7 +484,14 @@ def disco_lleno(r: dict, est: dict) -> str | None:
     return texto
 
 
-def juego_abierto(procesos=None) -> str | None:
+# Cosas que Steam instala en steamapps\common y que no son juegos: Wallpaper
+# Engine, sobre todo, corre todo el dia y dejaba Jarvis en modo gaming.
+NO_SON_JUEGOS = ("wallpaper_engine", "wallpaper engine", "steamworks shared", "steamvr",
+                 "steam controller configs", "steam linux runtime", "proton", "soundpad",
+                 "lossless scaling", "obs studio", "rpg maker", "blender", "aseprite")
+
+
+def juego_abierto(procesos=None, ignorar=()) -> str | None:
     """El juego que esta corriendo (Valorant o uno de Steam), o None."""
     if procesos is None:
         import psutil
@@ -500,14 +507,16 @@ def juego_abierto(procesos=None) -> str | None:
             return "Valorant"
         if "\\steamapps\\common\\" in e:
             juego = e.split("\\steamapps\\common\\", 1)[1].split("\\", 1)[0]
-            return juego.title() if juego else "un juego de Steam"
+            if not juego or any(x in juego for x in NO_SON_JUEGOS + tuple(i.lower() for i in ignorar)):
+                continue
+            return juego.title()
     return None
 
 
 def modo_juego(r: dict, est: dict, procesos=None) -> str | None:
     """Al abrir un juego pasa a gaming; al cerrarlo vuelve al modo de antes."""
     import modes
-    juego = juego_abierto(procesos)
+    juego = juego_abierto(procesos, r["disparador"].get("ignorar") or ())
     if juego:
         est["sin_juego"] = 0
         if est.get("juego"):
@@ -724,7 +733,11 @@ def interpretar(frase: str, ahora: datetime | None = None) -> dict | str | None:
     ahora = ahora or datetime.now()
     plano = _plano(frase)
 
-    m_clave = RE_CLAVE.search(plano)
+    # Los recordatorios los lleva Alexa (suena en el Echo y en el celular
+    # aunque el PC este apagado): aqui solo se programan ordenes.
+    if RE_CLAVE.search(plano):
+        return None
+    m_clave = None
     m_dias = RE_DIAS.search(plano)
     m_hora = RE_HORA.search(plano)
     m_medio = RE_MEDIODIA.search(plano) if not m_hora else None
