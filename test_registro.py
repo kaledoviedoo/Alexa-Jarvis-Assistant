@@ -124,6 +124,24 @@ def main() -> int:
               "las pistas del freno salen del registro")
 
     print()
+    print("EL PROMPT CABE EN EL CONTEXTO DE CADA MODO")
+    import modes
+    original = registro.disponible
+    registro.disponible = lambda h: True
+    try:
+        frase = "lee mis correos y mira que ventanas tengo y busca en mis notas y en internet"
+        sistema = [{"role": "system", "content": ollama_client.construir_prompt_sistema()},
+                   {"role": "user", "content": frase}]
+        for modo, perfil in modes.PERFILES.items():
+            extras = ollama_client._extras_para(perfil["num_ctx"])
+            ofrecidas = registro.esquemas(registro.para_el_modelo(frase, extras))
+            usados = ollama_client.tokens_estimados(sistema, ofrecidas)
+            comprobar(usados <= perfil["num_ctx"] * 0.85,
+                      f"modo {modo}: ~{usados} tokens de {perfil['num_ctx']} (con {extras} extras)")
+    finally:
+        registro.disponible = original
+
+    print()
     print("SE LE INSISTE AL MODELO QUE DESCRIBE EN VEZ DE ACTUAR")
     ofrecidas = ollama_client.herramientas_para("tengo algun programa de steam en las ventanas")
     casos = [

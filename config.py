@@ -124,8 +124,10 @@ PERFILES = {
         "nombre_hablado": "normal",
         "modelo": _env("JARVIS_MODELO_NORMAL", "llama3.2:3b"),
         "num_gpu": -1,
-        "num_ctx": 4096,
-        # ~2 GB en VRAM. Deja la GPU casi libre y responde en 1-2 segundos.
+        # 8192 y no 4096: el prompt del sistema mas los esquemas de las
+        # herramientas pasan de 4.700 tokens, y con 4096 Ollama recortaba el
+        # principio, justo las reglas. ~3 GB en VRAM con este contexto.
+        "num_ctx": 8192,
         "keep_alive": "30m",
         "temperatura": 0.3,
         "descripcion": "Modelo ligero siempre caliente. Respuestas casi instantáneas.",
@@ -144,7 +146,9 @@ PERFILES = {
         "nombre_hablado": "gaming",
         "modelo": _env("JARVIS_MODELO_GAMING", "llama3.2:3b"),
         "num_gpu": 0,  # <- la clave: cero capas en GPU, VRAM libre para el juego
-        "num_ctx": 2048,
+        # Igual que en normal: con 2048 el modelo no veia ni sus reglas.
+        # En CPU, mas contexto es mas lento, pero no ciego.
+        "num_ctx": 6144,
         "keep_alive": "10m",
         "temperatura": 0.3,
         "descripcion": "Suelta la RTX 3050 por completo. Jarvis corre en CPU.",

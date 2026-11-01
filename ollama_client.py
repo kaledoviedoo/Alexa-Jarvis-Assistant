@@ -167,11 +167,8 @@ HERRAMIENTAS = registro.esquemas(registro.para_el_modelo(""))   # solo el nucleo
 
 def _extras_para(num_ctx: int) -> int:
     """Cuantas herramientas fuera del nucleo caben segun el contexto del modo."""
-    if num_ctx <= 2048:
-        return 2
-    if num_ctx <= 4096:
-        return 4
-    return 8
+    # Solo el nucleo ya son ~3.000 tokens y el prompt del sistema ~1.700.
+    return 8 if num_ctx >= 8192 else 2
 
 
 def herramientas_para(comando: str) -> list[dict]:
@@ -423,6 +420,7 @@ def _conversar(comando: str) -> str:
 
     ofrecidas = herramientas_para(comando)
     log.info("Ofrezco %d herramientas al modelo", len(ofrecidas))
+    _avisar_si_no_cabe(mensajes, ofrecidas, perfil)
     insistido = False
 
     for paso in range(MAX_PASOS_TOOLS):
@@ -462,6 +460,11 @@ def _conversar(comando: str) -> str:
                 mensajes.append({"role": "user", "content": INSISTIR})
                 continue
 
+            if insistido and describe_en_vez_de_actuar(contenido, ofrecidas):
+                log.warning("Tras insistir, el modelo sigue describiendo: %r", contenido[:120])
+                return ("No me salió esa. Dímela más directa, o cambia a modo "
+                        "dedicado, que razona mejor.")
+
             log.info("Ollama respondió sin herramientas (paso %d)", paso)
             return limpiar_respuesta_modelo(contenido)
 
@@ -481,6 +484,26 @@ def _conversar(comando: str) -> str:
             })
 
     return "Di demasiadas vueltas con esa orden y preferí parar."
+
+
+# Caracteres por token en español, tirando a la baja para no quedarse corto.
+CARACTERES_POR_TOKEN = 3.5
+
+
+def tokens_estimados(mensajes: list[dict], ofrecidas: list[dict]) -> int:
+    texto = sum(len(str(m.get("content", ""))) for m in mensajes)
+    esquemas = len(json.dumps(ofrecidas, ensure_ascii=False))
+    return int((texto + esquemas) / CARACTERES_POR_TOKEN)
+
+
+def _avisar_si_no_cabe(mensajes: list[dict], ofrecidas: list[dict], perfil: dict) -> None:
+    """Si el prompt no cabe, Ollama recorta el principio sin decir nada."""
+    estimados = tokens_estimados(mensajes, ofrecidas)
+    limite = int(perfil.get("num_ctx", 4096))
+    if estimados > limite * 0.85:
+        log.warning("El prompt ocupa ~%d tokens y el contexto es de %d: el modelo "
+                    "perderá el principio (las reglas). Sube num_ctx o quita herramientas.",
+                    estimados, limite)
 
 
 INSISTIR = ("No me expliques qué función usar ni me preguntes si la uso: llama tú "
