@@ -245,6 +245,9 @@ def _programar_trabajo_de_fondo() -> None:
                 indice = intencion.cargar()
                 log.info("Intenciones      : %d ejemplos listos",
                          len(indice.get("entradas") or []))
+
+                import registro
+                log.info("Herramientas     : %s", registro.preparar_vectores())
             else:
                 log.info("Memoria vault    : falta %s (ollama pull %s)",
                          memoria.MODELO, memoria.MODELO)

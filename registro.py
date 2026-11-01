@@ -292,3 +292,114 @@ def llamar_con_texto(h: Herramienta, texto: str):
         return h.funcion()
     partes = [x.strip() for x in (texto or "").split("|", len(nombres) - 1)]
     return h.funcion(**{p: v for p, v in zip(nombres, partes) if v})
+
+
+# ---------------------------------------------------------------------------
+# Elegir por significado (nomic-embed-text, local)
+# ---------------------------------------------------------------------------
+# Con treinta herramientas a la vista hasta un modelo de 7B se lia: para
+# "tengo steam abierto" elegia cerrar_aplicacion. Se le ofrecen solo las que
+# mas se parecen a la orden.
+
+_vectores: dict | None = None          # {"firma": str, "v": {nombre: vector}}
+_ultimo_intento = 0.0
+_candado_vectores = None
+
+
+def _embeber(texto: str) -> list[float] | None:
+    """Vector normalizado de un texto, o None si Ollama no puede."""
+    try:
+        from tools import memoria
+    except Exception:
+        return None
+    v = memoria._vector(texto)
+    return memoria._normalizar(v) if v else None
+
+
+def _texto_de(h: Herramienta) -> str:
+    claves = ", ".join(h.palabras)
+    return f"search_document: {h.nombre.replace('_', ' ')}. {h.descripcion} {claves}".strip()
+
+
+def _elegibles() -> list[Herramienta]:
+    return [h for h in cargar().values() if h.riesgo in OFRECIBLES]
+
+
+def _firma_vectores() -> str:
+    import hashlib
+    crudo = "\n".join(sorted(_texto_de(h) for h in _elegibles()))
+    return hashlib.sha256(crudo.encode("utf-8")).hexdigest()[:16]
+
+
+def _archivo_vectores():
+    from config import CARPETA_DATOS
+    return CARPETA_DATOS / "herramientas_vectores.json"
+
+
+def preparar_vectores() -> str:
+    """Carga o calcula los vectores de las herramientas. Puede tardar la primera vez."""
+    global _vectores, _ultimo_intento, _candado_vectores
+    import json
+    import threading
+    if _candado_vectores is None:
+        _candado_vectores = threading.Lock()
+    with _candado_vectores:
+        firma = _firma_vectores()
+        if _vectores and _vectores.get("firma") == firma:
+            return f"{len(_vectores['v'])} vectores listos"
+        _ultimo_intento = time.monotonic()
+        try:
+            guardado = json.loads(_archivo_vectores().read_text(encoding="utf-8"))
+            if guardado.get("firma") == firma:
+                _vectores = guardado
+                return f"{len(guardado['v'])} vectores cargados"
+        except Exception:
+            pass
+        nuevos = {}
+        for h in _elegibles():
+            v = _embeber(_texto_de(h))
+            if v is None:
+                return "sin vectores (Ollama o nomic-embed-text no responden)"
+            nuevos[h.nombre] = v
+        _vectores = {"firma": firma, "v": nuevos}
+        try:
+            _archivo_vectores().parent.mkdir(parents=True, exist_ok=True)
+            _archivo_vectores().write_text(json.dumps(_vectores), encoding="utf-8")
+        except OSError as e:
+            log.warning("No pude guardar los vectores de herramientas: %s", e)
+        return f"{len(nuevos)} vectores calculados"
+
+
+def _preparar_en_segundo_plano() -> None:
+    import threading
+    threading.Thread(target=preparar_vectores, daemon=True, name="vectores-herramientas").start()
+
+
+def elegir(frase: str, cuantas: int = 10, por_palabras: int = 3) -> list[Herramienta] | None:
+    """Las herramientas que mas se parecen a la frase, o None si no hay vectores.
+
+    Nunca bloquea una orden calculando vectores: si no estan, los prepara en
+    segundo plano y devuelve None, y quien llama usa para_el_modelo().
+    """
+    if not _vectores or _vectores.get("firma") != _firma_vectores():
+        if time.monotonic() - _ultimo_intento > SEGUNDOS_CACHE:
+            _preparar_en_segundo_plano()
+        return None
+
+    consulta = _embeber(f"search_query: {frase}")
+    if consulta is None:
+        return None
+
+    candidatas = [h for h in _elegibles() if disponible(h) and h.nombre in _vectores["v"]]
+    puntuadas = sorted(
+        candidatas,
+        key=lambda h: -sum(a * b for a, b in zip(consulta, _vectores["v"][h.nombre])),
+    )
+    elegidas = puntuadas[:max(1, cuantas)]
+
+    # Las palabras clave siguen contando: si la frase dice "whatsapp", lo de
+    # WhatsApp entra aunque el vector lo haya dejado fuera.
+    frase_n = _normalizar(frase)
+    extra = [h for h in candidatas if h not in elegidas
+             and any(p and p in frase_n for p in h.palabras)]
+    return elegidas + extra[:max(0, por_palabras)]

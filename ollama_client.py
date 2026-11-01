@@ -125,6 +125,32 @@ def _quitar_prefijos(texto: str) -> str:
     return limpio
 
 
+_LATEX = [
+    (r"\\[()\[\]]", ""),                        # \( \) \[ \]
+    (r"\$\$?", ""),
+    (r"\\frac\{([^{}]*)\}\{([^{}]*)\}", r"\1 sobre \2"),
+    (r"\\sqrt\{([^{}]*)\}", r"raiz de \1"),
+    (r"\\int", "la integral de "),
+    (r"\\sum", "la suma de "),
+    (r"\\cdot|\\times", " por "),
+    (r"\\(?:,|;|!|quad|qquad)", " "),
+    (r"\\(alpha|beta|gamma|delta|theta|lambda|pi|sigma|infty)", r"\1"),
+    (r"\^\{?2\}?", " al cuadrado"),
+    (r"\^\{?([^{}\s]+)\}?", r" a la \1"),
+    (r"[{}]", ""),
+]
+
+
+def latex_a_palabras(texto: str) -> str:
+    """Lo que el modelo escribe en LaTeX, dicho para el altavoz."""
+    if "\\" not in texto and "$" not in texto:
+        return texto
+    for patron, cambio in _LATEX:
+        texto = re.sub(patron, cambio, texto)
+    texto = texto.replace("infty", "infinito")
+    return re.sub(r"\s{2,}", " ", texto).strip()
+
+
 def limpiar_respuesta_modelo(texto: str) -> str:
     """Deja la respuesta del modelo lista para pronunciarse."""
     texto = (texto or "").strip()
@@ -153,6 +179,7 @@ def limpiar_respuesta_modelo(texto: str) -> str:
 
     # Fuera bloques de codigo: Alexa los lee caracter a caracter.
     texto = re.sub(r"```[\s\S]*?```", "", texto).strip()
+    texto = latex_a_palabras(texto)
 
     return texto or "No supe qué hacer con esa orden."
 
@@ -172,10 +199,22 @@ def _extras_para(num_ctx: int) -> int:
 
 
 def herramientas_para(comando: str) -> list[dict]:
-    """Los esquemas que se le ofrecen al modelo para esta orden."""
+    """Los esquemas que se le ofrecen al modelo para esta orden.
+
+    Primero por significado (pocas y relevantes). Si no hay vectores, el
+    nucleo de siempre mas las extras por palabras clave.
+    """
     perfil = modes.perfil_actual()
-    extras = _extras_para(int(perfil.get("num_ctx", 4096)))
-    return registro.esquemas(registro.para_el_modelo(comando, extras))
+    num_ctx = int(perfil.get("num_ctx", 4096))
+    elegidas = registro.elegir(comando, cuantas=10 if num_ctx >= 8192 else 6)
+    if elegidas is None:
+        elegidas = registro.para_el_modelo(comando, _extras_para(num_ctx))
+        como = "nucleo + palabras"
+    else:
+        como = "por significado"
+    log.info("Ofrezco %d herramientas (%s): %s", len(elegidas), como,
+             ", ".join(h.nombre for h in elegidas))
+    return registro.esquemas(elegidas)
 
 
 PROMPT_BASE = """Eres Jarvis, el asistente local que controla este equipo con Windows.
@@ -187,9 +226,12 @@ REGLAS:
 4. Tu respuesta final la lee Alexa en voz alta: maximo dos frases cortas en espanol, sin markdown, sin listas, sin emojis y sin leer codigo.
 5. Nunca inventes rutas, nombres de archivo ni datos. Si necesitas saber que hay, usa listar_archivos, explorar_carpeta o buscar_en_contenido antes de responder.
 6. Si una herramienta falla, dilo con claridad. No finjas que funciono.
-7. Las preguntas de conocimiento general ("que es la oferta y la demanda", "explicame X", "cuanto es 15 por 4") se contestan DIRECTAMENTE con lo que sabes. No busques en Obsidian ni en el disco: las notas del usuario son SUS apuntes, no una enciclopedia. Solo usa obsidian_buscar si la orden menciona sus notas, su vault, su diario o algo que el escribio.
+7. Las preguntas de conocimiento general ("que es la oferta y la demanda", "explicame X", "cuanto es 15 por 4") se contestan DIRECTAMENTE con lo que sabes. No busques en Obsidian ni en el disco: las notas del usuario son SUS apuntes, no una enciclopedia. Solo usa las herramientas de notas si la orden menciona sus notas, sus apuntes, su vault, su diario o algo que el escribio.
 8. Si la orden es demasiado corta o ambigua para saber que quiere ("no", "si", "vale", "ok", "eso"), NO llames a ninguna herramienta: pregunta que necesita. Cambiar el modo del equipo porque el usuario dijo "no" es un error grave.
 9. Responde solo con lo que hay que decir. No narres lo que vas a hacer, no repitas la orden y no escribas prefijos como "Alexa lee en voz alta:" ni "Respuesta:". Esas palabras acabarian sonando por el altavoz.
+10. Elige la herramienta que hace EXACTAMENTE lo pedido. Si la orden es una pregunta ("tengo...", "hay...", "cual es...", "que dice..."), usa solo herramientas que miran (listar, leer, buscar, explicar); NUNCA una que cambia algo (cerrar, apuntar, mover, borrar, crear).
+11. Si dice "segun mis apuntes", "en mis notas" o "en mi boveda", la respuesta sale de sus notas: usa explicar_desde_notas o encontrar_nota, no tu memoria.
+12. Nada de LaTeX ni simbolos matematicos: las formulas se dicen con palabras ("la integral de u por dv es u por v menos la integral de v por du").
 
 COMO HABLAS:
 Hablas con {NOMBRE_USUARIO}, que es quien te construyo. Tuteale.
@@ -419,7 +461,6 @@ def _conversar(comando: str) -> str:
     ]
 
     ofrecidas = herramientas_para(comando)
-    log.info("Ofrezco %d herramientas al modelo", len(ofrecidas))
     _avisar_si_no_cabe(mensajes, ofrecidas, perfil)
     insistido = False
 

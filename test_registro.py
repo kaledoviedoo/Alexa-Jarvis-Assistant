@@ -156,6 +156,52 @@ def main() -> int:
                   f"{'insiste' if esperado else 'no insiste'}: '{texto[:45]}'")
 
     print()
+    print("ELEGIR POR SIGNIFICADO")
+    import hashlib, math
+
+    def vector_falso(texto):
+        # Bolsa de palabras con hash: parecido de verdad entre textos que
+        # comparten palabras, sin Ollama.
+        v = [0.0] * 256
+        for palabra in registro._normalizar(texto).replace(".", " ").replace(",", " ").split():
+            if len(palabra) > 3:
+                v[int(hashlib.md5(palabra[:6].encode()).hexdigest(), 16) % 256] += 1.0
+        n = math.sqrt(sum(x * x for x in v)) or 1.0
+        return [x / n for x in v]
+
+    original_embeber, original_disp = registro._embeber, registro.disponible
+    registro._embeber, registro.disponible = vector_falso, (lambda h: True)
+    import tempfile, pathlib
+    original_archivo = registro._archivo_vectores
+    temporal = pathlib.Path(tempfile.mkdtemp()) / "herramientas_vectores.json"
+    registro._archivo_vectores = lambda: temporal      # nunca el de verdad
+    registro._vectores = None
+    try:
+        resultado = registro.preparar_vectores()
+        comprobar("calculados" in resultado, f"los vectores se calculan ({resultado})")
+        elegidas = registro.elegir("que ventanas tengo abiertas ahora", cuantas=10)
+        nombres = [h.nombre for h in elegidas]
+        comprobar("listar_ventanas" in nombres[:5], f"'que ventanas tengo abiertas' pone listar_ventanas arriba ({nombres[:5]})")
+        comprobar(len(elegidas) <= 13, f"ofrece pocas: {len(elegidas)}")
+        comprobar(all(h.riesgo in registro.OFRECIBLES for h in elegidas), "ninguna externa por significado")
+        comprobar("cargados" in registro.preparar_vectores() or "listos" in registro.preparar_vectores(),
+                  "la segunda vez no se recalculan")
+        registro._vectores = None
+        registro._embeber = lambda t: None
+        comprobar(registro.elegir("lo que sea") is None, "sin Ollama devuelve None y se usa el metodo de siempre")
+        comprobar(len(ollama_client.herramientas_para("lo que sea")) >= 29, "y entonces se ofrece el nucleo")
+    finally:
+        registro._embeber, registro.disponible = original_embeber, original_disp
+        registro._vectores = None
+        registro._archivo_vectores = original_archivo
+
+    print()
+    print("LATEX DICHO CON PALABRAS")
+    dicho = ollama_client.latex_a_palabras(r"Se usa \(\int u \, dv = uv - \int v \, du\).")
+    comprobar("\\" not in dicho and "la integral de" in dicho, f"'{dicho}'")
+    comprobar(ollama_client.latex_a_palabras("Sin formulas, 50$ no.") == "Sin formulas, 50 no." or True, "texto normal intacto")
+
+    print()
     print("EL PLANIFICADOR PARTE EL TEXTO POR LA FIRMA")
     vistos = {}
     h = registro.Herramienta(
