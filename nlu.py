@@ -460,6 +460,35 @@ def _reiniciar(m) -> str:
     return confirmaciones.pedir("reiniciar el equipo", sistema.reiniciar_equipo)
 
 
+# ---- Rutinas y recordatorios (Fase 5) ----
+def _rutina_crear(m):
+    import rutinas
+    return rutinas.crear_desde_frase(m.group("frase"))
+
+
+def _rutinas_listar(m) -> str:
+    import rutinas
+    return rutinas.listar()
+
+
+def _rutina_estado(m) -> str:
+    import rutinas
+    acc = sin_acentos(m.group("acc") or "").lower()
+    if acc.startswith(("borra", "elimina", "quita")):
+        accion = "borrar"
+    elif acc.startswith(("enciende", "activa", "prende", "reactiva", "vuelve")):
+        accion = "encender"
+    else:
+        accion = "apagar"
+    nombre = "todas" if m.group("todas") else (m.group("nombre") or "")
+    return rutinas.cambiar(nombre, accion)
+
+
+def _descargas_ordenar(m) -> str:
+    import rutinas
+    return rutinas.aplicar_descargas()
+
+
 # ---- Meta ----
 def _pendiente(m) -> str:
     return tareas.consultar_pendiente()
@@ -1278,6 +1307,35 @@ SOBRE_MI_EQUIPO = (
 
 
 INTENTS: list[tuple[re.Pattern, callable]] = [
+    # Rutinas: antes que nada, para que "apaga la rutina de..." no apague el PC.
+    (
+        re.compile(r"\b(?P<acc>apaga|desactiva|deten|para|pausa|quita|cancela|enciende|activa|prende|"
+                   r"reactiva|vuelve\s+a\s+activar|borra|elimina)\s+"
+                   r"(?P<todas>todas\s+las\s+|todos\s+los\s+)?(?:la\s+|el\s+|las\s+|los\s+|mi\s+|mis\s+)?"
+                   r"(?:rutinas?|recordatorios?)\b(?:\s+(?:de|del|que|para))?\s*(?P<nombre>.*)$", _F),
+        _rutina_estado,
+    ),
+    (
+        re.compile(r"\b(?:que|cuales)\s+(?:rutinas|recordatorios)\b|\b(?:mis|las)\s+(?:rutinas|recordatorios)\s*$|"
+                   r"\blista(?:me)?\s+(?:las\s+|mis\s+)?(?:rutinas|recordatorios)\b|"
+                   r"\bque\s+(?:tengo\s+|hay\s+)?programado\b", _F),
+        _rutinas_listar,
+    ),
+    (
+        re.compile(r"^(?P<frase>.*\b(?:recuerdame|recordarme|recuerdeme|avisame|aviseme|recordatorio)\b.*)$", _F),
+        _rutina_crear,
+    ),
+    (
+        re.compile(r"^(?P<frase>(?:todos\s+los|todas\s+las|cada|de\s+lunes\s+a\s+viernes|entre\s+semana|"
+                   r"los\s+(?:lunes|martes|miercoles|jueves|viernes|sabados|domingos))\s+.+)$", _F),
+        _rutina_crear,
+    ),
+    (
+        re.compile(r"^\s*(?:s[ii][\s,]+)?(?:ordena|organiza|acomoda)(?:me)?\s+(?:las\s+|mis\s+)?descargas\s*$|"
+                   r"\baplica\s+(?:la\s+)?propuesta\s+de\s+(?:las\s+)?descargas\b", _F),
+        _descargas_ordenar,
+    ),
+
     (
         re.compile(r"^\s*(?:no|s[ií]|ok|okay|vale|bueno|claro|eso|ese|esa|"
                    r"aja|ah[aá]|mmm|este|pues|ya|nada|que|c[oó]mo|eh)\s*$", _F),

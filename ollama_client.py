@@ -824,10 +824,33 @@ def informe_de_parada(motivo: str, hechos: list) -> str:
     return f"No lo conseguí: {motivo}."
 
 
+_limite_riesgo = threading.local()
+
+
+def con_riesgos(permitidos, funcion, *args, **kwargs):
+    """Ejecuta funcion sin dejar que use herramientas fuera de esos riesgos.
+
+    Lo usan las rutinas: corren sin nadie delante, asi que nunca envian ni
+    hacen nada irreversible, aunque el modelo lo intente.
+    """
+    anterior = getattr(_limite_riesgo, "valor", None)
+    _limite_riesgo.valor = (set(permitidos) | {"lectura"}) - {"externa", "irreversible"}
+    try:
+        return funcion(*args, **kwargs)
+    finally:
+        _limite_riesgo.valor = anterior
+
+
 def _ejecutar_herramienta(nombre: str, argumentos: dict) -> str:
     h = registro.obtener(nombre)
     if h is None:
         return f"No existe la herramienta {nombre}."
+
+    permitidos = getattr(_limite_riesgo, "valor", None)
+    if permitidos is not None and h.riesgo not in permitidos:
+        log.warning("FRENO: %s es de riesgo %s y esta orden viene de una rutina.", nombre, h.riesgo)
+        return (f"No ejecuto {nombre}: esta orden viene de una rutina, y una rutina solo puede "
+                f"usar herramientas de riesgo {', '.join(sorted(permitidos))}. " + _SIN_INVENTAR)
 
     # Lo externo y lo irreversible solo si la frase lo pide expresamente, y
     # siempre acaba en una confirmacion que el usuario oye entera.
@@ -1052,6 +1075,11 @@ def _conversar(comando: str) -> str:
                 _turno.envio_intentado = True
                 _turno.resultado_envio = str(resultado)
 
+            try:
+                tareas.registrar_paso(nombre, argumentos, resultado)
+            except Exception as e:
+                log.debug("No pude apuntar el paso: %s", e)
+
             if str(resultado).startswith("No ejecuto"):
                 _turno.vetos.append(str(resultado))
             elif not str(resultado).startswith("No existe") and h is not None:
@@ -1197,7 +1225,7 @@ def restante_del_presupuesto() -> float:
 def _terminar_en_segundo_plano(identificador: str, resumen: str, comando: str) -> None:
     """Ejecuta y guarda el resultado sin que nadie espere."""
     try:
-        valor = _conversar(comando)
+        valor = tareas.con_tarea(identificador, _conversar, comando)
     except Exception as e:
         valor = f"La tarea falló: {e}"
     tareas.registrar_resultado(identificador, resumen, valor)
@@ -1219,11 +1247,12 @@ def procesar(comando: str) -> str:
                 "Pregúntame cómo quedó lo último cuando quieras.")
 
     tareas.registrar_inicio(identificador, resumen)
-    futuro = _ejecutor.submit(_conversar, comando)
+    futuro = _ejecutor.submit(tareas.con_tarea, identificador, _conversar, comando)
 
     try:
         resultado = futuro.result(timeout=restante)
-        tareas.registrar_resultado(identificador, resumen, resultado)
+        # Quien preguntaba ya lo oye: ni aviso de Windows ni "sin leer".
+        tareas.registrar_resultado(identificador, resumen, resultado, avisar=False)
         return resultado
 
     except TimeoutFuturo:
@@ -1250,7 +1279,7 @@ def procesar(comando: str) -> str:
 
     except Exception as e:
         log.exception("Error inesperado procesando el comando")
-        tareas.registrar_resultado(identificador, resumen, str(e))
+        tareas.registrar_resultado(identificador, resumen, f"La tarea falló: {e}", avisar=False)
         return f"Tuve un problema procesando esa orden: {e}"
 
 

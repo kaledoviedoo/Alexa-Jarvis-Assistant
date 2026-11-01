@@ -21,10 +21,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 import alexa_directivas
+import confirmaciones
 import mantener_caliente
 import modes
 import nlu
 import ollama_client
+import rutinas
 import tareas
 import voz
 from config import (
@@ -96,7 +98,30 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-11-01-fase4-cerebro"
+SELLO_CODIGO = "2026-11-01-fase5-fondo"
+
+
+def novedades_al_abrir() -> str:
+    """Lo que paso mientras no hablabamos: tareas terminadas o cortadas, y la
+    propuesta de ordenar Descargas, que se confirma con un "si" ahi mismo."""
+    partes = []
+    try:
+        partes.append(tareas.novedades())
+    except Exception as e:
+        log.debug("No pude leer las novedades: %s", e)
+    try:
+        propuesta = rutinas.propuesta_pendiente()
+        if propuesta and not propuesta.get("preguntada"):
+            # Se pregunta una vez. Si dices que no o cambias de tema, sigue ahi
+            # hasta la noche siguiente: "ordena las descargas" la aplica.
+            rutinas.marcar_preguntada()
+            partes.append(confirmaciones.pedir(
+                "ordenar las descargas como te propuse", rutinas.aplicar_descargas,
+                pregunta=(f"Preparé cómo ordenar {len(propuesta['plan'])} archivos sueltos de Descargas "
+                          "en subcarpetas, sin borrar nada. ¿Los ordeno? Di sí o no.")))
+    except Exception as e:
+        log.debug("No pude mirar la propuesta de Descargas: %s", e)
+    return " ".join(p for p in partes if p)
 
 
 @app.on_event("startup")
@@ -129,6 +154,20 @@ def al_arrancar():
         log.info("Obsidian          : %s", v or "vault no detectado")
     except Exception as e:
         log.debug("No pude mirar si hay boveda: %s", e)
+
+    # Fase 5: lo que quedo a medias en el ultimo apagado, y las rutinas.
+    try:
+        cortadas = tareas.al_arrancar()
+        log.info("Tareas            : %s", f"{cortadas} interrumpidas en el ultimo apagado" if cortadas else "nada a medias")
+    except Exception as e:
+        log.warning("No pude abrir la base de tareas: %s", e)
+    try:
+        rutinas.arrancar()
+        activas = [r["nombre"] for r in rutinas.cargar() if r.get("activa", True)]
+        log.info("Rutinas           : %d activas (%s) en %s", len(activas), ", ".join(activas),
+                 rutinas.ruta_rutinas())
+    except Exception as e:
+        log.warning("No pude arrancar las rutinas: %s", e)
 
     comet = detectar_comet()
     log.info("Comet             : %s", comet or "no detectado (usaré el navegador por defecto)")
@@ -581,6 +620,9 @@ async def endpoint_alexa(request: Request):
     if tipo == "LaunchRequest":
         perfil = modes.perfil_actual()
         saludo = voz.saludo_inicial(perfil["nombre_hablado"], SESION_CONTINUA)
+        extra = novedades_al_abrir()
+        if extra:
+            saludo = f"{saludo} {extra}"
 
         try:
             modes.precalentar_en_segundo_plano()

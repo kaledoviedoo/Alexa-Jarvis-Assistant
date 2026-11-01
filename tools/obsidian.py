@@ -242,6 +242,42 @@ def agregar_al_diario(contenido: str) -> str:
     return f"{accion} tu nota de hoy en Obsidian."
 
 
+def _carpeta_diario(v: Path) -> Path:
+    for nombre in ("Diario", "Daily", "Daily Notes", "Journal", "Notas diarias", "00 Diario"):
+        candidata = v / nombre
+        if candidata.is_dir():
+            return candidata
+    return v
+
+
+@herramienta(
+    "obsidian_leer_diario",
+    descripcion="Lee lo apuntado hoy en la nota diaria de Obsidian.",
+    riesgo="lectura",
+    palabras=("que apunte hoy", "mi diario de hoy", "lee el diario", "lee mi diario", "que tengo apuntado"),
+)
+def leer_diario() -> str:
+    """Las lineas de la nota de hoy, sin el frontmatter ni el titulo."""
+    v = vault()
+    if v is None:
+        return "No encontré tu vault de Obsidian."
+    ruta = _carpeta_diario(v) / f"{datetime.now():%Y-%m-%d}.md"
+    if not ruta.exists():
+        return "Hoy no tienes nada apuntado en el diario."
+    try:
+        texto = ruta.read_text(encoding="utf-8")
+    except Exception as e:
+        return f"No pude leer el diario: {e}"
+    if texto.startswith("---"):
+        fin = texto.find("\n---", 3)
+        texto = texto[fin + 4:] if fin != -1 else texto
+    lineas = [l.strip().lstrip("-* ").strip() for l in texto.splitlines()
+              if l.strip() and not l.strip().startswith("#")]
+    if not lineas:
+        return "Hoy no tienes nada apuntado en el diario."
+    return "En tu diario de hoy: " + "; ".join(lineas[:8]) + "."
+
+
 @herramienta(
     "obsidian_buscar",
     descripcion="Busca una frase dentro de todas las notas de Obsidian.",

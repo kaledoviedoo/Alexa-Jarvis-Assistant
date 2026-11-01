@@ -71,6 +71,10 @@ jobs:
       - name: Comprueba lo que hace y dice lo que no le salio
         run: python test_cerebro.py
 
+      - name: Termina lo que empieza, avisa y hace lo programado
+        # Sin pyyaml a proposito: asi se prueba el camino en JSON.
+        run: python test_fondo.py
+
       - name: El servidor contesta en formato Alexa
         run: python test_alexa.py
 
