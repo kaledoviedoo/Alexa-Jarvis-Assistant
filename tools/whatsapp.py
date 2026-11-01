@@ -223,7 +223,7 @@ def _borrar_caja() -> str:
     if pg is None:
         return "Cancelado, pero no pude borrar el texto: revísalo en WhatsApp."
     # Ctrl+A y borrar en otra ventana destrozaria lo que hubiera ahi.
-    if not _enfocar():
+    if not _enfocar() or not _ir_a_la_caja_de_mensaje(pg):
         return "Cancelado. No envié nada, pero el texto sigue escrito en WhatsApp: bórralo tú."
     try:
         pg.hotkey("ctrl", "a")
@@ -307,6 +307,55 @@ class SinFoco(RuntimeError):
     """El teclado no es de WhatsApp: no se teclea."""
 
 
+def pegar(pg, texto: str) -> None:
+    """Pone el texto pegandolo, no tecleandolo.
+
+    Teclear letra a letra respeta el Bloq Mayus ("vENTANAS ABIERTAS") y no
+    sabe escribir tildes ni eñes. Pegar no tiene ninguno de los dos
+    problemas. El portapapeles del usuario se deja como estaba.
+    """
+    try:
+        import pyperclip
+    except ImportError:
+        pg.write(texto, interval=0.01)
+        return
+
+    respaldo = None
+    try:
+        respaldo = pyperclip.paste()
+    except Exception as e:
+        log.debug("No pude leer el portapapeles: %s", e)
+
+    pyperclip.copy(texto)
+    time.sleep(0.08)
+    pg.hotkey("ctrl", "v")
+    # El navegador pega de forma asincrona: devolver el portapapeles antes
+    # de tiempo haria que pegara lo que el usuario tenia copiado.
+    time.sleep(0.4)
+
+    if respaldo is not None:
+        try:
+            pyperclip.copy(respaldo)
+        except Exception as e:
+            log.debug("No pude devolver el portapapeles: %s", e)
+
+
+def _ir_a_la_caja_de_mensaje(pg) -> bool:
+    """Clic en la caja de escribir, abajo en el panel del chat.
+
+    Tras abrir el chat el foco suele quedar ahi, pero si la busqueda no se
+    cerro bien queda en el buscador y el mensaje acababa escrito alli.
+    """
+    ventana = _ventana_de_whatsapp()
+    if ventana is None:
+        return False
+    x = int(ventana.left + ventana.width * 0.62)
+    y = int(ventana.top + ventana.height - 55)
+    pg.click(x, y)
+    time.sleep(0.25)
+    return _ventana_activa_es_whatsapp()
+
+
 def _buscar_y_abrir_chat(pg, nombre: str, lento: bool = False) -> None:
     """Busca el chat y lo abre. El cursor queda en la caja de mensaje."""
     if not _ventana_activa_es_whatsapp() and not _enfocar():
@@ -320,7 +369,14 @@ def _buscar_y_abrir_chat(pg, nombre: str, lento: bool = False) -> None:
     pg.hotkey("ctrl", "alt", "/")
     time.sleep(0.45)
 
-    pg.write(nombre, interval=0.015)
+    # Vaciar lo que quedara de una busqueda anterior: si no, la segunda
+    # busqueda era "familiafamilia" y no encontraba nada.
+    pg.hotkey("ctrl", "a")
+    time.sleep(0.05)
+    pg.press("backspace")
+    time.sleep(0.1)
+
+    pegar(pg, nombre)
     time.sleep(ESPERA_BUSQUEDA * (2.5 if lento else 1))
 
     pg.press("enter")
@@ -372,12 +428,12 @@ def enviar_mensaje(destinatario: str, mensaje: str) -> str:
         return (f"No encontré el chat {destinatario}: el que quedó abierto es {nombre_real}. "
                 "No escribí nada. Dime el nombre del chat tal como sale en WhatsApp.")
 
-    if not _ventana_activa_es_whatsapp():
+    if not _ventana_activa_es_whatsapp() or not _ir_a_la_caja_de_mensaje(pg):
         return ("El foco se fue de WhatsApp antes de escribir. No escribí nada. "
                 "Repítemelo con WhatsApp al frente.")
 
     try:
-        pg.write(mensaje, interval=0.008)
+        pegar(pg, mensaje)
         time.sleep(0.25)
     except Exception as e:
         log.exception("Falló escribiendo el mensaje")

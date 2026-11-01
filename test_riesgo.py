@@ -219,17 +219,23 @@ def main() -> int:
     comprobar(not whatsapp.coincide("familia", "ua esta activa"), "'familia' no encaja con 'ua esta activa'")
 
     class TecladoFalso:
-        def __init__(self): self.escrito = []
+        def __init__(self): self.escrito, self.atajos, self.clics = [], [], []
         def write(self, texto, interval=0): self.escrito.append(texto)
         def press(self, *a): pass
-        def hotkey(self, *a): pass
+        def hotkey(self, *a): self.atajos.append(a)
+        def click(self, *a): self.clics.append(a)
+
+    class VentanaFalsa:
+        left, top, width, height, title = 0, 0, 1920, 1040, "WhatsApp"
 
     teclado = TecladoFalso()
     guardado = (whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep,
-                whatsapp._ventana_activa_es_whatsapp)
+                whatsapp._ventana_activa_es_whatsapp, whatsapp.pegar, whatsapp._ventana_de_whatsapp)
     try:
         whatsapp._pyautogui = lambda: teclado
         whatsapp.time.sleep = lambda s: None
+        whatsapp.pegar = lambda pg, texto: pg.write(texto)
+        whatsapp._ventana_de_whatsapp = lambda: VentanaFalsa()
         whatsapp._ventana_activa_es_whatsapp = lambda: False
         whatsapp._enfocar = lambda: False
         salida = whatsapp.enviar_mensaje("familia", "hola")
@@ -257,10 +263,13 @@ def main() -> int:
                   "si al segundo intento si es el chat, escribe")
         comprobar("Familia Pérez Gómez" in salida and confirmaciones.hay_pendiente(),
                   f"y pregunta con el nombre real ('{salida[:60]}')")
+        comprobar(("ctrl", "a") in teclado.atajos, "el buscador se vacia antes de buscar")
+        comprobar(teclado.clics and teclado.clics[-1][1] > 900,
+                  "antes de escribir hace clic en la caja de mensaje, abajo")
         confirmaciones.olvidar()
     finally:
         (whatsapp._pyautogui, whatsapp._enfocar, whatsapp._quien_esta_abierto, whatsapp.time.sleep,
-         whatsapp._ventana_activa_es_whatsapp) = guardado
+         whatsapp._ventana_activa_es_whatsapp, whatsapp.pegar, whatsapp._ventana_de_whatsapp) = guardado
 
     print("\nSI EL ENVIO NO LLEGA A PREGUNTAR, SE DICE LO QUE PASO")
     confirmaciones.olvidar()
