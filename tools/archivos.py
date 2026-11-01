@@ -163,6 +163,7 @@ def crear_archivo(nombre_archivo: str, contenido: str = "", carpeta: str = "") -
 @herramienta(
     descripcion="Lee el contenido de un archivo de texto existente.",
     nucleo=True, args={"nombre_archivo": "Nombre del archivo con su extensión"},
+    fuente_externa=True,
 )
 def leer_archivo(nombre_archivo: str, carpeta: str = "") -> str:
     """Lee el contenido de un archivo de texto."""

@@ -29,10 +29,11 @@ log = logging.getLogger("jarvis.registro")
 # externa: sale del equipo (mensajes, correos). irreversible: no tiene vuelta.
 RIESGOS = ("lectura", "escritura", "externa", "irreversible")
 
-# Lo que el modelo puede ejecutar por su cuenta. Lo externo y lo irreversible
-# queda registrado pero fuera de su alcance hasta que exista la confirmacion
-# por plan (Fase 3): un correo leido no puede acabar mandando un WhatsApp.
+# Lo que se ofrece al modelo sin mas. Lo externo y lo irreversible solo se le
+# ofrece cuando la frase pide expresamente esa accion, y siempre termina en una
+# confirmacion que el usuario oye entera (Fase 3).
 OFRECIBLES = ("lectura", "escritura")
+CON_CONFIRMACION = ("externa", "irreversible")
 
 # Modulos que declaran herramientas. cargar() los importa en este orden.
 MODULOS = (
@@ -78,6 +79,7 @@ class Herramienta:
     nucleo: bool = False       # se ofrece siempre al modelo
     palabras: tuple = ()       # se ofrece si la frase contiene alguna
     en_plan: bool = False      # la puede usar el planificador
+    fuente_externa: bool = False  # lo que devuelve lo escribio otro (correo, web, chat)
 
     def esquema(self) -> dict:
         """El formato de function calling que espera Ollama."""
@@ -107,7 +109,8 @@ _cargado = False
 
 def herramienta(nombre: str | None = None, *, descripcion: str, riesgo: str = "lectura",
                 args: dict | None = None, necesita: tuple = (), corroboran: tuple = (),
-                nucleo: bool = False, palabras: tuple = (), en_plan: bool = False):
+                nucleo: bool = False, palabras: tuple = (), en_plan: bool = False,
+                fuente_externa: bool = False):
     """Registra la funcion decorada como herramienta. La devuelve sin tocarla.
 
     `args` dice que parametros ve el modelo y como se le explican. Los que no
@@ -149,6 +152,7 @@ def herramienta(nombre: str | None = None, *, descripcion: str, riesgo: str = "l
             parametros=tuple(parametros), requeridos=tuple(requeridos),
             necesita=tuple(necesita), corroboran=tuple(corroboran), nucleo=nucleo,
             palabras=tuple(_normalizar(x) for x in palabras), en_plan=en_plan,
+            fuente_externa=fuente_externa,
         )
         return funcion
 
@@ -240,7 +244,8 @@ def _normalizar(texto: str) -> str:
     return "".join(c for c in texto if unicodedata.category(c) != "Mn")
 
 
-def para_el_modelo(frase: str = "", extras: int = 4) -> list[Herramienta]:
+def para_el_modelo(frase: str = "", extras: int = 4,
+                   riesgos: tuple = OFRECIBLES) -> list[Herramienta]:
     """Lo que se le ofrece al modelo para esta frase.
 
     El nucleo siempre; del resto, las `extras` que mas palabras clave comparten
@@ -250,7 +255,7 @@ def para_el_modelo(frase: str = "", extras: int = 4) -> list[Herramienta]:
     frase_n = _normalizar(frase)
     nucleo, candidatas = [], []
     for h in cargar().values():
-        if h.riesgo not in OFRECIBLES or not disponible(h):
+        if h.riesgo not in riesgos or not disponible(h):
             continue
         if h.nucleo:
             nucleo.append(h)
@@ -322,7 +327,8 @@ def _texto_de(h: Herramienta) -> str:
 
 
 def _elegibles() -> list[Herramienta]:
-    return [h for h in cargar().values() if h.riesgo in OFRECIBLES]
+    # Se vectorizan todas; cuales se ofrecen lo decide elegir() con `riesgos`.
+    return list(cargar().values())
 
 
 def _firma_vectores() -> str:
@@ -375,7 +381,8 @@ def _preparar_en_segundo_plano() -> None:
     threading.Thread(target=preparar_vectores, daemon=True, name="vectores-herramientas").start()
 
 
-def elegir(frase: str, cuantas: int = 10, por_palabras: int = 3) -> list[Herramienta] | None:
+def elegir(frase: str, cuantas: int = 10, por_palabras: int = 3,
+           riesgos: tuple = OFRECIBLES) -> list[Herramienta] | None:
     """Las herramientas que mas se parecen a la frase, o None si no hay vectores.
 
     Nunca bloquea una orden calculando vectores: si no estan, los prepara en
@@ -390,7 +397,8 @@ def elegir(frase: str, cuantas: int = 10, por_palabras: int = 3) -> list[Herrami
     if consulta is None:
         return None
 
-    candidatas = [h for h in _elegibles() if disponible(h) and h.nombre in _vectores["v"]]
+    candidatas = [h for h in _elegibles() if h.riesgo in riesgos and disponible(h)
+                  and h.nombre in _vectores["v"]]
     puntuadas = sorted(
         candidatas,
         key=lambda h: -sum(a * b for a, b in zip(consulta, _vectores["v"][h.nombre])),

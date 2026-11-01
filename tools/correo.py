@@ -115,6 +115,7 @@ def _mensajes(carpeta, cuantos: int, solo_sin_leer: bool = False) -> list:
     descripcion="Los últimos correos recibidos en Outlook: remitente y asunto.",
     necesita=("outlook",), args={"cuantos": "Cuántos correos. Por defecto 3."},
     palabras=("correo", "mail", "bandeja", "outlook"),
+    fuente_externa=True,
 )
 def ultimos_correos(cuantos: int = 3, con_cuerpo: bool = False) -> str:
     """Los ultimos correos recibidos."""
@@ -152,6 +153,7 @@ def ultimos_correos(cuantos: int = 3, con_cuerpo: bool = False) -> str:
     descripcion="Cuántos correos hay sin leer en Outlook y de quién son los primeros.",
     necesita=("outlook",), args={"cuantos": "Cuántos mostrar. Por defecto 3."},
     palabras=("correo", "mail", "sin leer", "bandeja", "outlook"),
+    fuente_externa=True,
 )
 def correos_sin_leer(cuantos: int = 3) -> str:
     """Cuantos hay sin leer y de quien son los primeros."""
@@ -183,6 +185,7 @@ def correos_sin_leer(cuantos: int = 3) -> str:
     descripcion="Lee un correo concreto de Outlook con su cuerpo, por su posición en la bandeja.",
     necesita=("outlook",), args={"cual": "Posición: 1 es el más reciente."},
     palabras=("correo", "mail", "lee el", "outlook"),
+    fuente_externa=True,
 )
 def leer_correo(cual: int = 1) -> str:
     """Lee un correo concreto por su posicion, con el cuerpo."""
@@ -210,6 +213,7 @@ def leer_correo(cual: int = 1) -> str:
     necesita=("outlook",),
     args={"quien": "Nombre o dirección del remitente", "cuantos": "Cuántos. Por defecto 3."},
     palabras=("correo", "correos de", "mail", "me escribio", "outlook"),
+    fuente_externa=True,
 )
 def buscar_correos(quien: str, cuantos: int = 3) -> str:
     """Correos de un remitente concreto."""
@@ -317,6 +321,7 @@ def preparar_correo(quien: str, asunto: str, cuerpo: str):
     riesgo="externa", necesita=("outlook",),
     args={"quien": "Destinatario", "cuerpo": "Texto del correo", "asunto": "Asunto"},
     palabras=("correo", "mail", "envia", "manda"),
+    corroboran=("manda", "envia", "escribele", "escribe", "redacta", "responde", "contesta", "reenvia"),
 )
 def enviar_correo(quien: str, cuerpo: str, asunto: str = "") -> str:
     """Redacta, confirma con el nombre que resolvio Outlook, y luego envia."""
@@ -358,6 +363,7 @@ def enviar_correo(quien: str, cuerpo: str, asunto: str = "") -> str:
     descripcion="Responde al último correo recibido en Outlook.",
     riesgo="externa", necesita=("outlook",), args={"cuerpo": "Texto de la respuesta"},
     palabras=("responde", "contesta", "correo"),
+    corroboran=("responde", "contesta"),
 )
 def responder_ultimo(cuerpo: str) -> str:
     """Responde al ultimo correo recibido."""

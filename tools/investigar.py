@@ -170,6 +170,7 @@ def _sin_resultados(consulta: str) -> str:
     descripcion="Busca en internet y resume lo que se dice sobre un tema.",
     en_plan=True, args={"consulta": "Qué investigar"},
     palabras=("investiga", "internet", "averigua", "que se sabe", "noticias", "busca informacion"),
+    fuente_externa=True,
 )
 def investigar(consulta: str) -> str:
     """Busca y resume lo que dice internet."""
@@ -187,6 +188,7 @@ def investigar(consulta: str) -> str:
     descripcion="Compara opciones o precios buscando en internet y recomienda una.",
     args={"consulta": "Qué comparar, por ejemplo 'rtx 4060 vs rx 7600'"},
     palabras=("compara", "precio", "precios", "diferencia entre", " vs ", "versus"),
+    fuente_externa=True,
 )
 def comparar(consulta: str) -> str:
     """Compara opciones o precios y recomienda."""
@@ -206,6 +208,7 @@ def comparar(consulta: str) -> str:
     descripcion="Busca en internet cuál es la mejor opción para algo y la dice sin rodeos.",
     args={"consulta": "Para qué se busca la mejor opción"},
     palabras=("mejor opcion", "cual es mejor", "recomienda", "me conviene"),
+    fuente_externa=True,
 )
 def mejor_opcion(consulta: str) -> str:
     """Cual es la mejor opcion, sin rodeos."""

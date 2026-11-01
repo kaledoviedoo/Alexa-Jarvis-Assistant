@@ -134,7 +134,8 @@ def precalentar_en_segundo_plano() -> None:
 @herramienta(
     descripcion="Cambia el modo de Jarvis: normal (ligero), dedicado (modelo grande en GPU) o gaming (libera la gráfica).",
     riesgo="escritura", nucleo=True, args={"nuevo_modo": "normal, dedicado o gaming"},
-    corroboran=("modo", "gaming", "dedicado", "normal", "juego"),
+    corroboran=("modo", "activa", "cambia", "pon ", "pasa a", "entra en", "me voy a jugar",
+                "voy a jugar", "gaming", "dedicado", "normal", "juego"),
 )
 def cambiar_modo(nuevo_modo: str) -> str:
     """Cambia de modo y devuelve la frase que dirá Alexa."""

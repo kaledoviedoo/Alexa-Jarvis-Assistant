@@ -172,6 +172,7 @@ def _lineas(palabras: list[dict]) -> list[str]:
     descripcion="Lee con OCR el texto que se ve ahora en la pantalla.",
     necesita=("tesseract",),
     palabras=("pantalla", "que dice", "que pone", "lee lo que", "que se ve"),
+    fuente_externa=True,
 )
 def leer_pantalla(maximo_lineas: int = 12, zona=None) -> str:
     """Lee en voz alta lo que pone en la pantalla."""
@@ -217,6 +218,7 @@ def leer_primera_linea(zona=None) -> str:
     descripcion="Dice si un texto aparece en la pantalla ahora mismo.",
     necesita=("tesseract",), args={"texto": "El texto a encontrar"},
     palabras=("pantalla", "aparece", "sale en", "ves"),
+    fuente_externa=True,
 )
 def buscar_en_pantalla(texto: str) -> str:
     """¿Esta ese texto en la pantalla?"""
@@ -288,6 +290,7 @@ def clic_en(texto: str) -> str:
     descripcion="Describe la pantalla con un modelo de visión, o responde una pregunta sobre lo que se ve.",
     necesita=("ollama",), args={"pregunta": "Qué quiere saber de la pantalla. Opcional."},
     palabras=("pantalla", "que ves", "describe", "que hay en"),
+    fuente_externa=True,
 )
 def describir_pantalla(pregunta: str = "") -> str:
     """Describe la pantalla con un modelo de vision."""

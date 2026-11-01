@@ -167,6 +167,7 @@ def diagnostico() -> str:
 @herramienta(
     descripcion="Cierra los programas que sobran para liberar memoria.",
     riesgo="irreversible", palabras=("cierra lo que sobra", "libera memoria"),
+    corroboran=("cierra", "libera", "limpia", "mata"),
 )
 def cerrar_prescindibles() -> str:
     """Cierra lo que sobra. Solo se llama tras una confirmacion."""

@@ -352,6 +352,7 @@ _CARPETAS_IGNORADAS = {
     nucleo=True,
     args={"texto": "La frase o palabra a buscar dentro de los archivos",
           "carpeta": "Opcional: limitar a escritorio, descargas o documentos"},
+    fuente_externa=True,
 )
 def buscar_en_contenido(texto: str, carpeta: str = "", limite: int = 10) -> str:
     """Busca una frase DENTRO de los archivos, no solo en sus nombres."""

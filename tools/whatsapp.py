@@ -205,6 +205,7 @@ def _buscar_y_abrir_chat(pg, nombre: str) -> None:
     riesgo="externa", necesita=("windows",),
     args={"destinatario": "Contacto o grupo", "mensaje": "Texto a enviar"},
     palabras=("whatsapp", "mensaje", "manda", "dile", "escribele"),
+    corroboran=("manda", "envia", "dile", "dila", "escribele", "escribe", "responde", "contesta", "avisa", "pasale", "reenvia", "comparte"),
 )
 def enviar_mensaje(destinatario: str, mensaje: str) -> str:
     """Prepara el mensaje y pide confirmacion con el nombre REAL del chat."""
@@ -299,6 +300,7 @@ def abrir_chat(nombre: str) -> str:
     descripcion="Lee los últimos mensajes visibles del chat de WhatsApp Web que esté abierto.",
     necesita=("windows", "tesseract"),
     palabras=("whatsapp", "chat", "mensajes", "que me escribieron", "que dicen"),
+    fuente_externa=True,
 )
 def leer_chat() -> str:
     """Lee los ultimos mensajes visibles del chat abierto."""

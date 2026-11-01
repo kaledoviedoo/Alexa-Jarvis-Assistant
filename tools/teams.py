@@ -90,6 +90,7 @@ def abrir_canal(nombre: str) -> str:
     "leer_teams",
     descripcion="Lee los mensajes que estén a la vista en Teams.",
     necesita=("windows", "tesseract"), palabras=("teams",),
+    fuente_externa=True,
 )
 def leer_lo_visible(cuantas_lineas: int = 10) -> str:
     """Lee los mensajes que esten a la vista en Teams."""
@@ -107,6 +108,7 @@ def leer_lo_visible(cuantas_lineas: int = 10) -> str:
     "actividad_teams",
     descripcion="Abre la pestaña de Actividad de Teams y lee lo que aparezca.",
     necesita=("windows", "tesseract"), palabras=("teams", "actividad"),
+    fuente_externa=True,
 )
 def resumen_actividad() -> str:
     """Abre la pestaña de Actividad y lee lo que aparezca."""

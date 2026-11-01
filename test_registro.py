@@ -107,10 +107,15 @@ def main() -> int:
     print()
     print("EL MODELO NO PUEDE SALTARSE EL REGISTRO")
     import ollama_client
+    ollama_client._empezar_turno()
+    ollama_client.recordar_peticion("hola que tal, como va todo")
+    salida = ollama_client._ejecutar_herramienta(
+        "enviar_mensaje", {"destinatario": "familia", "mensaje": "llego en 10"})
+    comprobar("No ejecuto enviar_mensaje" in salida, "enviar_mensaje sin que la frase lo pida se rechaza")
     ollama_client.recordar_peticion("mandale un whatsapp a familia que llego en 10")
     salida = ollama_client._ejecutar_herramienta(
         "enviar_mensaje", {"destinatario": "familia", "mensaje": "llego en 10"})
-    comprobar("No ejecuto enviar_mensaje" in salida, "enviar_mensaje pedido por nombre se rechaza")
+    comprobar("No ejecuto" not in salida, f"pedido de verdad, pasa a la herramienta ('{salida[:50]}')")
 
     salida = ollama_client._ejecutar_herramienta("inventada", {})
     comprobar("No existe" in salida, "una herramienta inventada se rechaza")
