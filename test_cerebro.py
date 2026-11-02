@@ -156,6 +156,14 @@ def main() -> int:
     comprobar(ollama_client.pasos_sin_hacer("mira que ventanas tengo y apunta en el diario cuales son",
                                             ["prueba_diario"]) == [], "hecha la parte, no falta nada")
 
+    print("\nDICE 'LISTO' SIN HABER USADO NADA: SE DICE LA VERDAD")
+    guion[:] = [{"message": {"content": "Listo, abro Valorant y te doy acceso al juego."}}]
+    respuesta = ollama_client._conversar("quiero que abras valorant y le des a jugar")
+    comprobar(respuesta.startswith("No lo hice"), f"accion pedida, ninguna herramienta: lo reconoce ('{respuesta[:50]}')")
+    guion[:] = [{"message": {"content": "Listo, aquí estoy cuando me necesites."}}]
+    respuesta = ollama_client._conversar("hola, como vas")
+    comprobar(not respuesta.startswith("No lo hice"), "en una charla, 'listo' no es una mentira")
+
     print("\nINSISTIDO Y SIGUE SIN HACERLO: LO HACE JARVIS O LO DICE")
     # con dos diarios (el real y el de prueba) no elegiria: se aparta el real
     diario_real = registro.cargar().pop("obsidian_agregar_al_diario", None)

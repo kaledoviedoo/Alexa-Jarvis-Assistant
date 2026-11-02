@@ -588,6 +588,7 @@ PRESUPUESTO_PROBAR = 50.0
 # Fase 6: el chat local, en /chat. Solo desde este PC o tu red de Tailscale.
 chat.configurar(procesar_con_origen)
 voz_local.configurar(procesar_con_origen)
+rutinas.configurar(procesar_con_origen)
 app.include_router(chat.router)
 
 

@@ -1358,6 +1358,13 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _recordatorio_a_alexa,
     ),
     (
+        # "a las 10:38 abre valorant", "quiero que en 20 minutos minimices todo"
+        re.compile(r"^(?P<frase>.*(?:\ba\s+las?\s+(?:\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|"
+                   r"diez|once|doce)\b|\ben\s+(?:\d{1,3}|un|una|media|dos|tres|cinco|diez|quince|veinte|treinta)"
+                   r"\s+(?:minutos?|horas?)\b|\bal\s+mediodia\b).*)$", _F),
+        _rutina_crear,
+    ),
+    (
         re.compile(r"^(?P<frase>(?:todos\s+los|todas\s+las|cada|de\s+lunes\s+a\s+viernes|entre\s+semana|"
                    r"los\s+(?:lunes|martes|miercoles|jueves|viernes|sabados|domingos))\s+.+)$", _F),
         _rutina_crear,

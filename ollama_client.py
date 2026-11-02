@@ -701,6 +701,32 @@ _DICE_QUE_LO_HIZO = re.compile(
     r"\b(?:listo|hecho|ya\s+est[aá]n?|ya\s+lo|a[nñ]adid|agregad|enviad|mandad|guardad|"
     r"apuntad|anotad|cread|movid|borrad|cerrad|abiert)", re.IGNORECASE)
 
+# "Listo, abro Valorant": promete en presente lo que no hizo.
+_PROMETE = re.compile(
+    r"\b(?:listo|hecho|ya\s+est[aá]|abro|abriendo|cierro|mando|env[ií]o|apunto|anoto|muevo|creo|"
+    r"guardo|pulso|le\s+doy|te\s+doy|program[eé]|programado|lo\s+hago|me\s+encargo|en\s+marcha)\b",
+    re.IGNORECASE)
+
+
+def promesa_vacia(frase: str, contenido: str, hechas: int, lecturas: list, vetos: list) -> str:
+    """La frase pedia cambiar algo, el modelo no uso ninguna herramienta y aun
+    asi dice que lo hizo (o que lo hara). Se dice la verdad en vez de eso."""
+    if hechas or lecturas or vetos or not _PROMETE.search(contenido or ""):
+        return ""
+    try:
+        import rutinas
+        frase = rutinas.a_imperativo(frase)
+    except Exception:
+        pass
+    n = registro._normalizar(frase)
+    pide = any(h.riesgo != "lectura" and h.corroboran and any(registro.casa(c, n) for c in h.corroboran)
+               for h in registro.cargar().values())
+    if not pide:
+        return ""
+    log.warning("El modelo dijo que lo hizo sin usar ninguna herramienta: %r", contenido[:120])
+    return ("No lo hice: no llegué a usar ninguna herramienta para eso. "
+            "Prueba a decirlo de otra forma, o en modo dedicado.")
+
 
 def respuesta_honesta(contenido: str, vetos: list[str], hechas: int) -> str:
     """Si nada que cambie algo se ejecuto y el modelo dice que si, se corrige."""
@@ -1081,6 +1107,10 @@ def _conversar(comando: str) -> str:
                                         getattr(_turno, "hechas", 0))
             if honesta:
                 return honesta
+            vacia = promesa_vacia(comando, contenido, getattr(_turno, "hechas", 0),
+                                  getattr(_turno, "lecturas", []), getattr(_turno, "vetos", []))
+            if vacia:
+                return vacia
 
             log.info("Ollama respondió sin herramientas (paso %d)", paso)
             return limpiar_respuesta_modelo(contenido)

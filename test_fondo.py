@@ -169,8 +169,28 @@ def main() -> int:
         ok = isinstance(r, dict) and r.get("orden") == que and rutinas.describir(r, domingo) == cuando
         comprobar(ok, f"'{frase}' -> {que} | {cuando}"
                   + ("" if ok else f"  (salio {r if isinstance(r, str) else (r.get('orden'), rutinas.describir(r, domingo)) if r else None})"))
-    comprobar(rutinas.interpretar(casos[0][0], domingo)["riesgos"] == ["lectura"],
-              "una orden creada por voz solo puede mirar")
+    comprobar(rutinas.interpretar(casos[0][0], domingo)["riesgos"] == ["lectura", "escritura"],
+              "una orden creada por voz puede mirar y cambiar cosas que se deshacen, nunca enviar")
+
+    print("\nACCIONES A UNA HORA, DICHAS COMO SALGAN")
+    lunes = datetime(2026, 11, 2, 10, 35)
+    for frase, orden, cuando in [
+        ("quieor que a las 10:36 am de hoy abras valorant y le des a jugar", "juega valorant", "hoy a las 10:36"),
+        ("quiero que a las 10:38 abras valorant y le des al boton que dice jugar", "juega valorant", "hoy a las 10:38"),
+        ("a las 5 abre spotify", "abre spotify", "hoy a las 17:00"),
+        ("abre spotify a las 9 de la noche", "abre spotify", "hoy a las 21:00"),
+        ("en 20 minutos minimiza todo", "minimiza todo", "hoy a las 10:55"),
+        ("necesito que a las 3 me digas como esta el equipo", "dime como esta el equipo", "hoy a las 15:00"),
+    ]:
+        r = rutinas.interpretar(frase, lunes)
+        ok = isinstance(r, dict) and r["orden"] == orden and rutinas.describir(r, lunes) == cuando
+        comprobar(ok, f"'{frase}' -> {orden} | {cuando}" + ("" if ok else f"  (salio {r})"))
+    comprobar("necesita tu «sí» en vivo" in rutinas.interpretar("a las 6 mandale a familia que llego tarde", lunes),
+              "enviar a una hora no se programa: necesita tu si")
+    for frase in ("apaga el equipo a las 11", "en 5 minutos apaga el equipo", "que tengo a las 3"):
+        comprobar(rutinas.interpretar(frase, lunes) is None, f"'{frase}' sigue su camino de siempre")
+    comprobar(rutinas.a_imperativo("abras valorant y le des a jugar") == "abre valorant y dale a jugar",
+              "del subjuntivo a la orden")
     comprobar("¿A qué hora?" in rutinas.interpretar("todos los lunes revisa mis correos", domingo),
               "sin hora, la pregunta")
     for frase in ("cada vez que abro chrome va lento", "todos los archivos pdf muévelos a documentos",
@@ -319,6 +339,35 @@ def main() -> int:
     despues = rutinas._ruta_estado().stat().st_mtime_ns if rutinas._ruta_estado().exists() else None
     comprobar(marca == despues, "una vuelta sin novedades no toca el disco")
     comprobar(rutinas.SEGUNDOS_TICK >= 60, "y mira una vez por minuto, no cada 30 s")
+
+    print("\nUNA ORDEN PROGRAMADA VA POR EL CAMINO DE SIEMPRE Y NO CONFIRMA SOLA")
+    vistos = []
+
+    def procesar(texto, datos, presupuesto, en_este_hilo=False):
+        vistos.append((texto, ollama_client.canal_actual(), sorted(ollama_client._limite_riesgo.valor)))
+        if "familia" in texto:
+            return confirmaciones.pedir("mandarle a familia", lambda: "Enviado."), "modelo"
+        return "Abrí Valorant y le di a JUGAR.", "router"
+
+    rutinas.configurar(procesar)
+    r = {"nombre": "juego", "orden": "juega valorant", "riesgos": ["lectura", "escritura"],
+         "disparador": {"tipo": "una_vez", "cuando": "2026-11-02T10:38"}}
+    salida = rutinas._orden(r, {})
+    comprobar(salida == "Abrí Valorant y le di a JUGAR." and vistos[-1][0] == "juega valorant",
+              "pasa por el router/modelo como cualquier orden")
+    comprobar(vistos[-1][2] == ["escritura", "lectura"], "con el riesgo limitado a lectura y escritura")
+    salida = rutinas._orden(dict(r, orden="mandale a familia que ya voy"), {})
+    comprobar(confirmaciones.pendiente() is None and "necesita tu «sí» en vivo" in salida,
+              "si algo pide confirmacion, se cancela: nadie esta delante para decir que si")
+    rutinas.configurar(None)
+
+    print("\nSI EL PC ESTABA APAGADO A LA HORA, NO LO HACE HORAS DESPUES")
+    avisos.ENVIADOS.clear()
+    rutinas.guardar([{"nombre": "tarde", "activa": True, "riesgos": ["lectura", "escritura"], "orden": "juega valorant",
+                      "disparador": {"tipo": "una_vez", "cuando": (datetime.now() - timedelta(hours=3)).isoformat(timespec="minutes")}}])
+    comprobar(rutinas.tick() == ["tarde"], "la ve vencida")
+    comprobar(any("el PC estaba apagado" in t for _, t in avisos.ENVIADOS), "y avisa que no la hizo")
+    comprobar(rutinas.cargar() == [], "y la quita")
 
     print("\nEL DIARIO DE HOY SE PUEDE LEER")
     h = registro.obtener("obsidian_leer_diario")

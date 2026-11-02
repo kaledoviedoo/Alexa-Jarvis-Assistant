@@ -39,6 +39,7 @@ FINDE = [5, 6]
 
 DISPARADORES = ("hora", "una_vez", "disco", "juego")
 PROHIBIDOS = ("externa", "irreversible")
+MINUTOS_DE_TOLERANCIA = 30         # una orden "a las X" que llega mas tarde que esto, no se hace
 SEGUNDOS_TICK = 60                 # una mirada por minuto: casi nada de procesador
 MINUTOS_ENTRE_DISCOS = 10
 
@@ -553,10 +554,32 @@ def memoria_al_dia(r: dict, est: dict) -> str:
     return "Memoria al día. " + ". ".join(partes) + "."
 
 
+_procesar = None                    # server.procesar_con_origen, lo inyecta el servidor
+
+
+def configurar(procesar) -> None:
+    global _procesar
+    _procesar = procesar
+
+
 def _orden(r: dict, est: dict) -> str:
-    """Una orden en lenguaje normal: la resuelve el modelo, con el riesgo limitado."""
+    """Una orden en lenguaje normal, por el mismo camino que Alexa y el chat
+    (router, capa semantica, modelo), con el riesgo limitado. Si algo pide
+    confirmacion, se cancela: nadie esta delante para decir que si."""
+    import confirmaciones
     import ollama_client
-    return ollama_client.con_riesgos(r.get("riesgos") or ["lectura"], ollama_client._conversar, r["orden"])
+    riesgos = r.get("riesgos") or ["lectura"]
+    antes = confirmaciones.pendiente()
+    if _procesar is not None:
+        respuesta, _origen = ollama_client.con_riesgos(
+            riesgos, ollama_client.en_canal, "voz", _procesar, r["orden"], None, 300.0, en_este_hilo=True)
+    else:
+        respuesta = ollama_client.con_riesgos(riesgos, ollama_client._conversar, r["orden"])
+    if antes is None and confirmaciones.pendiente() is not None:
+        confirmaciones.olvidar()
+        respuesta = (f"{str(respuesta).rstrip('.')}. No lo confirmé: eso necesita tu «sí» en vivo, "
+                     "pídemelo cuando estés.")
+    return respuesta
 
 
 ACCIONES = {
@@ -586,6 +609,16 @@ def ejecutar(r: dict, estado: dict, ahora: datetime | None = None) -> None:
     est["ultima"] = ahora.isoformat(timespec="seconds")
     funcion = _funcion(r)
     avisar = r.get("avisar", True)
+
+    if r["disparador"]["tipo"] == "una_vez":
+        cuando = datetime.fromisoformat(str(r["disparador"]["cuando"]))
+        if ahora - cuando > timedelta(minutes=MINUTOS_DE_TOLERANCIA):
+            guardar([x for x in cargar() if x["nombre"] != nombre])
+            estado.pop(nombre, None)
+            tareas.registrar_resultado(f"t{int(time.time() * 1000) % 10**9:09d}", f"rutina {nombre}",
+                                       f"No hice «{r.get('orden') or r.get('aviso')}» a las "
+                                       f"{cuando:%H:%M}: el PC estaba apagado y ya era tarde.", avisar=avisar)
+            return
 
     if r["disparador"]["tipo"] in RAPIDAS:
         try:
@@ -688,7 +721,56 @@ RE_EL_DIA = re.compile(rf"\b(?:el|este|el\s+proximo|el\s+otro)\s+(?P<dia>{_DIA})
 RE_CLAVE = re.compile(r"\b(?:recuerdame|recordarme|recuerdeme|avisame|aviseme|ponme\s+un\s+recordatorio|"
                       r"crea\s+un\s+recordatorio|recordatorio)\b(?:\s+(?:de|para|que))?")
 VERBOS_ORDEN = ("investiga", "busca", "dime", "revisa", "lee", "resume", "resumeme", "comprueba",
-                "mira", "compara", "cuentame", "dame")
+                "mira", "compara", "cuentame", "dame", "abre", "cierra", "juega", "dale", "pulsa",
+                "presiona", "apunta", "anota", "crea", "mueve", "copia", "minimiza", "maximiza",
+                "cambia", "pasa", "pon", "reproduce", "ejecuta", "inicia", "lanza", "toma", "escribe",
+                "entra", "selecciona", "archiva", "guarda", "activa", "prende", "haz", "explicame",
+                "ordena", "organiza", "libera")
+# Lo que nunca se deja programado: enviar necesita tu "si" en vivo.
+VERBOS_QUE_ENVIAN = ("manda", "mandale", "envia", "enviale", "responde", "contesta", "escribele")
+# Apagar o reiniciar a una hora ya lo hace el router con el temporizador de Windows.
+VERBOS_DEL_ROUTER = ("apaga", "reinicia", "suspende", "hiberna", "bloquea")
+
+# "quiero que a las 5 ABRAS spotify": del subjuntivo a la orden de siempre.
+_IMPERATIVO = {
+    "abras": "abre", "cierres": "cierra", "juegues": "juega", "busques": "busca", "investigues": "investiga",
+    "apuntes": "apunta", "anotes": "anota", "crees": "crea", "muevas": "mueve", "copies": "copia",
+    "minimices": "minimiza", "maximices": "maximiza", "cambies": "cambia", "pases": "pasa",
+    "reproduzcas": "reproduce", "leas": "lee", "revises": "revisa", "mires": "mira", "ejecutes": "ejecuta",
+    "inicies": "inicia", "lances": "lanza", "tomes": "toma", "escribas": "escribe", "pongas": "pon",
+    "hagas": "haz", "digas": "di", "des": "da", "pulses": "pulsa", "presiones": "presiona", "entres": "entra",
+    "selecciones": "selecciona", "archives": "archiva", "guardes": "guarda", "actives": "activa",
+    "prendas": "prende", "compares": "compara", "resumas": "resume", "ordenes": "ordena",
+    "organices": "organiza", "expliques": "explica", "mandes": "manda", "envies": "envia",
+    "respondas": "responde", "contestes": "contesta", "apagues": "apaga", "reinicies": "reinicia",
+}
+
+
+def a_imperativo(texto: str) -> str:
+    """'abras valorant y le des a jugar' -> 'abre valorant y dale a jugar'."""
+    def cambiar(m):
+        clitico, verbo = (m.group(1) or "").strip().lower(), m.group(2)
+        imperativo = _IMPERATIVO.get(_plano(verbo))
+        if not imperativo:
+            return m.group(0)
+        if clitico in ("le", "me", "lo", "la", "les", "los", "las", "te"):
+            return imperativo + clitico
+        return (m.group(1) or "") + imperativo
+    return re.sub(r"\b((?:le|me|lo|la|les|los|las|te)\s+)?(\w+)\b", cambiar, texto, flags=re.I)
+
+
+def _quitar_entrada(texto: str) -> str:
+    """Fuera 'quiero que', 'necesito que', 'por favor', 'de hoy'... del principio."""
+    t = texto.strip()
+    for _ in range(3):
+        nuevo = re.sub(r"^(?:por\s+favor|porfa|oye|jarvis|hoy|de\s+hoy|y)[\s,]+", "", t, flags=re.I)
+        nuevo = re.sub(r"^(?:yo\s+)?(?:\w+\s+){1,2}que\s+(?=\w)", lambda m: "" if _plano(m.group(0).split()[0])
+                       not in VERBOS_ORDEN else m.group(0), nuevo, count=1, flags=re.I)
+        if nuevo == t:
+            break
+        t = nuevo.strip()
+    t = re.sub(r"\b(?:de\s+)?hoy\b", " ", t, flags=re.I)
+    return re.sub(r"\s+", " ", t).strip(" ,.")
 _MAS_NUM = {"quince": 15, "veinte": 20, "treinta": 30, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "diez": 10}
 
 
@@ -747,12 +829,9 @@ def interpretar(frase: str, ahora: datetime | None = None) -> dict | str | None:
     m_man = RE_MANANA.search(plano) if not m_dias else None
     m_el = RE_EL_DIA.search(plano) if not m_dias else None
 
-    if m_clave:
-        tipo = "aviso"
-    elif m_dias and m_dias.start() < 4:
-        tipo = "orden"
-    else:
+    if not (m_dias or m_hora or m_medio or m_en or m_man or m_el):
         return None
+    tipo = "orden"
 
     # El contenido es la frase sin la palabra clave, los dias y las horas.
     mascara = list(frase)
@@ -764,9 +843,22 @@ def interpretar(frase: str, ahora: datetime | None = None) -> dict | str | None:
     contenido = re.sub(r"\s+", " ", contenido)
     contenido = re.sub(r"^[\s,.:;]*(?:(?:y|que|de|a|para)\s+)*", "", contenido, flags=re.I)
     contenido = re.sub(r"(?:[\s,.;:]+(?:y|a|que|de))*[\s,.;:]*$", "", contenido, flags=re.I).strip()
+    contenido = a_imperativo(_quitar_entrada(contenido))
 
-    if tipo == "orden" and (not contenido or _plano(contenido).split()[0] not in VERBOS_ORDEN):
+    primera = _plano(contenido).split()[0] if contenido.split() else ""
+    if primera in VERBOS_DEL_ROUTER:
         return None
+    verbos = {_plano(p) for p in re.findall(r"\w+", contenido)}
+    if verbos & set(VERBOS_QUE_ENVIAN) or primera in VERBOS_QUE_ENVIAN:
+        return ("Enviar mensajes o correos necesita tu «sí» en vivo, así que no lo dejo programado. "
+                "Si quieres que te lo recuerden, díselo a Alexa: «Alexa, recuérdame…».")
+    if tipo == "orden" and primera not in VERBOS_ORDEN:
+        return None
+    # "abre valorant y dale a jugar": el router ya sabe abrir el lanzador y pulsar JUGAR.
+    juego = re.match(r"(?:abre|inicia|ejecuta|lanza)\s+(?P<app>[\w ]+?)\s+y\s+(?:dale|da|pulsa|presiona|haz\s+clic)\b.*\bjugar\b",
+                     _plano(contenido))
+    if juego:
+        contenido = f"juega {contenido[juego.start('app'):juego.end('app')]}"
     if not contenido:
         return "¿Qué quieres que te recuerde? Dímelo así: recuérdame a las 5 llamar a mamá."
 
@@ -810,8 +902,10 @@ def interpretar(frase: str, ahora: datetime | None = None) -> dict | str | None:
                     f"{contenido}, o en 20 minutos.")
         return None
 
+    # Lo que programas tu puede mirar y cambiar cosas que se deshacen (abrir un
+    # juego, apuntar en el diario). Enviar o apagar nunca: eso pide tu si en vivo.
     r = {"nombre": _nombre_nuevo(contenido), "activa": True, "disparador": disparador,
-         "riesgos": ["lectura"]}
+         "riesgos": ["lectura", "escritura"]}
     r["aviso" if tipo == "aviso" else "orden"] = contenido
     return r
 
