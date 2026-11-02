@@ -32,7 +32,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 import confirmaciones
 import modes
@@ -309,7 +309,7 @@ _SEGURIDAD = {
     "Referrer-Policy": "no-referrer",
     "Content-Security-Policy": ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
                                 "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-                                "connect-src 'self'; frame-ancestors 'none'"),
+                                "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'"),
 }
 
 _SIN_LLAVE = """<!doctype html><html lang="es"><head><meta charset="utf-8">
@@ -416,8 +416,52 @@ def estado(request: Request):
     conversacion = [{"id": c["id"], "texto": c["texto"], "respuesta": c["respuesta"], "origen": c["origen"],
                      "momento": c["momento"]} for c in tareas.historial_chat(300)]
     return {"modo": modes.modo_actual(), "modelo": perfil["modelo"], "lugar": lugar,
-            "nombre": NOMBRE_USUARIO or "", "tareas": recientes,
+            "nombre": NOMBRE_USUARIO or "", "tareas": recientes, "voz": _estado_voz(),
             "confirmacion": confirmaciones.pendiente(), "conversacion": conversacion}
+
+
+MAX_AUDIO = 8 * 1024 * 1024
+
+
+def _estado_voz() -> dict:
+    try:
+        import voz_local
+        e = voz_local.estado()
+        return {"oir": e["oir"], "hablar": bool(e["hablar"]), "atajo": e["atajo"]}
+    except Exception:
+        return {"oir": False, "hablar": False, "atajo": None}
+
+
+@router.post("/chat/escuchar")
+async def escuchar(request: Request):
+    """Audio grabado en el navegador a texto, con Whisper en este PC."""
+    _exigir(request, escribir=True)
+    import asyncio
+    import voz_local
+    if not voz_local.puede_oir():
+        raise HTTPException(status_code=503, detail="Falta faster-whisper: corre scripts\\instalar_voz.ps1.")
+    audio = await request.body()
+    if not audio:
+        raise HTTPException(status_code=400, detail="No llegó audio.")
+    if len(audio) > MAX_AUDIO:
+        raise HTTPException(status_code=413, detail="El audio es demasiado largo.")
+    texto = await asyncio.to_thread(voz_local.transcribir, audio)
+    return {"texto": texto}
+
+
+@router.post("/chat/hablar")
+async def hablar(request: Request, cuerpo: dict):
+    """Texto a voz (WAV) con Piper o la voz de Windows, para leerlo en el navegador."""
+    _exigir(request, escribir=True)
+    import asyncio
+    import voz_local
+    texto = str((cuerpo or {}).get("texto", "")).strip()
+    if not texto:
+        raise HTTPException(status_code=400, detail="Falta el texto.")
+    wav = await asyncio.to_thread(voz_local.sintetizar, texto[:5000])
+    if not wav:
+        raise HTTPException(status_code=503, detail="No hay con qué hablar: corre scripts\\instalar_voz.ps1.")
+    return Response(wav, media_type="audio/wav", headers={"Cache-Control": "no-store"})
 
 
 @router.post("/chat/nuevo")

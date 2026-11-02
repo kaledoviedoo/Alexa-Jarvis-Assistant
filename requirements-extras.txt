@@ -23,6 +23,15 @@ pypdf>=4.0.0
 mss>=9.0.0
 pytesseract>=0.3.10
 
+# ---- Voz sin Alexa (Fase 6.2) ----
+# Oir con Whisper (en el procesador), grabar del microfono, el atajo de
+# teclado y contestar con Piper. scripts\instalar_voz.ps1 instala esto y baja
+# el modelo y la voz. Sin Piper, Jarvis habla con la voz de Windows.
+faster-whisper>=1.0.0
+sounddevice>=0.4.6
+keyboard>=0.13.5; sys_platform == "win32"
+piper-tts>=1.2.0
+
 # ---- Correo por Outlook de escritorio ----
 # Solo Windows. Despues de instalarlo hay que registrar sus DLLs:
 #     py -m pywin32_postinstall -install

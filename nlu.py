@@ -2030,7 +2030,7 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         _correos_sin_leer,
     ),
     (
-        # "lee los ultimos 3 correos": con cuerpo, que es lo que pidio Kaled.
+        # "lee los ultimos 3 correos": con cuerpo, que es lo que se pidio.
         re.compile(r"\b(?:l[eé]e(?:me)?|leer|dime|cu[eé]ntame|dame)\s+"
                    r"(?:el\s+|los\s+|las\s+|mis\s+)?(?:[uú]ltimos?\s+)?"
                    r"(?P<cuantos>\d+|un|una|dos|tres|cuatro|cinco)?\s*"

@@ -147,7 +147,7 @@ def resumen_para_modelo() -> str:
     if not carpetas:
         return ""
 
-    lineas = [f"Reglas de la boveda de Obsidian de {NOMBRE_USUARIO}:"]
+    lineas = [f"Reglas de la boveda de Obsidian de {NOMBRE_USUARIO or 'el usuario'}:"]
     descripciones = {
         "clase": "apuntes de una materia",
         "documento": "un archivo importante (pdf, guia, entrega)",

@@ -30,6 +30,7 @@ import ollama_client
 import rutinas
 import tareas
 import voz
+import voz_local
 from config import (
     ARCHIVO_LOG,
     CARPETAS_PERMITIDAS,
@@ -99,7 +100,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-11-01-fase6-chat"
+SELLO_CODIGO = "2026-11-01-fase6-voz"
 
 
 def novedades_al_abrir() -> str:
@@ -169,6 +170,12 @@ def al_arrancar():
                  rutinas.ruta_rutinas())
     except Exception as e:
         log.warning("No pude arrancar las rutinas: %s", e)
+
+    # Fase 6.2: hablarle sin Alexa, con un atajo de teclado.
+    try:
+        log.info("Voz local        : %s", voz_local.arrancar())
+    except Exception as e:
+        log.warning("No pude arrancar la voz local: %s", e)
 
     comet = detectar_comet()
     log.info("Comet             : %s", comet or "no detectado (usaré el navegador por defecto)")
@@ -576,6 +583,7 @@ PRESUPUESTO_PROBAR = 50.0
 
 # Fase 6: el chat local, en /chat. Solo desde este PC o tu red de Tailscale.
 chat.configurar(procesar_con_origen)
+voz_local.configurar(procesar_con_origen)
 app.include_router(chat.router)
 
 

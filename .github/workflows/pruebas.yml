@@ -78,6 +78,9 @@ jobs:
       - name: El chat solo existe en casa y ensena cada paso
         run: python test_chat.py
 
+      - name: Te oye y te contesta sin salir de casa
+        run: python test_voz.py
+
       - name: El servidor contesta en formato Alexa
         run: python test_alexa.py
 

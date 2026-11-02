@@ -187,6 +187,15 @@ textarea::placeholder { color: var(--tenue); }
   background: linear-gradient(135deg, #a78bfa, #7c3aed); color: #fff; box-shadow: 0 0 20px rgba(139,92,246,.45);
 }
 #enviar:disabled { opacity: .45; box-shadow: none; cursor: default; }
+.redondo {
+  width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: transparent; border: 1px solid var(--borde-fuerte); color: var(--suave);
+}
+.redondo:hover { color: var(--texto); border-color: var(--morado); }
+.redondo.activo { color: var(--morado-claro); border-color: var(--morado); background: var(--morado-tinte); }
+.redondo.grabando { color: #fff; border-color: #ef4444; background: #ef4444; animation: grabando 1.2s ease-in-out infinite; }
+@keyframes grabando { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.5) } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0) } }
+.aviso-voz { font-size: 12.5px; color: var(--tenue); margin: 8px 4px 0; min-height: 1.2em; }
 
 /* Sugerencias */
 #sugerencias { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
@@ -359,11 +368,18 @@ dialog p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
         <div class="caja-pie">
           <div class="chip-modelo"><span class="mini"></span><span id="chip-modelo">Jarvis</span></div>
           <span class="espacio"></span>
+          <button type="button" class="redondo" id="btn-voz-alta" title="Contestar en voz alta" aria-label="Contestar en voz alta" hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          </button>
+          <button type="button" class="redondo" id="btn-mic" title="Hablar" aria-label="Hablar" hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+          </button>
           <button id="enviar" type="submit" aria-label="Enviar">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>
           </button>
         </div>
       </form>
+      <div class="aviso-voz" id="aviso-voz"></div>
       <div id="sugerencias">
         <button class="sug" data-orden="cómo está el equipo">
           <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
@@ -503,6 +519,7 @@ function anotar(v, ev) {
       if (v.nPasos === 0 && v.pasos.childElementCount <= 1) v.pasos.remove();
       else v.pasos.open = false;
       if (ev.confirmacion) confirmar(v.caja, ev.confirmacion);
+      if (vozAlta && vozInfo.hablar) decir(ev.texto);
     }
   } else if (ev.tipo === "fondo") {
     const f = el("div", "fondo");
@@ -682,6 +699,12 @@ async function refrescarEstado() {
     $("#estado").textContent = `modo ${s.modo}`;
     $("#chip-modelo").textContent = `${s.modelo} · ${s.modo}`;
     $("#tarjeta-lat").hidden = s.lugar !== "local";
+    vozInfo = s.voz || {};
+    const micPosible = vozInfo.oir && window.isSecureContext && navigator.mediaDevices && window.MediaRecorder;
+    $("#btn-mic").hidden = !micPosible;
+    $("#btn-mic").title = vozInfo.atajo ? `Hablar (en el PC también con ${vozInfo.atajo})` : "Hablar";
+    $("#btn-voz-alta").hidden = !vozInfo.hablar;
+    $("#btn-voz-alta").classList.toggle("activo", vozAlta);
     if (s.nombre) {
       $("#saludo").textContent = `¡Bienvenido de nuevo, ${s.nombre}!`;
     }
@@ -732,6 +755,96 @@ $("#btn-vincular").onclick = async () => {
   }
 };
 document.querySelectorAll("[data-cerrar]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
+
+/* ---------- Voz: microfono y respuesta en voz alta ---------- */
+let vozInfo = {};
+let vozAlta = false;
+try { vozAlta = localStorage.getItem("jarvis-voz-alta") === "1"; } catch {}
+let audioActual = null;
+
+function avisoVoz(t) { $("#aviso-voz").textContent = t || ""; }
+
+$("#btn-voz-alta").onclick = () => {
+  vozAlta = !vozAlta;
+  try { localStorage.setItem("jarvis-voz-alta", vozAlta ? "1" : "0"); } catch {}
+  $("#btn-voz-alta").classList.toggle("activo", vozAlta);
+  if (!vozAlta && audioActual) audioActual.pause();
+  avisoVoz(vozAlta ? "Te contestaré en voz alta." : "");
+  setTimeout(() => avisoVoz(""), 2500);
+};
+
+async function decir(texto) {
+  try {
+    if (audioActual) audioActual.pause();
+    const r = await fetch("/chat/hablar", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Jarvis-Chat": "1" },
+      body: JSON.stringify({ texto }),
+    });
+    if (!r.ok) return;
+    audioActual = new Audio(URL.createObjectURL(await r.blob()));
+    audioActual.play().catch(() => {});
+  } catch {}
+}
+
+let grabadora = null;
+async function empezarAGrabar() {
+  if (audioActual) audioActual.pause();
+  let flujo;
+  try {
+    flujo = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch {
+    avisoVoz("El navegador no me deja usar el micrófono. Revisa el permiso del sitio.");
+    return;
+  }
+  const trozos = [];
+  const rec = new MediaRecorder(flujo);
+  rec.ondataavailable = (e) => e.data.size && trozos.push(e.data);
+  // Para solo cuando te callas: 1,3 s de silencio despues de hablar.
+  const ctx = new AudioContext();
+  const analizador = ctx.createAnalyser();
+  analizador.fftSize = 1024;
+  ctx.createMediaStreamSource(flujo).connect(analizador);
+  const datos = new Float32Array(analizador.fftSize);
+  let hablo = 0, callado = 0, total = 0;
+  const vigia = setInterval(() => {
+    analizador.getFloatTimeDomainData(datos);
+    let suma = 0; for (const x of datos) suma += x * x;
+    const volumen = Math.sqrt(suma / datos.length);
+    total += 0.1;
+    if (volumen > 0.015) { hablo += 0.1; callado = 0; } else callado += 0.1;
+    if ((hablo > 0.3 && callado > 1.3) || total > 20 || (hablo < 0.3 && total > 7)) parar();
+  }, 100);
+  function parar() { if (rec.state !== "inactive") rec.stop(); }
+  rec.onstop = async () => {
+    clearInterval(vigia);
+    flujo.getTracks().forEach((t) => t.stop());
+    ctx.close();
+    grabadora = null;
+    $("#btn-mic").classList.remove("grabando");
+    if (hablo < 0.3) { avisoVoz("No te oí. Toca el micrófono y habla."); return; }
+    avisoVoz("Transcribiendo…");
+    try {
+      const blob = new Blob(trozos, { type: rec.mimeType || "audio/webm" });
+      const r = await fetch("/chat/escuchar", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": blob.type, "X-Jarvis-Chat": "1" }, body: blob,
+      });
+      if (!r.ok) throw new Error(r.status);
+      const { texto } = await r.json();
+      avisoVoz("");
+      if (texto) mandar(texto); else avisoVoz("No te entendí. Prueba otra vez.");
+    } catch (e) {
+      avisoVoz("No pude transcribir (" + e.message + ").");
+    }
+  };
+  rec.start(250);
+  grabadora = { parar };
+  $("#btn-mic").classList.add("grabando");
+  avisoVoz("Te escucho… cuando termines, haz una pausa y lo envío.");
+}
+
+$("#btn-mic").onclick = () => { if (grabadora) grabadora.parar(); else empezarAGrabar(); };
 
 /* ---------- Barra lateral en el celular ---------- */
 function abrirLateral() { $("#lateral").classList.add("abierta"); $("#velo").classList.add("visible"); }

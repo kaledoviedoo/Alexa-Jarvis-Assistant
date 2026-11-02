@@ -359,7 +359,7 @@ def detectar_comet() -> str:
 MOTOR_BUSQUEDA = _env("JARVIS_MOTOR_BUSQUEDA", "https://www.perplexity.ai/search?q={q}")
 
 
-NOMBRE_USUARIO = _env("JARVIS_NOMBRE_USUARIO", "Kaled")
+NOMBRE_USUARIO = _env("JARVIS_NOMBRE_USUARIO", "")
 
 FRECUENCIA_NOMBRE = int(_env("JARVIS_FRECUENCIA_NOMBRE", "4"))
 

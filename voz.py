@@ -69,7 +69,7 @@ def con_nombre(texto: str, siempre: bool = False) -> str:
     # que quedar FUERA de los signos y la frase entrar entera detras.
     if limpio.endswith(("?", "!")):
         # Si empieza por signo de apertura, la minuscula va DESPUES del signo:
-        # "Kaled, ¿Que aplicacion..." con mayuscula queda mal.
+        # "Ana, ¿Que aplicacion..." con mayuscula queda mal.
         if limpio[0] in "¿¡" and len(limpio) > 2:
             cuerpo = limpio[0] + limpio[1].lower() + limpio[2:]
         elif limpio[:2].isupper():
@@ -88,11 +88,11 @@ def saludo_inicial(modo_hablado: str, continua: bool) -> str:
     """El saludo de apertura. Aqui el nombre va siempre."""
     if continua:
         return (
-            f"Hola {NOMBRE_USUARIO}. Jarvis en línea en modo {modo_hablado}. "
+            f"Hola{(' ' + NOMBRE_USUARIO) if NOMBRE_USUARIO else ''}. Jarvis en línea en modo {modo_hablado}. "
             "Te escucho: dime órdenes seguidas sin repetir mi nombre. "
             "Di pausa cuando termines."
         )
-    return f"Hola {NOMBRE_USUARIO}. Jarvis en línea en modo {modo_hablado}. ¿Qué necesitas?"
+    return f"Hola{(' ' + NOMBRE_USUARIO) if NOMBRE_USUARIO else ''}. Jarvis en línea en modo {modo_hablado}. ¿Qué necesitas?"
 
 
 PALABRAS_INGLESAS = {
