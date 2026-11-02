@@ -39,7 +39,7 @@ FINDE = [5, 6]
 
 DISPARADORES = ("hora", "una_vez", "disco", "juego")
 PROHIBIDOS = ("externa", "irreversible")
-SEGUNDOS_TICK = 30
+SEGUNDOS_TICK = 60                 # una mirada por minuto: casi nada de procesador
 MINUTOS_ENTRE_DISCOS = 10
 
 PREDETERMINADAS = [
@@ -622,6 +622,7 @@ def tick(ahora: datetime | None = None) -> list[str]:
     """Una vuelta del planificador. Devuelve los nombres que corrieron."""
     ahora = ahora or datetime.now()
     estado = _cargar_estado()
+    antes = json.dumps(estado, sort_keys=True)
     corridas = []
     for r in cargar():
         est = estado.setdefault(r["nombre"], {})
@@ -631,7 +632,8 @@ def tick(ahora: datetime | None = None) -> list[str]:
                 corridas.append(r["nombre"])
         except Exception as e:
             log.warning("Rutina %r: %s", r.get("nombre"), e)
-    _guardar_estado(estado)
+    if json.dumps(estado, sort_keys=True) != antes:      # sin escribir al disco cada minuto
+        _guardar_estado(estado)
     return corridas
 
 

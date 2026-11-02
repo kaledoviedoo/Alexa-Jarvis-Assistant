@@ -309,6 +309,17 @@ def main() -> int:
     comprobar([r["nombre"] for r in rutinas.cargar()] == ["luego"], "la de una vez desaparece al cumplirse")
     comprobar(rutinas.tick() == [], "y no se repite")
 
+    print("\nEL PLANIFICADOR NO ESCRIBE AL DISCO SI NADA CAMBIO")
+    rutinas.guardar([{"nombre": "lejana", "activa": True, "riesgos": ["lectura"], "aviso": "x",
+                      "disparador": {"tipo": "hora", "dias": [0], "hora": "04:00", "margen": 1}}])
+    rutinas.tick()
+    marca = rutinas._ruta_estado().stat().st_mtime_ns if rutinas._ruta_estado().exists() else None
+    time.sleep(0.05)
+    rutinas.tick()
+    despues = rutinas._ruta_estado().stat().st_mtime_ns if rutinas._ruta_estado().exists() else None
+    comprobar(marca == despues, "una vuelta sin novedades no toca el disco")
+    comprobar(rutinas.SEGUNDOS_TICK >= 60, "y mira una vez por minuto, no cada 30 s")
+
     print("\nEL DIARIO DE HOY SE PUEDE LEER")
     h = registro.obtener("obsidian_leer_diario")
     comprobar(h is not None and h.riesgo == "lectura", "obsidian_leer_diario existe y solo mira")

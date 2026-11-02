@@ -351,6 +351,10 @@ def pagina(request: Request):
     if not autorizado(request):
         return HTMLResponse(_SIN_LLAVE, status_code=401, headers=_SEGURIDAD)
     try:
+        modes.precalentar_en_segundo_plano()     # mientras escribes, se carga el modelo
+    except Exception:
+        pass
+    try:
         html = PAGINA.read_text(encoding="utf-8")
     except Exception as e:
         return HTMLResponse(f"No encuentro chat.html: {e}", status_code=500)

@@ -55,6 +55,9 @@ _lock = threading.RLock()
 _whisper = None
 _piper = None
 _estado = {"grabando": False, "hablando": False, "pensando": False}
+MINUTOS_PARA_SOLTAR = 10           # Whisper ocupa ~0,5-1 GB de RAM: se suelta si no lo usas
+_ultimo_uso = 0.0
+_vigia: threading.Timer | None = None
 _detener_grabacion = threading.Event()
 
 
@@ -116,8 +119,45 @@ def estado() -> dict:
 # ---------------------------------------------------------------------------
 # Oir
 # ---------------------------------------------------------------------------
+def liberar() -> bool:
+    """Suelta Whisper y la voz de Piper de la memoria. True si habia algo."""
+    global _whisper, _piper
+    with _lock:
+        habia = _whisper is not None or _piper is not None
+        _whisper = None
+        _piper = None
+    if habia:
+        import gc
+        gc.collect()
+        log.info("Voz local: modelos soltados de la memoria.")
+    return habia
+
+
+def _soltar_si_no_se_usa() -> None:
+    if time.time() - _ultimo_uso >= MINUTOS_PARA_SOLTAR * 60 - 1 and not any(_estado.values()):
+        liberar()
+    else:
+        _programar_vigia()
+
+
+def _programar_vigia() -> None:
+    global _vigia
+    if _vigia is not None:
+        _vigia.cancel()
+    _vigia = threading.Timer(MINUTOS_PARA_SOLTAR * 60, _soltar_si_no_se_usa)
+    _vigia.daemon = True
+    _vigia.start()
+
+
+def _usado() -> None:
+    global _ultimo_uso
+    _ultimo_uso = time.time()
+    _programar_vigia()
+
+
 def _modelo_whisper():
     global _whisper
+    _usado()
     with _lock:
         if _whisper is None:
             from faster_whisper import WhisperModel
@@ -186,6 +226,7 @@ def texto_para_hablar(texto: str) -> str:
 
 def _voz_piper():
     global _piper
+    _usado()
     with _lock:
         if _piper is None:
             from piper import PiperVoice
@@ -431,5 +472,7 @@ def arrancar() -> str:
         keyboard.add_hotkey(ATAJO, al_atajo, suppress=False)
     except Exception as e:
         return f"no pude registrar el atajo {ATAJO}: {e}"
-    threading.Thread(target=_modelo_whisper, daemon=True, name="whisper-carga").start()
-    return f"atajo {ATAJO} · whisper {MODELO_WHISPER} · habla con {motor_de_habla() or 'nada'}"
+    # Whisper NO se carga aqui: se carga al pulsar el atajo y se suelta si no
+    # lo usas. Cuesta ~1 s la primera vez; a cambio, no ocupa memoria de gana.
+    return (f"atajo {ATAJO} · whisper {MODELO_WHISPER} (se carga al usarlo) · "
+            f"habla con {motor_de_habla() or 'nada'}")

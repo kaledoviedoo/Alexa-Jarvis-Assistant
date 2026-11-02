@@ -19,6 +19,7 @@ import urllib.parse
 import urllib.request
 
 from config import (
+    AHORRO,
     INTERVALO_CALIENTE,
     MANTENER_CALIENTE,
     TUNEL_URL,
@@ -186,7 +187,9 @@ def _ping_publico() -> None:
 
 # Cuanto tiempo se considera que "sigues por aqui". Mientras dure, el modelo
 # se mantiene cargado en la VRAM; pasado eso, se le deja caer.
-MINUTOS_DE_GRACIA = 20
+# Tras la ultima orden, cuanto se mantiene el modelo cargado a base de tocarlo.
+# En ahorro, poco: si no hablas, que se suelte y deje libre la grafica.
+MINUTOS_DE_GRACIA = 5 if AHORRO else 20
 
 # Ultima vez que llego algo de Alexa. Lo marca el servidor en cada peticion.
 _ultima_actividad = 0.0

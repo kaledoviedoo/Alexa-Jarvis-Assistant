@@ -171,6 +171,34 @@ def main() -> int:
               "el audio del navegador pasa por un archivo temporal que luego se borra")
     voz_local._whisper = None
 
+    print("\nAHORRO: NADA CARGADO SIN USARSE")
+    import modes
+    import nlu
+    comprobar("se carga al usarlo" in voz_local.arrancar() or voz_local.faltan(),
+              "Whisper no se carga al arrancar")
+    voz_local._whisper, voz_local._piper = object(), object()
+    comprobar(voz_local.liberar() and voz_local._whisper is None and voz_local._piper is None,
+              "liberar suelta Whisper y Piper de la memoria")
+    voz_local._whisper = object()
+    voz_local._ultimo_uso = 0.0
+    voz_local._soltar_si_no_se_usa()
+    comprobar(voz_local._whisper is None, "si no se usa en 10 minutos, se suelta solo")
+    if voz_local._vigia:
+        voz_local._vigia.cancel()
+    soltados = []
+    original = modes.descargar_modelos
+    modes.descargar_modelos = lambda: soltados.append(1) or 2
+    for frase in ("libera la memoria", "suelta los modelos", "libera la gráfica", "pon el modo ahorro"):
+        r = nlu.enrutar(frase) or ""
+        comprobar(r.startswith("Listo, solté los modelos"), f"'{frase}' suelta los modelos")
+    modes.descargar_modelos = original
+    comprobar(len(soltados) == 4, "y de verdad llama a soltarlos")
+    comprobar(not (nlu.enrutar("libera espacio en el disco") or "").startswith("Listo, solté"),
+              "'libera espacio' sigue siendo del disco")
+    comprobar(config.AHORRO and config.PERFILES["normal"]["keep_alive"] == "10m"
+              and config.PERFILES["gaming"]["keep_alive"] == "5m",
+              "en ahorro, el modelo se suelta a los pocos minutos")
+
     print()
     print("=" * 70)
     if fallos:

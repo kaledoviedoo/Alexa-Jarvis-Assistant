@@ -119,16 +119,27 @@ MODO_NORMAL = "normal"
 MODO_DEDICADO = "dedicado"
 MODO_GAMING = "gaming"
 
+# Ahorro (por defecto): Jarvis no carga nada hasta que lo usas y lo suelta a
+# los pocos minutos. El modelo se carga al abrir la skill o el chat, mientras
+# hablas, asi que casi no se nota. JARVIS_AHORRO=0 vuelve al modo de siempre
+# caliente (modelo cargado desde el arranque y durante media hora).
+AHORRO = _env("JARVIS_AHORRO", "1").strip().lower() not in ("0", "no", "false")
+
+
+def _retener(ahorro: str, siempre: str) -> str:
+    return _env("JARVIS_KEEP_ALIVE", ahorro if AHORRO else siempre)
+
+
 PERFILES = {
     MODO_NORMAL: {
         "nombre_hablado": "normal",
-        "modelo": _env("JARVIS_MODELO_NORMAL", "llama3.2:3b"),
+        "modelo": _env("JARVIS_MODELO_NORMAL", "qwen2.5:3b"),
         "num_gpu": -1,
         # 8192 y no 4096: el prompt del sistema mas los esquemas de las
         # herramientas pasan de 4.700 tokens, y con 4096 Ollama recortaba el
         # principio, justo las reglas. ~3 GB en VRAM con este contexto.
         "num_ctx": 8192,
-        "keep_alive": "30m",
+        "keep_alive": _retener("10m", "30m"),
         "temperatura": 0.3,
         "max_pasos": 4,
         "descripcion": "Modelo ligero siempre caliente. Respuestas casi instantáneas.",
@@ -139,19 +150,19 @@ PERFILES = {
         "num_gpu": -1,
         "num_ctx": 8192,
         # ~4.7 GB en VRAM: entra en 6 GB con margen si no hay un juego abierto.
-        "keep_alive": "60m",
+        "keep_alive": _retener("10m", "60m"),
         "temperatura": 0.4,
         "max_pasos": 8,
         "descripcion": "Modelo grande en la RTX 3050. Razona mejor, tarda más.",
     },
     MODO_GAMING: {
         "nombre_hablado": "gaming",
-        "modelo": _env("JARVIS_MODELO_GAMING", "llama3.2:3b"),
+        "modelo": _env("JARVIS_MODELO_GAMING", "qwen2.5:3b"),
         "num_gpu": 0,  # <- la clave: cero capas en GPU, VRAM libre para el juego
         # Igual que en normal: con 2048 el modelo no veia ni sus reglas.
         # En CPU, mas contexto es mas lento, pero no ciego.
         "num_ctx": 6144,
-        "keep_alive": "10m",
+        "keep_alive": _retener("5m", "10m"),
         "temperatura": 0.3,
         "max_pasos": 4,
         "descripcion": "Suelta la RTX 3050 por completo. Jarvis corre en CPU.",

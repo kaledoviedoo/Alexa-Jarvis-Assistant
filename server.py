@@ -32,6 +32,7 @@ import tareas
 import voz
 import voz_local
 from config import (
+    AHORRO,
     ARCHIVO_LOG,
     CARPETAS_PERMITIDAS,
     ESCRITORIO,
@@ -195,8 +196,11 @@ def al_arrancar():
         log.info("Ollama            : conectado")
         # Precalentar es lo que evita que la primera orden del día tarde 30 s
         # y Alexa la corte. Se hace en segundo plano para no bloquear el arranque.
-        modes.precalentar_en_segundo_plano()
-        log.info("Precalentando el modelo en segundo plano...")
+        if AHORRO:
+            log.info("Ahorro            : el modelo se carga al abrir la skill o el chat, no ahora")
+        else:
+            modes.precalentar_en_segundo_plano()
+            log.info("Precalentando el modelo en segundo plano...")
     else:
         log.warning("Ollama            : NO responde. Solo funcionarán los comandos básicos.")
 

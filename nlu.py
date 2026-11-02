@@ -460,6 +460,25 @@ def _reiniciar(m) -> str:
     return confirmaciones.pedir("reiniciar el equipo", sistema.reiniciar_equipo)
 
 
+# ---- Ahorro: soltar los modelos ya ----
+def _liberar_modelos(m) -> str:
+    sueltos = modes.descargar_modelos()
+    try:
+        import ollama
+        from tools import memoria
+        ollama.generate(model=memoria.MODELO, prompt="", keep_alive=0)
+    except Exception:
+        pass
+    try:
+        import voz_local
+        voz_local.liberar()
+    except Exception:
+        pass
+    log.info("Ahorro: %d modelos soltados a peticion.", sueltos)
+    return ("Listo, solté los modelos: la gráfica y la memoria quedan libres. "
+            "Vuelvo a cargarlos cuando me hables.")
+
+
 # ---- Rutinas y recordatorios (Fase 5) ----
 def _rutina_crear(m):
     import rutinas
@@ -1314,6 +1333,12 @@ SOBRE_MI_EQUIPO = (
 
 
 INTENTS: list[tuple[re.Pattern, callable]] = [
+    (
+        re.compile(r"\b(?:libera|suelta|descarga|vacia)(?:me)?\s+(?:la\s+|los\s+)?"
+                   r"(?:memoria(?:\s+de\s+la\s+grafica)?|grafica|vram|ram|modelos?)\b|"
+                   r"\b(?:pon(?:te)?\s+(?:en\s+)?(?:el\s+)?)?modo\s+(?:reposo|ahorro)\b", _F),
+        _liberar_modelos,
+    ),
     # Rutinas: antes que nada, para que "apaga la rutina de..." no apague el PC.
     (
         re.compile(r"\b(?P<acc>apaga|desactiva|deten|para|pausa|quita|cancela|enciende|activa|prende|"
