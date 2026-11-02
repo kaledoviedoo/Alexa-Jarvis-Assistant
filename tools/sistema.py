@@ -10,8 +10,10 @@ parecido del catalogo, el buscador de Windows, y rendirse proponiendo
 alternativas.
 """
 
+import json
 import logging
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import time
@@ -304,6 +306,51 @@ JUEGOS = {
 }
 
 
+# Los juegos de Riot se lanzan como su acceso directo: RiotClientServices con
+# --launch-product entra directo al juego. Con el enlace riotclient:// solo se
+# abria el cliente y habia que buscar el boton de jugar en la pantalla.
+PRODUCTOS_RIOT = {"valorant": "valorant", "league of legends": "league_of_legends", "lol": "league_of_legends"}
+ENTRAN_DIRECTO = ("valorant",)          # League abre su cliente: ahi si hay que darle a jugar
+
+
+def cliente_riot() -> str | None:
+    candidatos = []
+    try:
+        datos = json.loads((Path(os.environ.get("PROGRAMDATA", r"C:\ProgramData")) / "Riot Games"
+                            / "RiotClientInstalls.json").read_text(encoding="utf-8"))
+        candidatos += [datos.get(k) for k in ("rc_default", "rc_live")]
+    except Exception:
+        pass
+    candidatos += [rf"{u}:\Riot Games\Riot Client\RiotClientServices.exe" for u in "CDEF"]
+    for c in candidatos:
+        if c and Path(c).exists():
+            return c
+    return None
+
+
+def _juego_canonico(crudo: str) -> str:
+    crudo = (crudo or "").strip().lower()
+    if crudo in JUEGOS:
+        return crudo
+    for alias in JUEGOS:
+        if alias in crudo or crudo in alias:
+            return alias
+    return crudo
+
+
+def entra_directo(nombre: str) -> bool:
+    return _juego_canonico(nombre) in ENTRAN_DIRECTO and cliente_riot() is not None
+
+
+def _liberar_para_jugar() -> str:
+    from tools import rendimiento
+    import modes
+    partes = [rendimiento.cerrar_prescindibles()]
+    if modes.modo_actual() != "gaming":
+        partes.append(modes.cambiar_modo("gaming"))
+    return " ".join(p for p in partes if p)
+
+
 def abrir_juego(nombre: str) -> str:
     """Lanza un juego y avisa de lo que conviene hacer antes."""
     crudo = (nombre or "").strip().lower()
@@ -322,22 +369,33 @@ def abrir_juego(nombre: str) -> str:
         # el propio Steam en vez de decir que no lo conocemos.
         return abrir_aplicacion(crudo)
 
+    riot = cliente_riot() if crudo in PRODUCTOS_RIOT else None
     try:
-        subprocess.Popen(comando, shell=True, creationflags=subprocess.DETACHED_PROCESS
-                         if os.name == "nt" else 0)
+        if riot:
+            subprocess.Popen([riot, f"--launch-product={PRODUCTOS_RIOT[crudo]}", "--launch-patchline=live"],
+                             creationflags=subprocess.DETACHED_PROCESS if os.name == "nt" else 0)
+        else:
+            subprocess.Popen(comando, shell=True, creationflags=subprocess.DETACHED_PROCESS
+                             if os.name == "nt" else 0)
     except Exception as e:
         return f"No pude abrir {crudo}: {e}"
 
-    log.info("Juego lanzado: %s", crudo)
+    log.info("Juego lanzado: %s%s", crudo, " (directo con el cliente de Riot)" if riot else "")
 
+    # Antes era solo una pregunta en el texto: decir "si" no hacia nada.
+    # Ahora queda pendiente de verdad y el "si" cierra lo que sobra.
+    import confirmaciones
     from tools import rendimiento
+    base = (f"Abriendo {crudo}: entra directo al juego, sin pasar por el botón de jugar."
+            if riot and crudo in ENTRAN_DIRECTO else f"Abriendo {crudo}.")
     cerrables = rendimiento.candidatos_a_cerrar()
     if cerrables:
         nombres = ", ".join(p["nombre"] for p in cerrables[:3])
-        return (f"Abriendo {crudo}. Tienes {nombres} comiendo recursos. "
-                "¿Los cierro y paso a modo gaming?")
-
-    return f"Abriendo {crudo}. ¿Paso a modo gaming?"
+        return confirmaciones.pedir(
+            f"cerrar {nombres} y pasar a modo gaming", _liberar_para_jugar,
+            pregunta=(f"{base} Tienes {nombres} comiendo recursos. "
+                      "¿Los cierro y paso a modo gaming? Di sí o no."))
+    return base
 
 
 EXE_POR_ALIAS = {
@@ -859,8 +917,13 @@ def arrancar_partida(nombre: str = "") -> str:
     """Abre el lanzador y ADEMAS le da a jugar."""
     crudo = (nombre or "").strip()
     if crudo:
+        directo = entra_directo(crudo)
         apertura = abrir_juego(crudo)
         if apertura.lower().startswith("no "):
+            return apertura
+        if directo:
+            # Valorant con su acceso directo entra solo: buscar "jugar" en la
+            # pantalla pulsaba cualquier cosa que dijera "jugar".
             return apertura
     else:
         apertura = ""

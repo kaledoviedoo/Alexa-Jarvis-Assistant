@@ -357,9 +357,39 @@ def main() -> int:
               "pasa por el router/modelo como cualquier orden")
     comprobar(vistos[-1][2] == ["escritura", "lectura"], "con el riesgo limitado a lectura y escritura")
     salida = rutinas._orden(dict(r, orden="mandale a familia que ya voy"), {})
-    comprobar(confirmaciones.pendiente() is None and "necesita tu «sí» en vivo" in salida,
-              "si algo pide confirmacion, se cancela: nadie esta delante para decir que si")
+    p = confirmaciones.pendiente()
+    comprobar(p is not None and p["segundos"] > 100 and "Contéstame «sí» o «no»" in salida,
+              f"si algo pide confirmacion, queda 2 minutos para contestar por voz o en el chat ({p})")
+    confirmaciones.olvidar()
     rutinas.configurar(None)
+
+    print("\nVALORANT ENTRA DIRECTO Y EL 'SI' DE CERRAR LO QUE SOBRA FUNCIONA")
+    from tools import sistema, rendimiento
+    lanzados = []
+    originales = (sistema.cliente_riot, sistema.subprocess.Popen, rendimiento.candidatos_a_cerrar,
+                  rendimiento.cerrar_prescindibles)
+    sistema.cliente_riot = lambda: r"C:\Riot Games\Riot Client\RiotClientServices.exe"
+    sistema.subprocess.Popen = lambda args, **k: lanzados.append(args)
+    rendimiento.candidatos_a_cerrar = lambda: [{"nombre": "comet", "ram": 1.2, "cpu": 3}]
+    cerrado = []
+    rendimiento.cerrar_prescindibles = lambda: cerrado.append(1) or "Cerré comet."
+    import modes
+    modo_original = (modes.modo_actual, modes.cambiar_modo)
+    modes.modo_actual = lambda: "gaming"
+    try:
+        texto = sistema.arrancar_partida("valorant")
+        comprobar(lanzados and lanzados[-1][1:] == ["--launch-product=valorant", "--launch-patchline=live"],
+                  f"se lanza como su acceso directo ({lanzados[-1] if lanzados else None})")
+        comprobar(texto.startswith("Abriendo valorant: entra directo al juego") and "Di sí o no" in texto,
+                  f"sin buscar el boton de jugar, y con la pregunta ('{texto[:70]}')")
+        comprobar(confirmaciones.pendiente() is not None, "la pregunta queda pendiente de verdad")
+        respuesta = confirmaciones.resolver("sí")
+        comprobar(cerrado == [1] and "Cerré comet" in (respuesta or ""), "y el 'sí' cierra lo que sobra")
+    finally:
+        (sistema.cliente_riot, sistema.subprocess.Popen, rendimiento.candidatos_a_cerrar,
+         rendimiento.cerrar_prescindibles) = originales
+        modes.modo_actual, modes.cambiar_modo = modo_original
+        confirmaciones.olvidar()
 
     print("\nSI EL PC ESTABA APAGADO A LA HORA, NO LO HACE HORAS DESPUES")
     avisos.ENVIADOS.clear()

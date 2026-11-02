@@ -575,7 +575,7 @@ function confirmar(caja, c) {
   let quedan = Math.max(0, Math.floor(c.segundos));
   const tic = () => {
     cuenta.textContent = `${quedan} s`;
-    if (quedan-- <= 0) { clearInterval(reloj); box.replaceChildren(el("div", "meta", "La confirmación caducó.")); }
+    if (quedan-- <= 0) { clearInterval(reloj); box.className = ""; box.replaceChildren(el("div", "meta", "La confirmación caducó.")); }
   };
   const reloj = setInterval(tic, 1000);
   tic();
@@ -792,6 +792,7 @@ async function refrescarEstado() {
     $("#btn-voz-alta").hidden = !vozInfo.hablar;
     $("#btn-voz-alta").classList.toggle("activo", vozAlta);
     actualizarPrincipal();
+    pendienteGlobal(s.confirmacion);
     const ids = historial.map((c) => c.id).join();
     historial = s.conversacion || [];
     if (historial.map((c) => c.id).join() !== ids && $("#historial-panel").classList.contains("abierto")) pintarHistorial();
@@ -799,6 +800,26 @@ async function refrescarEstado() {
     $("#estado").classList.add("sin");
     $("#estado").textContent = "sin conexión";
   }
+}
+
+// Lo que espera un si o un no aunque no venga de este chat (una orden
+// programada, Alexa): aparece aqui con sus botones.
+let tarjetaPendiente = null;
+function pendienteGlobal(c) {
+  if (!c) {
+    if (tarjetaPendiente) { tarjetaPendiente.remove(); tarjetaPendiente = null; }
+    return;
+  }
+  if (document.querySelector(".confirmar")) return;     // ya se ve en una respuesta
+  if (tarjetaPendiente && tarjetaPendiente.dataset.desc === c.descripcion) return;
+  if (tarjetaPendiente) tarjetaPendiente.remove();
+  modoChat();
+  const caja = cajaJarvis();
+  tarjetaPendiente = caja.parentElement;
+  tarjetaPendiente.dataset.desc = c.descripcion;
+  caja.append(el("div", "respuesta", "Tengo una pregunta pendiente."));
+  confirmar(caja, c);
+  abajo();
 }
 
 function mostrarTareas() {
@@ -942,7 +963,9 @@ $("#btn-mic").onclick = () => { if (grabadora) grabadora.parar(); else empezarAG
   await refrescarEstado();
   ajustar();
   entrada.focus();
-  setInterval(() => { if (!ocupados) refrescarEstado(); }, 30000);
+  // Cada 10 s con la pagina a la vista (para las preguntas pendientes); si no, cada minuto.
+  setInterval(() => { if (!ocupados && !document.hidden) refrescarEstado(); }, 10000);
+  setInterval(() => { if (!ocupados && document.hidden) refrescarEstado(); }, 60000);
 })();
 </script>
 </body>

@@ -46,15 +46,26 @@ def pendiente() -> dict | None:
     with _candado:
         if not _pendiente:
             return None
-        quedan = SEGUNDOS_VIDA - (time.monotonic() - _pendiente["momento"])
+        quedan = _pendiente.get("vida", SEGUNDOS_VIDA) - (time.monotonic() - _pendiente["momento"])
         return {"descripcion": _pendiente.get("descripcion", "eso"), "segundos": max(0, int(quedan))}
+
+
+def extender(segundos: int) -> bool:
+    """Da mas tiempo para contestar (lo que pregunta una orden programada:
+    puede que estes lejos y tardes en verlo)."""
+    with _candado:
+        if not _pendiente:
+            return False
+        _pendiente["momento"] = time.monotonic()
+        _pendiente["vida"] = segundos
+    return True
 
 
 def hay_pendiente() -> bool:
     with _candado:
         if not _pendiente:
             return False
-        if time.monotonic() - _pendiente["momento"] > SEGUNDOS_VIDA:
+        if time.monotonic() - _pendiente["momento"] > _pendiente.get("vida", SEGUNDOS_VIDA):
             log.info("La confirmación caducó: %s", _pendiente["descripcion"])
             _pendiente.clear()
             return False

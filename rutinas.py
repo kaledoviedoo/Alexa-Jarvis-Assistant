@@ -39,6 +39,7 @@ FINDE = [5, 6]
 
 DISPARADORES = ("hora", "una_vez", "disco", "juego")
 PROHIBIDOS = ("externa", "irreversible")
+SEGUNDOS_PARA_CONTESTAR = 120     # lo que pregunta una orden programada
 MINUTOS_DE_TOLERANCIA = 30         # una orden "a las X" que llega mas tarde que esto, no se hace
 SEGUNDOS_TICK = 60                 # una mirada por minuto: casi nada de procesador
 MINUTOS_ENTRE_DISCOS = 10
@@ -576,9 +577,12 @@ def _orden(r: dict, est: dict) -> str:
     else:
         respuesta = ollama_client.con_riesgos(riesgos, ollama_client._conversar, r["orden"])
     if antes is None and confirmaciones.pendiente() is not None:
-        confirmaciones.olvidar()
-        respuesta = (f"{str(respuesta).rstrip('.')}. No lo confirmé: eso necesita tu «sí» en vivo, "
-                     "pídemelo cuando estés.")
+        # Nadie esta delante para decir que si: la pregunta queda abierta un
+        # rato y se contesta por voz o en el chat. Si no contestas, no se hace.
+        confirmaciones.extender(SEGUNDOS_PARA_CONTESTAR)
+        respuesta = (f"{str(respuesta).rstrip('.')} Contéstame «sí» o «no» en los próximos "
+                     f"{SEGUNDOS_PARA_CONTESTAR // 60} minutos: por voz con Ctrl+Alt+J o en el chat. "
+                     "Si no, no hago nada.")
     return respuesta
 
 
