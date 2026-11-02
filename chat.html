@@ -3,237 +3,171 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0910">
+<meta name="theme-color" content="#0e0e0f">
 <title>Jarvis</title>
 <style>
 :root {
   color-scheme: dark;
-  --fondo: #0b0910;
-  --lateral: #121016;
-  --panel: #17141d;
-  --panel-2: #1f1a27;
-  --borde: #2a2433;
-  --borde-fuerte: #3a3147;
-  --texto: #eeebf4;
-  --suave: #a9a2b6;
-  --tenue: #6f687b;
-  --morado: #8b5cf6;
-  --morado-claro: #c4b5fd;
-  --morado-oscuro: #5b21b6;
-  --morado-tinte: rgba(139, 92, 246, .14);
-  --brillo: rgba(139, 92, 246, .45);
+  --fondo: #0e0e0f;
+  --marco: #151516;
+  --panel: #1b1b1d;
+  --panel-2: #222225;
+  --borde: #262629;
+  --borde-fuerte: #34343a;
+  --texto: #ededee;
+  --suave: #a1a1a7;
+  --tenue: #6b6b72;
+  --acento: #6d4aff;
+  --acento-claro: #a594ff;
+  --acento-tinte: rgba(109, 74, 255, .14);
   --freno: #f5b45a;
   --freno-fondo: rgba(245, 180, 90, .08);
   --mal: #f38b82;
   --mal-fondo: rgba(243, 139, 130, .08);
-  --bien: #86d39b;
-  --radio: 18px;
+  --bien: #7dd69a;
+  --azul: #4f8dff;
+  --rojo: #ff5a6e;
+  --naranja: #ff9f43;
+  --morado: #8b6cff;
+  --rosa: #ff6fae;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--fondo); color: var(--texto);
   font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
-  display: flex; overflow: hidden;
+  display: flex; flex-direction: column; overflow: hidden;
 }
 button { font: inherit; color: inherit; }
-svg { display: block; }
+svg { display: block; flex: none; }
 
-/* ---------- Barra lateral ---------- */
-aside {
-  width: 272px; flex: none; background: var(--lateral); border-right: 1px solid var(--borde);
-  display: flex; flex-direction: column; padding: 14px 14px 16px; gap: 14px; z-index: 5;
+/* ---------- Barra superior ---------- */
+.barra {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  padding: 12px 24px; gap: 12px; flex: none;
 }
-.lat-cab { display: flex; align-items: center; gap: 4px; }
+.marca { font-size: 21px; font-weight: 600; letter-spacing: -.02em; display: flex; align-items: center; gap: 10px; }
+.centro { display: flex; align-items: center; gap: 4px; }
+.nav {
+  display: flex; align-items: center; gap: 7px; border: 1px solid transparent; background: transparent;
+  color: var(--suave); border-radius: 999px; padding: 7px 13px; cursor: pointer; font-size: 13.5px; white-space: nowrap;
+}
+.nav:hover { color: var(--texto); background: var(--panel); }
+.nav.marcado { border-color: var(--borde-fuerte); color: var(--texto); background: var(--panel); }
+.derecha { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+#estado {
+  font-size: 12.5px; color: var(--suave); border: 1px solid var(--borde); background: var(--marco);
+  border-radius: 999px; padding: 5px 12px; white-space: nowrap; display: flex; align-items: center; gap: 7px;
+}
+#estado { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+#estado::before { content: ""; width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--bien); }
+@media (max-width: 1180px) { #btn-vincular span { display: none; } #estado { max-width: 150px; } }
+#estado.sin::before { background: var(--mal); }
+#abrir-menu { display: none; }
 .icono {
-  width: 34px; height: 34px; display: grid; place-items: center; border: 0; background: transparent;
+  width: 36px; height: 36px; display: grid; place-items: center; border: 0; background: transparent;
   border-radius: 10px; color: var(--suave); cursor: pointer;
 }
-.icono:hover { background: var(--panel-2); color: var(--texto); }
-.icono.morado { color: var(--morado-claro); }
-.lat-cab .espacio { flex: 1; }
-#cerrar-lateral { display: none; }
-.buscar {
-  display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid transparent;
-  border-radius: 999px; padding: 0 14px; height: 40px; color: var(--tenue);
-}
-.buscar:focus-within { border-color: var(--borde-fuerte); }
-.buscar input { flex: 1; border: 0; background: transparent; color: var(--texto); font: inherit; outline: none; min-width: 0; }
-#historial { flex: 1; overflow-y: auto; margin: 0 -6px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
-.grupo { margin: 4px 0 14px; }
-.grupo h3 { font-size: 13px; font-weight: 600; color: var(--texto); margin: 0 0 8px 4px; }
-.item {
-  display: flex; align-items: center; gap: 6px; background: var(--panel-2); border-radius: 999px;
-  padding: 0 6px 0 14px; height: 38px; margin-bottom: 6px; cursor: pointer; border: 1px solid transparent;
-}
-.item:hover { border-color: var(--borde-fuerte); }
-.item.activo { border-color: var(--morado); background: var(--morado-tinte); }
-.item .t { flex: 1; font-size: 13px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.item .mas { width: 28px; height: 28px; border: 0; background: transparent; color: var(--tenue); border-radius: 50%; cursor: pointer; letter-spacing: 1px; }
-.item .mas:hover { color: var(--texto); background: var(--panel); }
-.item.borrar { background: var(--mal-fondo); }
-.item.borrar .t { color: var(--mal); }
-.item.borrar button { border: 0; background: transparent; cursor: pointer; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; }
-.item.borrar .si { color: var(--mal); font-weight: 600; }
-.lat-vacio { color: var(--tenue); font-size: 13px; padding: 4px; }
-.tarjeta-lat {
-  border-radius: var(--radio); padding: 14px 14px 14px 16px; position: relative; overflow: hidden;
-  background: radial-gradient(120% 140% at 0% 100%, #6d28d9 0%, #3b1a6e 45%, #1c1328 100%);
-  border: 1px solid rgba(196, 181, 253, .18);
-}
-.tarjeta-lat b { display: block; font-size: 15px; line-height: 1.25; }
-.tarjeta-lat span { display: block; font-size: 12px; color: rgba(238, 235, 244, .65); margin-top: 4px; padding-right: 38px; }
-.tarjeta-lat .ir {
-  position: absolute; right: 12px; bottom: 12px; width: 32px; height: 32px; border-radius: 50%;
-  border: 0; background: rgba(255, 255, 255, .92); color: #2e1065; display: grid; place-items: center; cursor: pointer;
-}
+.icono:hover { background: var(--panel); color: var(--texto); }
 
-/* ---------- Principal ---------- */
-main {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; isolation: isolate;
-  background-image:
-    linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
-  background-size: 44px 44px;
+/* ---------- Marco central ---------- */
+.marco {
+  flex: 1; min-height: 0; margin: 0 16px 16px; background: var(--marco); border: 1px solid var(--borde);
+  border-radius: 22px; display: flex; flex-direction: column; overflow: hidden; position: relative;
 }
-main::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(45% 55% at 100% 0%, rgba(124, 58, 237, .30), transparent 70%),
-    radial-gradient(40% 50% at 100% 100%, rgba(139, 92, 246, .22), transparent 70%),
-    radial-gradient(35% 40% at 0% 100%, rgba(91, 33, 182, .16), transparent 70%);
-}
-header { display: flex; align-items: center; gap: 12px; padding: 16px 24px; }
-#abrir-lateral { display: none; }
-.marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
-.logo {
-  width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
-  background: linear-gradient(135deg, #a78bfa, #6d28d9); color: #fff; font-size: 15px; font-weight: 800;
-  box-shadow: 0 0 18px var(--brillo);
-}
-header .espacio { flex: 1; }
-#estado {
-  font-size: 12.5px; color: var(--suave); background: rgba(23, 20, 29, .7); border: 1px solid var(--borde);
-  border-radius: 999px; padding: 5px 12px; white-space: nowrap; max-width: 44vw; overflow: hidden; text-overflow: ellipsis;
-  backdrop-filter: blur(6px);
-}
-#estado::before { content: "●"; color: var(--bien); margin-right: 6px; font-size: 10px; vertical-align: 1px; }
-#estado.sin::before { color: var(--mal); }
-.avatar {
-  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
-  background: linear-gradient(135deg, #2e1065, #6d28d9); border: 2px solid rgba(196, 181, 253, .35);
-}
+#zona { flex: 1; overflow-y: auto; padding: 0 24px; scrollbar-width: thin; scrollbar-color: var(--borde-fuerte) transparent; }
+.columna { max-width: 800px; margin: 0 auto; }
+#pie { flex: none; padding: 10px 24px 22px; }
 
-#zona { flex: 1; overflow-y: auto; padding: 0 24px; scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
-#pie { flex: none; padding: 8px 24px calc(18px + env(safe-area-inset-bottom)); }
-.columna { max-width: 780px; margin: 0 auto; }
+.marco.inicio #zona { display: flex; flex-direction: column; justify-content: center; }
+.marco:not(.inicio) #bienvenida, .marco:not(.inicio) .sugerencias { display: none; }
+.marco.inicio #conversacion { display: none; }
 
-/* Inicio: bienvenida y caja centradas, como en la referencia */
-main.inicio #zona { display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
-main.inicio #pie { flex: 1; }
-main:not(.inicio) #bienvenida, main:not(.inicio) #sugerencias { display: none; }
-main.inicio #conversacion { display: none; }
+#bienvenida { text-align: center; padding: 24px 0 8px; max-width: 900px; }
+#bienvenida h1 { margin: 0; font-size: clamp(28px, 4.2vw, 42px); font-weight: 600; letter-spacing: -.03em; line-height: 1.15; }
+#bienvenida h1 .nombre { color: #8c8c93; }
+#bienvenida p { margin: 10px auto 0; color: var(--suave); max-width: 420px; }
 
-#bienvenida { text-align: center; padding: 10px 0 30px; }
-.orbe {
-  width: 128px; height: 128px; margin: 0 auto 26px; border-radius: 50%; position: relative;
-  background: radial-gradient(circle at 36% 30%, #f5f3ff 0%, #c4b5fd 14%, #8b5cf6 36%, #4c1d95 62%, #13071f 82%);
-  box-shadow: 0 0 70px rgba(139, 92, 246, .55), 0 0 0 7px rgba(139, 92, 246, .10), inset 0 0 26px rgba(255,255,255,.18);
-  animation: flotar 7s ease-in-out infinite;
+.categorias { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 34px auto 0; text-align: left; }
+.cat {
+  background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 12px 12px 13px;
+  cursor: pointer; text-align: left; transition: border-color .15s, background .15s;
 }
-.orbe::before, .orbe::after {
-  content: ""; position: absolute; inset: 14%; border-radius: 50%; mix-blend-mode: screen; filter: blur(7px);
-  background: conic-gradient(from 0deg, transparent 0 18%, rgba(237, 233, 254, .85) 26%, transparent 40% 62%, rgba(167, 139, 250, .9) 72%, transparent 86%);
-  animation: girar 9s linear infinite;
-}
-.orbe::after { inset: 24%; filter: blur(5px); animation-duration: 6s; animation-direction: reverse; opacity: .8; }
-.orbe.piensa { animation: flotar 7s ease-in-out infinite, latir 1.4s ease-in-out infinite; }
-@keyframes flotar { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
-@keyframes girar { to { transform: rotate(360deg) } }
-@keyframes latir { 0%,100% { box-shadow: 0 0 70px rgba(139,92,246,.55), 0 0 0 7px rgba(139,92,246,.10), inset 0 0 26px rgba(255,255,255,.18) }
-                   50% { box-shadow: 0 0 100px rgba(167,139,250,.8), 0 0 0 12px rgba(139,92,246,.16), inset 0 0 26px rgba(255,255,255,.25) } }
-@media (prefers-reduced-motion: reduce) { .orbe, .orbe::before, .orbe::after, .punto { animation: none !important; } }
-#bienvenida h1 {
-  margin: 0; font-size: clamp(30px, 5vw, 46px); line-height: 1.1; font-weight: 750; letter-spacing: -.025em;
-  background: linear-gradient(90deg, #a78bfa 0%, #c4b5fd 35%, #f5f3ff 70%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-#bienvenida p { margin: 10px 0 0; color: var(--suave); font-size: 15.5px; }
+.cat:hover { border-color: var(--borde-fuerte); background: var(--panel-2); }
+.cat .ic { width: 20px; height: 20px; margin-bottom: 10px; }
+.cat b { display: block; font-size: 14px; font-weight: 600; }
+.cat small { display: block; font-size: 12px; color: var(--tenue); margin-top: 2px; line-height: 1.4; }
+.c-azul { color: var(--azul); } .c-rojo { color: var(--rojo); } .c-naranja { color: var(--naranja); }
+.c-morado { color: var(--morado); } .c-rosa { color: var(--rosa); }
 
 /* Caja de escribir */
-.caja {
-  background: rgba(10, 8, 14, .92); border: 1px solid var(--borde); border-radius: 22px;
-  padding: 14px 14px 12px 20px; box-shadow: 0 10px 40px rgba(0,0,0,.35);
-}
-.caja:focus-within { border-color: rgba(139, 92, 246, .55); box-shadow: 0 0 0 4px rgba(139,92,246,.10), 0 10px 40px rgba(0,0,0,.35); }
+.caja { background: var(--fondo); border: 1px solid var(--borde-fuerte); border-radius: 16px; padding: 12px 12px 10px 14px; }
+.caja:focus-within { border-color: #4a4a52; }
 textarea {
   width: 100%; resize: none; border: 0; outline: none; background: transparent; color: var(--texto);
-  font: inherit; font-size: 15.5px; line-height: 1.45; min-height: 26px; max-height: 180px; padding: 4px 0;
+  font: inherit; font-size: 15px; line-height: 1.45; min-height: 44px; max-height: 180px; padding: 2px 2px 6px;
 }
 textarea::placeholder { color: var(--tenue); }
-.caja-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.chip-modelo {
-  display: flex; align-items: center; gap: 8px; color: var(--morado-claro); font-size: 13.5px; font-weight: 500;
-  white-space: nowrap; overflow: hidden; min-width: 0;
-}
-.chip-modelo .mini {
-  width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center;
-  background: radial-gradient(circle at 35% 30%, #ddd6fe, #7c3aed 60%, #2e1065);
-}
-.chip-modelo span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.caja-pie { display: flex; align-items: center; gap: 6px; }
 .caja-pie .espacio { flex: 1; }
-#enviar {
-  width: 38px; height: 38px; flex: none; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
-  background: linear-gradient(135deg, #a78bfa, #7c3aed); color: #fff; box-shadow: 0 0 20px rgba(139,92,246,.45);
+.cuadro {
+  width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--borde); color: var(--suave); position: relative;
 }
-#enviar:disabled { opacity: .45; box-shadow: none; cursor: default; }
-.redondo {
-  width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
-  background: transparent; border: 1px solid var(--borde-fuerte); color: var(--suave);
+.cuadro:hover { color: var(--texto); border-color: var(--borde-fuerte); }
+.cuadro.activo { color: var(--acento-claro); border-color: var(--acento); background: var(--acento-tinte); }
+.cuadro.grabando { color: #fff; background: #ef4444; border-color: #ef4444; animation: grabando 1.2s ease-in-out infinite; }
+@keyframes grabando { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.5) } 50% { box-shadow: 0 0 0 7px rgba(239,68,68,0) } }
+#principal {
+  height: 34px; padding: 0 15px; border-radius: 9px; border: 0; cursor: pointer; display: flex; align-items: center; gap: 7px;
+  background: var(--acento); color: #fff; font-weight: 600; font-size: 13.5px;
 }
-.redondo:hover { color: var(--texto); border-color: var(--morado); }
-.redondo.activo { color: var(--morado-claro); border-color: var(--morado); background: var(--morado-tinte); }
-.redondo.grabando { color: #fff; border-color: #ef4444; background: #ef4444; animation: grabando 1.2s ease-in-out infinite; }
-@keyframes grabando { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.5) } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0) } }
-.aviso-voz { font-size: 12.5px; color: var(--tenue); margin: 8px 4px 0; min-height: 1.2em; }
+#principal:hover { background: #7c5cff; }
+#principal:disabled { opacity: .45; cursor: default; }
+#principal.grabando { background: #ef4444; }
+.aviso-voz { font-size: 12.5px; color: var(--tenue); margin: 7px 4px 0; min-height: 1.2em; }
 
-/* Sugerencias */
-#sugerencias { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+.sugerencias { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .sug {
-  display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
-  background: rgba(10, 8, 14, .85); border: 1px solid var(--borde); border-radius: var(--radio); padding: 12px 14px;
+  display: flex; align-items: center; gap: 7px; border: 1px solid var(--borde); background: transparent;
+  color: var(--suave); border-radius: 9px; padding: 6px 10px; font-size: 12.5px; cursor: pointer;
 }
-.sug:hover { border-color: rgba(139, 92, 246, .5); }
-.sug .ic {
-  width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center;
-  background: var(--morado-tinte); color: var(--morado-claro); border: 1px solid rgba(139,92,246,.25);
+.sug:hover { color: var(--texto); border-color: var(--borde-fuerte); }
+
+/* Menus */
+.menu {
+  position: absolute; bottom: 46px; right: 0; background: var(--panel-2); border: 1px solid var(--borde-fuerte);
+  border-radius: 12px; padding: 6px; min-width: 210px; z-index: 6; box-shadow: 0 12px 40px rgba(0,0,0,.45);
 }
-.sug b { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; }
-.sug b em { font-style: normal; color: var(--morado-claro); }
-.sug small { display: block; font-size: 11.5px; color: var(--tenue); margin-top: 3px; line-height: 1.35; }
+.menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px; }
+.menu button:hover { background: var(--panel); }
+.menu small { display: block; color: var(--tenue); font-size: 12px; }
+.menu hr { border: 0; border-top: 1px solid var(--borde); margin: 4px 2px; }
+.ancla { position: relative; }
+#menu-movil { display: none; }
+#menu-movil.abierto { display: block; position: fixed; top: 54px; left: 12px; bottom: auto; right: auto; z-index: 9; }
 
 /* Conversacion */
-#conversacion { display: flex; flex-direction: column; gap: 18px; padding: 8px 0 20px; }
+#conversacion { display: flex; flex-direction: column; gap: 18px; padding: 24px 0 16px; }
 .yo {
-  align-self: flex-end; max-width: 80%; background: linear-gradient(135deg, #3b1d6e, #2a1650);
-  border: 1px solid rgba(167, 139, 250, .22); padding: 10px 15px; border-radius: 18px 18px 6px 18px;
-  white-space: pre-wrap; word-wrap: break-word;
+  align-self: flex-end; max-width: 78%; background: var(--panel-2); border: 1px solid var(--borde);
+  padding: 9px 14px; border-radius: 16px 16px 5px 16px; white-space: pre-wrap; word-wrap: break-word;
 }
 .jarvis { display: flex; gap: 12px; align-items: flex-start; }
-.jarvis .mini {
-  width: 30px; height: 30px; flex: none; border-radius: 50%; margin-top: 2px;
-  background: radial-gradient(circle at 35% 30%, #ede9fe, #8b5cf6 45%, #2e1065 85%);
-  box-shadow: 0 0 14px rgba(139,92,246,.45);
+.jarvis .marca-j {
+  width: 28px; height: 28px; flex: none; border-radius: 8px; display: grid; place-items: center; margin-top: 1px;
+  background: var(--acento-tinte); color: var(--acento-claro); border: 1px solid rgba(109,74,255,.35);
 }
 .jarvis .cuerpo { flex: 1; min-width: 0; }
 .respuesta { white-space: pre-wrap; word-wrap: break-word; }
 .meta { font-size: 12px; color: var(--tenue); margin-top: 6px; }
-.fecha-sep { text-align: center; font-size: 12px; color: var(--tenue); margin: 4px 0; }
-.pensando { color: var(--suave); font-size: 14px; display: flex; align-items: center; gap: 8px; min-height: 30px; }
-.punto { width: 7px; height: 7px; border-radius: 50%; background: var(--morado); animation: pulso 1s infinite ease-in-out; }
+.fecha-sep { text-align: center; font-size: 12px; color: var(--tenue); }
+.pensando { color: var(--suave); font-size: 14px; display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.punto { width: 7px; height: 7px; border-radius: 50%; background: var(--acento-claro); animation: pulso 1s infinite ease-in-out; }
 @keyframes pulso { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
-details.pasos { margin: 2px 0 10px; border: 1px solid var(--borde); border-radius: 14px; background: rgba(23, 20, 29, .75); padding: 8px 12px; }
-details.pasos > summary { cursor: pointer; font-size: 13px; color: var(--suave); list-style: none; display: flex; align-items: center; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .punto, .cuadro.grabando { animation: none; } }
+details.pasos { margin: 2px 0 10px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); padding: 8px 12px; }
+details.pasos > summary { cursor: pointer; font-size: 13px; color: var(--suave); list-style: none; display: flex; align-items: center; gap: 7px; }
 details.pasos > summary::-webkit-details-marker { display: none; }
 details.pasos > summary::before { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
 details.pasos[open] > summary::before { transform: rotate(45deg); }
@@ -242,9 +176,9 @@ details.pasos[open] > summary { margin-bottom: 6px; }
 .linea.freno { color: var(--freno); background: var(--freno-fondo); padding: 5px 9px; border-radius: 8px; }
 .linea.verificacion { color: var(--mal); background: var(--mal-fondo); padding: 5px 9px; border-radius: 8px; }
 .linea.insiste { color: var(--freno); }
-.linea.router { color: var(--morado-claro); }
-.paso { font-size: 13px; margin: 8px 0; padding: 9px 11px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); }
-.paso .nombre { font-weight: 600; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px; color: var(--morado-claro); }
+.linea.router { color: var(--acento-claro); }
+.paso { font-size: 13px; margin: 8px 0; padding: 9px 11px; border: 1px solid var(--borde); border-radius: 10px; background: var(--fondo); }
+.paso .nombre { font-weight: 600; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px; color: var(--acento-claro); }
 .paso .args { color: var(--tenue); font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; margin-top: 2px; }
 .paso .res { margin-top: 5px; white-space: pre-wrap; word-wrap: break-word; max-height: 10em; overflow: auto; color: var(--suave); }
 .paso.vetado { border-color: rgba(245, 180, 90, .45); }
@@ -253,30 +187,62 @@ details.pasos[open] > summary { margin-bottom: 6px; }
 .etiqueta.no { color: var(--mal); }
 .etiqueta.freno { color: var(--freno); }
 .confirmar {
-  margin-top: 10px; padding: 12px 14px; border: 1px solid rgba(139, 92, 246, .5); border-radius: 14px;
-  background: var(--morado-tinte); display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-top: 10px; padding: 11px 13px; border: 1px solid rgba(109, 74, 255, .55); border-radius: 12px;
+  background: var(--acento-tinte); display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
 }
 .confirmar .q { flex: 1 1 220px; font-size: 14px; }
-.confirmar button { border: 0; border-radius: 999px; padding: 8px 18px; font-weight: 600; font-size: 14px; cursor: pointer; }
-.confirmar .si { background: linear-gradient(135deg, #a78bfa, #7c3aed); color: #fff; }
+.confirmar button { border: 0; border-radius: 9px; padding: 7px 16px; font-weight: 600; font-size: 13.5px; cursor: pointer; }
+.confirmar .si { background: var(--acento); color: #fff; }
 .confirmar .no { background: transparent; border: 1px solid var(--borde-fuerte); }
 .cuenta { font-size: 12px; color: var(--tenue); font-variant-numeric: tabular-nums; }
 .fondo { margin-top: 10px; font-size: 14px; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--borde); }
 .fondo .res { white-space: pre-wrap; margin-top: 4px; }
 .error { color: var(--mal); }
 
+/* ---------- Historial (panel lateral) ---------- */
+#historial-panel {
+  position: fixed; inset: 0 auto 0 0; width: min(340px, 88vw); background: var(--marco); border-right: 1px solid var(--borde);
+  transform: translateX(-102%); transition: transform .2s ease; z-index: 8; display: flex; flex-direction: column;
+  padding: 16px 14px; gap: 12px; box-shadow: 24px 0 60px rgba(0,0,0,.5);
+}
+#historial-panel.abierto { transform: none; }
+#velo { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 7; }
+#velo.visible { display: block; }
+.h-cab { display: flex; align-items: center; justify-content: space-between; }
+.h-cab h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.buscar {
+  display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--borde);
+  border-radius: 10px; padding: 0 12px; height: 38px; color: var(--tenue);
+}
+.buscar:focus-within { border-color: var(--borde-fuerte); }
+.buscar input { flex: 1; border: 0; background: transparent; color: var(--texto); font: inherit; outline: none; min-width: 0; }
+#historial { flex: 1; overflow-y: auto; margin: 0 -6px; padding: 0 6px; scrollbar-width: thin; scrollbar-color: var(--borde) transparent; }
+.grupo { margin: 6px 0 14px; }
+.grupo h3 { font-size: 12px; font-weight: 600; color: var(--tenue); margin: 0 0 6px 6px; text-transform: uppercase; letter-spacing: .04em; }
+.item { display: flex; align-items: center; gap: 6px; border-radius: 10px; padding: 0 4px 0 10px; height: 36px; cursor: pointer; }
+.item:hover { background: var(--panel); }
+.item.activo { background: var(--acento-tinte); }
+.item .t { flex: 1; font-size: 13.5px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item:hover .t, .item.activo .t { color: var(--texto); }
+.item .mas { width: 28px; height: 28px; border: 0; background: transparent; color: var(--tenue); border-radius: 8px; cursor: pointer; opacity: 0; }
+.item:hover .mas, .item.activo .mas { opacity: 1; }
+@media (hover: none) { .item .mas { opacity: 1; } }
+.item .mas:hover { color: var(--texto); background: var(--panel-2); }
+.item.borrar { background: var(--mal-fondo); }
+.item.borrar .t { color: var(--mal); }
+.item.borrar button { border: 0; background: transparent; cursor: pointer; font-size: 12.5px; padding: 4px 8px; border-radius: 8px; opacity: 1; }
+.item.borrar .si { color: var(--mal); font-weight: 600; }
+.lat-vacio { color: var(--tenue); font-size: 13px; padding: 4px 6px; }
+
 /* Dialogos */
 dialog {
-  border: 1px solid var(--borde); border-radius: 20px; background: var(--panel); color: var(--texto);
+  border: 1px solid var(--borde-fuerte); border-radius: 18px; background: var(--marco); color: var(--texto);
   padding: 22px; max-width: min(460px, calc(100vw - 32px)); width: 100%;
 }
-dialog::backdrop { background: rgba(5, 3, 9, .7); backdrop-filter: blur(3px); }
-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+dialog::backdrop { background: rgba(0, 0, 0, .6); }
+dialog h2 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
 dialog p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
-.codigo-grande {
-  font: 700 42px/1 ui-monospace, Consolas, monospace; letter-spacing: .25em; text-align: center; margin: 16px 0;
-  background: linear-gradient(90deg, #c4b5fd, #f5f3ff); -webkit-background-clip: text; background-clip: text; color: transparent;
-}
+.codigo-grande { font: 700 42px/1 ui-monospace, Consolas, monospace; letter-spacing: .25em; text-align: center; margin: 16px 0; color: var(--acento-claro); }
 .direccion { font-family: ui-monospace, Consolas, monospace; font-size: 14.5px; background: var(--fondo); border: 1px solid var(--borde); padding: 9px 12px; border-radius: 10px; word-break: break-all; }
 .tarea { padding: 10px 0; border-top: 1px solid var(--borde); font-size: 14px; }
 .tarea:first-child { border-top: 0; }
@@ -285,118 +251,179 @@ dialog p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
 .tarea .txt { color: var(--suave); font-size: 13px; margin-top: 3px; }
 #lista-tareas { max-height: 60vh; overflow-y: auto; }
 .dlg-pie { display: flex; justify-content: flex-end; margin-top: 16px; }
-.boton-sec { border: 1px solid var(--borde-fuerte); background: transparent; border-radius: 999px; padding: 7px 16px; cursor: pointer; }
-.boton-sec:hover { border-color: var(--morado); }
-#velo { display: none; }
+.boton-sec { border: 1px solid var(--borde-fuerte); background: transparent; border-radius: 9px; padding: 7px 16px; cursor: pointer; }
+.boton-sec:hover { border-color: var(--acento); }
 
-/* Celular */
-@media (max-width: 860px) {
-  aside {
-    position: fixed; inset: 0 auto 0 0; width: min(300px, 86vw); transform: translateX(-102%);
-    transition: transform .2s ease; box-shadow: 20px 0 50px rgba(0,0,0,.5);
-  }
-  aside.abierta { transform: none; }
-  #velo.visible { display: block; position: fixed; inset: 0; background: rgba(5,3,9,.6); z-index: 4; }
-  #cerrar-lateral, #abrir-lateral { display: grid; }
-  header { padding: 12px 16px; }
+/* ---------- Celular ---------- */
+@media (max-width: 900px) {
+  .barra { grid-template-columns: auto 1fr auto; padding: 10px 14px; }
+  .centro { display: none; }
+  #abrir-menu { display: grid; }
+  .marca { font-size: 19px; gap: 4px; }
+  .marco { margin: 0 8px 8px; border-radius: 20px; }
   #zona { padding: 0 16px; }
-  #pie { padding: 8px 16px calc(14px + env(safe-area-inset-bottom)); }
-  #sugerencias { grid-template-columns: 1fr; gap: 8px; }
-  .sug small { display: none; }
-  .sug .ic { width: 38px; height: 38px; }
-  .orbe { width: 96px; height: 96px; margin-bottom: 18px; }
-  #bienvenida { padding-bottom: 20px; }
+  #pie { padding: 8px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .categorias { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 22px; }
+  .cat { display: flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 9px; }
+  .cat .ic { width: 16px; height: 16px; margin: 0; }
+  .cat b { font-size: 13px; font-weight: 500; }
+  .cat small { display: none; }
+  .pie-columna { display: flex; flex-direction: column; }
+  .marco.inicio .sugerencias { order: -1; margin: 0 0 10px; display: grid; grid-template-columns: 1fr 1fr; }
+  .marco.inicio .sugerencias .sug:nth-child(n+3) { display: none; }
+  .sug { padding: 9px 10px; text-align: left; }
+  .sug svg { display: none; }
   .yo { max-width: 90%; }
-  #estado { max-width: 38vw; }
+  #estado { display: none; }
+  #btn-vincular span { display: none; }
+  #principal span { display: none; }
+  #principal { width: 34px; padding: 0; justify-content: center; border-radius: 50%; }
 }
-@media (max-width: 420px) { #estado { display: none; } }
 </style>
 </head>
 <body>
 
-<aside id="lateral" aria-label="Historial">
-  <div class="lat-cab">
-    <button class="icono morado" id="btn-nuevo" title="Chat nuevo" aria-label="Chat nuevo">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+<nav class="barra">
+  <div class="marca">
+    <button class="icono" id="abrir-menu" aria-label="Menú">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
-    <button class="icono" id="btn-tareas" title="Tareas y rutinas" aria-label="Tareas y rutinas">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/></svg>
+    Jarvis
+  </div>
+  <div class="centro">
+    <button class="nav marcado" id="btn-nuevo">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      Nuevo chat
     </button>
-    <span class="espacio"></span>
-    <button class="icono" id="cerrar-lateral" aria-label="Cerrar">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    <button class="nav" id="btn-buscar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Buscar chats
+    </button>
+    <button class="nav" id="btn-historial">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5A1.5 1.5 0 0 1 4.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4.5A1.5 1.5 0 0 1 3 16.5z"/><path d="M21 5.5A1.5 1.5 0 0 0 19.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
+      Historial
+    </button>
+    <button class="nav" id="btn-tareas">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/></svg>
+      Tareas
     </button>
   </div>
-  <label class="buscar">
-    <input id="buscar" type="search" placeholder="Buscar" aria-label="Buscar en el historial">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-  </label>
-  <div id="historial"></div>
-  <div class="tarjeta-lat" id="tarjeta-lat" hidden>
-    <b>Vincula tu celular</b>
-    <span>Habla con Jarvis desde cualquier lugar de tu red de Tailscale.</span>
-    <button class="ir" id="btn-vincular" aria-label="Vincular celular">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-    </button>
-  </div>
-</aside>
-<div id="velo"></div>
-
-<main id="principal" class="inicio">
-  <header>
-    <button class="icono" id="abrir-lateral" aria-label="Abrir historial">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
-    </button>
-    <div class="marca">Jarvis</div>
-    <span class="espacio"></span>
+  <div class="derecha">
     <div id="estado">conectando…</div>
-  </header>
+    <button class="nav marcado" id="btn-vincular" hidden>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>
+      <span>Vincular celular</span>
+    </button>
+  </div>
+</nav>
 
+<div class="menu" id="menu-movil">
+  <button data-accion="nuevo">Nuevo chat</button>
+  <button data-accion="historial">Historial y búsqueda</button>
+  <button data-accion="tareas">Tareas</button>
+</div>
+
+<main class="marco inicio" id="marco">
   <section id="zona">
     <div class="columna" id="bienvenida">
-      <div class="orbe" id="orbe"></div>
-      <h1 id="saludo">¡Bienvenido de nuevo!</h1>
-      <p>¿Qué hacemos hoy en tu PC?</p>
+      <h1>Qué bueno verte<span id="saludo-nombre"></span></h1>
+      <p>Jarvis, tu agente local para todo lo que pase en tu PC.</p>
+      <div class="categorias">
+        <button class="cat" data-enviar="cómo está el equipo">
+          <svg class="ic c-azul" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+          <b>Equipo</b><small>Estado, lentitud y modos de la gráfica</small>
+        </button>
+        <button class="cat" data-escribir="busca el archivo llamado ">
+          <svg class="ic c-rojo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <b>Archivos</b><small>Buscar, leer, mover y ordenar</small>
+        </button>
+        <button class="cat" data-escribir="explícame según mis apuntes ">
+          <svg class="ic c-naranja" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-1.5zM4 19.5A2 2 0 0 1 6 18h12"/></svg>
+          <b>Estudio</b><small>Explica y repasa con tus apuntes</small>
+        </button>
+        <button class="cat" data-escribir="investiga ">
+          <svg class="ic c-morado" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+          <b>Investigar</b><small>Busca en internet y te lo resume</small>
+        </button>
+        <button class="cat" data-enviar="qué rutinas tengo">
+          <svg class="ic c-rosa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg>
+          <b>Rutinas</b><small>Lo que hace solo, a su hora</small>
+        </button>
+      </div>
     </div>
     <div class="columna" id="conversacion"></div>
   </section>
 
   <div id="pie">
-    <div class="columna">
+    <div class="columna pie-columna">
       <form class="caja" id="formulario" autocomplete="off">
-        <textarea id="entrada" rows="1" placeholder="Pídele algo a Jarvis…" aria-label="Orden para Jarvis"></textarea>
+        <textarea id="entrada" rows="2" placeholder="¿Qué hacemos hoy?" aria-label="Orden para Jarvis"></textarea>
         <div class="caja-pie">
-          <div class="chip-modelo"><span class="mini"></span><span id="chip-modelo">Jarvis</span></div>
+          <button type="button" class="cuadro" id="btn-voz-alta" title="Contestar en voz alta" aria-label="Contestar en voz alta" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          </button>
+          <button type="button" class="cuadro" id="btn-ultimo" title="Cómo quedó lo último" aria-label="Cómo quedó lo último">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+          </button>
           <span class="espacio"></span>
-          <button type="button" class="redondo" id="btn-voz-alta" title="Contestar en voz alta" aria-label="Contestar en voz alta" hidden>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+          <div class="ancla">
+            <button type="button" class="cuadro" id="btn-ajustes" title="Modo y memoria" aria-label="Modo y memoria">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+            </button>
+            <div class="menu" id="menu-ajustes" hidden>
+              <button data-orden="pon el modo normal">Modo normal<small>Rápido, para el día a día</small></button>
+              <button data-orden="pon el modo dedicado">Modo dedicado<small>Modelo grande, razona mejor</small></button>
+              <button data-orden="pon el modo gaming">Modo gaming<small>Deja la gráfica libre</small></button>
+              <hr>
+              <button data-orden="libera la memoria">Liberar memoria<small>Suelta los modelos ya</small></button>
+            </div>
+          </div>
+          <button type="button" class="cuadro" id="btn-mic" title="Dictar" aria-label="Dictar" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
           </button>
-          <button type="button" class="redondo" id="btn-mic" title="Hablar" aria-label="Hablar" hidden>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
-          </button>
-          <button id="enviar" type="submit" aria-label="Enviar">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg>
+          <button type="submit" id="principal">
+            <svg id="ic-principal" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <span id="txt-principal">Enviar</span>
           </button>
         </div>
       </form>
       <div class="aviso-voz" id="aviso-voz"></div>
-      <div id="sugerencias">
-        <button class="sug" data-orden="cómo está el equipo">
-          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
-          <span><b>Estado <em>del equipo</em></b><small>CPU, memoria y gráfica en este momento</small></span>
+      <div class="sugerencias">
+        <button class="sug" data-enviar="mira qué ventanas tengo abiertas">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 21h11a2 2 0 0 0 2-2V8"/></svg>
+          Mira qué ventanas tengo abiertas
         </button>
-        <button class="sug" data-orden="qué ventanas tengo abiertas">
-          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 21h11a2 2 0 0 0 2-2V8"/></svg></span>
-          <span><b>Ventanas <em>abiertas</em></b><small>Qué tienes abierto y en primer plano</small></span>
+        <button class="sug" data-enviar="por qué va lento el pc">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 18 10 12l4 4 6-8"/></svg>
+          Por qué va lento el PC
         </button>
-        <button class="sug" data-orden="cómo quedó lo último">
-          <span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-          <span><b>Cómo quedó <em>lo último</em></b><small>El resultado de lo que dejaste trabajando</small></span>
+        <button class="sug" data-enviar="qué archivos he tocado hoy">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>
+          Qué archivos he tocado hoy
+        </button>
+        <button class="sug" data-enviar="qué tengo apuntado hoy en el diario">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          Qué tengo apuntado hoy
         </button>
       </div>
     </div>
   </div>
 </main>
+
+<aside id="historial-panel" aria-label="Historial">
+  <div class="h-cab">
+    <h2>Historial</h2>
+    <button class="icono" id="cerrar-historial" aria-label="Cerrar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <label class="buscar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="buscar" type="search" placeholder="Buscar chats" aria-label="Buscar en el historial">
+  </label>
+  <div id="historial"></div>
+</aside>
+<div id="velo"></div>
 
 <dialog id="dlg-vincular">
   <h2>Vincular el celular</h2>
@@ -416,11 +443,10 @@ dialog p { margin: 0 0 12px; color: var(--suave); font-size: 14px; }
 <script>
 "use strict";
 const $ = (s) => document.querySelector(s);
-const principal = $("#principal");
+const marco = $("#marco");
 const conversacion = $("#conversacion");
 const zona = $("#zona");
 const entrada = $("#entrada");
-const orbe = $("#orbe");
 
 function el(tag, clase, texto) {
   const e = document.createElement(tag);
@@ -429,8 +455,8 @@ function el(tag, clase, texto) {
   return e;
 }
 function abajo() { zona.scrollTop = zona.scrollHeight; }
-function modoChat() { principal.classList.remove("inicio"); }
-function modoInicio() { principal.classList.add("inicio"); conversacion.replaceChildren(); }
+function modoChat() { marco.classList.remove("inicio"); }
+function modoInicio() { marco.classList.add("inicio"); conversacion.replaceChildren(); }
 
 async function api(ruta, opciones = {}) {
   const r = await fetch(ruta, {
@@ -451,13 +477,15 @@ function corto(obj) {
 }
 
 const ORIGEN = { router: "router", modelo: "modelo", semantica: "capa semántica", error: "error" };
+const SVG_J = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>';
 
 function burbujaYo(texto) { conversacion.append(el("div", "yo", texto)); }
-
 function cajaJarvis() {
   const fila = el("div", "jarvis");
+  const m = el("div", "marca-j");
+  m.innerHTML = SVG_J;
   const cuerpo = el("div", "cuerpo");
-  fila.append(el("div", "mini"), cuerpo);
+  fila.append(m, cuerpo);
   conversacion.append(fila);
   return cuerpo;
 }
@@ -478,7 +506,7 @@ function nuevaRespuesta(texto) {
   return { caja, pasos, resumen, pensando, nPasos: 0 };
 }
 
-function anotar(v, ev) {
+function anotar(v, ev, hablarAhora) {
   if (ev.tipo === "log") {
     if (ev.clase === "ejecutando") {
       v.pensando.lastChild.textContent = ev.mensaje.replace("Ejecutando herramienta ", "Usando ").split(" con ")[0] + "…";
@@ -519,7 +547,7 @@ function anotar(v, ev) {
       if (v.nPasos === 0 && v.pasos.childElementCount <= 1) v.pasos.remove();
       else v.pasos.open = false;
       if (ev.confirmacion) confirmar(v.caja, ev.confirmacion);
-      if (vozAlta && vozInfo.hablar) decir(ev.texto);
+      if ((vozAlta || hablarAhora) && vozInfo.hablar) decir(ev.texto);
     }
   } else if (ev.tipo === "fondo") {
     const f = el("div", "fondo");
@@ -557,13 +585,11 @@ function confirmar(caja, c) {
 }
 
 let ocupados = 0;
-function pensandoGlobal() { orbe.classList.toggle("piensa", ocupados > 0); $("#enviar").disabled = false; }
-
-async function mandar(texto) {
+async function mandar(texto, hablarAhora = false) {
   texto = (texto || "").trim();
   if (!texto) return;
   const v = nuevaRespuesta(texto);
-  ocupados++; pensandoGlobal();
+  ocupados++;
   try {
     const { id } = await api("/chat/orden", { method: "POST", body: JSON.stringify({ texto }) });
     let desde = 0, terminado = false, fallosRed = 0;
@@ -571,7 +597,7 @@ async function mandar(texto) {
       try {
         const r = await api(`/chat/eventos/${id}?desde=${desde}`);
         fallosRed = 0;
-        for (const ev of r.eventos) anotar(v, ev);
+        for (const ev of r.eventos) anotar(v, ev, hablarAhora);
         desde = r.siguiente;
         terminado = r.terminado;
       } catch (e) {
@@ -583,24 +609,64 @@ async function mandar(texto) {
     v.pensando.remove();
     v.caja.append(el("div", "respuesta error", `No pude hablar con Jarvis (${e.message}). ¿Está encendido?`));
   } finally {
-    ocupados--; pensandoGlobal();
+    ocupados--;
     refrescarEstado();
   }
 }
 
+/* ---------- El boton morado: "Hablar" con la caja vacia, "Enviar" con texto ---------- */
+const ICONO_HABLAR = '<path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/>';
+const ICONO_ENVIAR = '<path d="M5 12h14M13 6l6 6-6 6"/>';
+function actualizarPrincipal() {
+  const hayTexto = entrada.value.trim().length > 0;
+  const puedeHablar = microfonoPosible() && !hayTexto;
+  const hablando = !!grabadora && grabadora.modo === "hablar";
+  $("#txt-principal").textContent = hablando ? "Parar" : (puedeHablar ? "Hablar" : "Enviar");
+  $("#ic-principal").innerHTML = (puedeHablar || hablando) ? ICONO_HABLAR : ICONO_ENVIAR;
+  $("#principal").classList.toggle("grabando", hablando);
+  $("#principal").disabled = !hayTexto && !puedeHablar && !grabadora;
+}
+
 $("#formulario").onsubmit = (e) => {
   e.preventDefault();
+  if (grabadora) { grabadora.parar(); return; }
   const t = entrada.value;
+  if (!t.trim()) { if (microfonoPosible()) empezarAGrabar("hablar"); return; }
   entrada.value = "";
   ajustar();
   mandar(t);
 };
 entrada.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#formulario").requestSubmit(); }
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    if (entrada.value.trim()) $("#formulario").requestSubmit();
+  }
 });
-function ajustar() { entrada.style.height = "auto"; entrada.style.height = Math.min(entrada.scrollHeight, 180) + "px"; }
+function ajustar() {
+  entrada.style.height = "auto";
+  entrada.style.height = Math.min(Math.max(entrada.scrollHeight, 44), 180) + "px";
+  actualizarPrincipal();
+}
 entrada.addEventListener("input", ajustar);
-document.querySelectorAll(".sug").forEach((b) => (b.onclick = () => mandar(b.dataset.orden)));
+
+document.querySelectorAll("[data-enviar]").forEach((b) => (b.onclick = () => mandar(b.dataset.enviar)));
+document.querySelectorAll("[data-escribir]").forEach((b) => (b.onclick = () => {
+  entrada.value = b.dataset.escribir;
+  ajustar();
+  entrada.focus();
+  entrada.setSelectionRange(entrada.value.length, entrada.value.length);
+}));
+$("#btn-ultimo").onclick = () => mandar("cómo quedó lo último");
+
+$("#btn-ajustes").onclick = (e) => { e.stopPropagation(); $("#menu-ajustes").hidden = !$("#menu-ajustes").hidden; };
+document.querySelectorAll("#menu-ajustes [data-orden]").forEach((b) => (b.onclick = () => {
+  $("#menu-ajustes").hidden = true;
+  mandar(b.dataset.orden);
+}));
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".ancla")) $("#menu-ajustes").hidden = true;
+  if (!e.target.closest("#menu-movil") && !e.target.closest("#abrir-menu")) $("#menu-movil").classList.remove("abierto");
+});
 
 /* ---------- Historial ---------- */
 let historial = [];
@@ -638,7 +704,6 @@ function pintarHistorial() {
       caja.append(grupo);
     }
     const it = el("div", "item");
-    it.dataset.id = c.id;
     it.append(el("span", "t", c.texto));
     const mas = el("button", "mas", "•••");
     mas.title = "Opciones";
@@ -675,20 +740,39 @@ function abrirDelHistorial(c, it) {
   const caja = cajaJarvis();
   caja.append(el("div", "respuesta" + (c.origen === "error" ? " error" : ""), c.respuesta || ""));
   if (c.origen) caja.append(el("div", "meta", ORIGEN[c.origen] || c.origen));
-  cerrarLateral();
+  cerrarHistorial();
   abajo();
   entrada.focus();
 }
 
+function abrirHistorial(buscar = false) {
+  pintarHistorial();
+  $("#historial-panel").classList.add("abierto");
+  $("#velo").classList.add("visible");
+  if (buscar) setTimeout(() => $("#buscar").focus(), 120);
+}
+function cerrarHistorial() { $("#historial-panel").classList.remove("abierto"); $("#velo").classList.remove("visible"); }
 $("#buscar").addEventListener("input", pintarHistorial);
+$("#btn-historial").onclick = () => abrirHistorial(false);
+$("#btn-buscar").onclick = () => abrirHistorial(true);
+$("#cerrar-historial").onclick = cerrarHistorial;
+$("#velo").onclick = cerrarHistorial;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarHistorial(); });
 
-$("#btn-nuevo").onclick = async () => {
+async function chatNuevo() {
   try { await api("/chat/nuevo", { method: "POST" }); } catch {}
   document.querySelectorAll(".item.activo").forEach((x) => x.classList.remove("activo"));
   modoInicio();
-  cerrarLateral();
+  cerrarHistorial();
   entrada.focus();
-};
+}
+$("#btn-nuevo").onclick = chatNuevo;
+
+$("#abrir-menu").onclick = (e) => { e.stopPropagation(); $("#menu-movil").classList.toggle("abierto"); };
+document.querySelectorAll("#menu-movil [data-accion]").forEach((b) => (b.onclick = () => {
+  $("#menu-movil").classList.remove("abierto");
+  ({ nuevo: chatNuevo, historial: () => abrirHistorial(false), tareas: () => $("#btn-tareas").click() })[b.dataset.accion]();
+}));
 
 /* ---------- Estado ---------- */
 async function refrescarEstado() {
@@ -696,21 +780,21 @@ async function refrescarEstado() {
     const s = await api("/chat/estado");
     estadoActual = s;
     $("#estado").classList.remove("sin");
-    $("#estado").textContent = `modo ${s.modo}`;
-    $("#chip-modelo").textContent = `${s.modelo} · ${s.modo}`;
-    $("#tarjeta-lat").hidden = s.lugar !== "local";
+    $("#estado").textContent = `${s.modo} · ${s.modelo.replace(/-instruct.*$/, "")}`;
+    $("#estado").title = `Modo ${s.modo} con ${s.modelo}`;
+    $("#btn-vincular").hidden = s.lugar !== "local";
+    const saludo = $("#saludo-nombre");
+    saludo.replaceChildren();
+    if (s.nombre) saludo.append(", ", el("span", "nombre", s.nombre));
     vozInfo = s.voz || {};
-    const micPosible = vozInfo.oir && window.isSecureContext && navigator.mediaDevices && window.MediaRecorder;
-    $("#btn-mic").hidden = !micPosible;
-    $("#btn-mic").title = vozInfo.atajo ? `Hablar (en el PC también con ${vozInfo.atajo})` : "Hablar";
+    $("#btn-mic").hidden = !microfonoPosible();
+    $("#btn-mic").title = vozInfo.atajo ? `Dictar (en el PC también con ${vozInfo.atajo})` : "Dictar";
     $("#btn-voz-alta").hidden = !vozInfo.hablar;
     $("#btn-voz-alta").classList.toggle("activo", vozAlta);
-    if (s.nombre) {
-      $("#saludo").textContent = `¡Bienvenido de nuevo, ${s.nombre}!`;
-    }
+    actualizarPrincipal();
     const ids = historial.map((c) => c.id).join();
     historial = s.conversacion || [];
-    if (historial.map((c) => c.id).join() !== ids) pintarHistorial();
+    if (historial.map((c) => c.id).join() !== ids && $("#historial-panel").classList.contains("abierto")) pintarHistorial();
   } catch {
     $("#estado").classList.add("sin");
     $("#estado").textContent = "sin conexión";
@@ -756,12 +840,16 @@ $("#btn-vincular").onclick = async () => {
 };
 document.querySelectorAll("[data-cerrar]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
 
-/* ---------- Voz: microfono y respuesta en voz alta ---------- */
+/* ---------- Voz: dictar, hablar y respuesta en voz alta ---------- */
 let vozInfo = {};
 let vozAlta = false;
 try { vozAlta = localStorage.getItem("jarvis-voz-alta") === "1"; } catch {}
 let audioActual = null;
+let grabadora = null;
 
+function microfonoPosible() {
+  return !!(vozInfo.oir && window.isSecureContext && navigator.mediaDevices && window.MediaRecorder);
+}
 function avisoVoz(t) { $("#aviso-voz").textContent = t || ""; }
 
 $("#btn-voz-alta").onclick = () => {
@@ -787,8 +875,9 @@ async function decir(texto) {
   } catch {}
 }
 
-let grabadora = null;
-async function empezarAGrabar() {
+// "dictar": el texto queda en la caja para revisarlo.
+// "hablar": se envia solo y la respuesta se dice en voz alta.
+async function empezarAGrabar(modo) {
   if (audioActual) audioActual.pause();
   let flujo;
   try {
@@ -800,7 +889,6 @@ async function empezarAGrabar() {
   const trozos = [];
   const rec = new MediaRecorder(flujo);
   rec.ondataavailable = (e) => e.data.size && trozos.push(e.data);
-  // Para solo cuando te callas: 1,3 s de silencio despues de hablar.
   const ctx = new AudioContext();
   const analizador = ctx.createAnalyser();
   analizador.fftSize = 1024;
@@ -822,7 +910,8 @@ async function empezarAGrabar() {
     ctx.close();
     grabadora = null;
     $("#btn-mic").classList.remove("grabando");
-    if (hablo < 0.3) { avisoVoz("No te oí. Toca el micrófono y habla."); return; }
+    actualizarPrincipal();
+    if (hablo < 0.3) { avisoVoz("No te oí. Prueba otra vez."); return; }
     avisoVoz("Transcribiendo…");
     try {
       const blob = new Blob(trozos, { type: rec.mimeType || "audio/webm" });
@@ -833,29 +922,25 @@ async function empezarAGrabar() {
       if (!r.ok) throw new Error(r.status);
       const { texto } = await r.json();
       avisoVoz("");
-      if (texto) mandar(texto); else avisoVoz("No te entendí. Prueba otra vez.");
+      if (!texto) { avisoVoz("No te entendí. Prueba otra vez."); return; }
+      if (modo === "hablar") mandar(texto, true);
+      else { entrada.value = (entrada.value ? entrada.value + " " : "") + texto; ajustar(); entrada.focus(); }
     } catch (e) {
       avisoVoz("No pude transcribir (" + e.message + ").");
     }
   };
   rec.start(250);
-  grabadora = { parar };
-  $("#btn-mic").classList.add("grabando");
-  avisoVoz("Te escucho… cuando termines, haz una pausa y lo envío.");
+  grabadora = { parar, modo };
+  if (modo === "dictar") $("#btn-mic").classList.add("grabando");
+  actualizarPrincipal();
+  avisoVoz("Te escucho… cuando termines, haz una pausa.");
 }
 
-$("#btn-mic").onclick = () => { if (grabadora) grabadora.parar(); else empezarAGrabar(); };
-
-/* ---------- Barra lateral en el celular ---------- */
-function abrirLateral() { $("#lateral").classList.add("abierta"); $("#velo").classList.add("visible"); }
-function cerrarLateral() { $("#lateral").classList.remove("abierta"); $("#velo").classList.remove("visible"); }
-$("#abrir-lateral").onclick = abrirLateral;
-$("#cerrar-lateral").onclick = cerrarLateral;
-$("#velo").onclick = cerrarLateral;
+$("#btn-mic").onclick = () => { if (grabadora) grabadora.parar(); else empezarAGrabar("dictar"); };
 
 (async () => {
   await refrescarEstado();
-  pintarHistorial();
+  ajustar();
   entrada.focus();
   setInterval(() => { if (!ocupados) refrescarEstado(); }, 30000);
 })();
