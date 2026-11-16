@@ -1,0 +1,28 @@
+Jarvis (Alexa-Jarvis-Assistant)
+
+Este proyecto incluye codigo adaptado de OpenJarvis
+https://github.com/open-jarvis/OpenJarvis
+Licencia Apache License 2.0 (copia en licencias/OpenJarvis-LICENSE.txt).
+Version de referencia: commit 3b1aa1792af41c5dfb14b31ed15a3d4573b58067.
+
+Archivos de Jarvis que parten de OpenJarvis, y que se cambio en cada uno:
+
+  seguridad.py
+    - security/injection_scanner.py: patrones de inyeccion. Se anadieron
+      patrones en espanol, la neutralizacion de la marca <dato_externo> y se
+      quito el backend de Rust.
+    - security/credential_stripper.py: patrones de credenciales. Se anadieron
+      Google, Tailscale, GitHub fine-grained, JWT, CLAVE=valor y llaves en
+      URL, y un filtro de logging.
+    - security/ssrf.py: bloqueo de IP privadas y de metadatos. Se anadio la
+      revision de cada redirect, los dominios locales (.local, .lan, .ts.net)
+      y se quito el backend de Rust.
+
+  guardia_bucles.py
+    - agents/loop_guard.py: llamadas identicas, ping-pong y presupuesto por
+      herramienta. Sin Rust, sin bus de eventos ni compresion de contexto; el
+      aviso no vuelve a ejecutar la llamada repetida.
+
+  tools/calculadora.py
+    - tools/calculator.py: evaluador por arbol AST. Se anadieron frases en
+      espanol, porcentajes, limites de tamano y la respuesta para la voz.

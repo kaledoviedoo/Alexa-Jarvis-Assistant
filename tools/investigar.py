@@ -15,6 +15,7 @@ import urllib.request
 
 from config import MODO_DEDICADO
 from registro import herramienta
+from seguridad import abrir_url
 
 log = logging.getLogger("jarvis.investigar")
 
@@ -59,7 +60,7 @@ def buscar(consulta: str, cuantos: int = MAX_RESULTADOS) -> list[dict]:
     peticion = urllib.request.Request(url, headers={"User-Agent": AGENTE})
 
     try:
-        with urllib.request.urlopen(peticion, timeout=12) as respuesta:
+        with abrir_url(peticion, timeout=12) as respuesta:
             pagina = respuesta.read().decode("utf-8", errors="ignore")
     except Exception as e:
         log.warning("La búsqueda falló: %s", e)
@@ -101,7 +102,7 @@ def diagnostico() -> str:
     peticion = urllib.request.Request(url, headers={"User-Agent": AGENTE})
 
     try:
-        with urllib.request.urlopen(peticion, timeout=12) as respuesta:
+        with abrir_url(peticion, timeout=12) as respuesta:
             pagina = respuesta.read().decode("utf-8", errors="ignore")
             estado = respuesta.status
     except Exception as e:

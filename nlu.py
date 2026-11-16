@@ -461,6 +461,14 @@ def _reiniciar(m) -> str:
 
 
 # ---- Ahorro: soltar los modelos ya ----
+def _calcular(m):
+    from tools import calculadora
+    try:
+        return calculadora.calcular_frase(m.group(0))
+    except calculadora.ErrorDeCuenta:
+        return None
+
+
 def _liberar_modelos(m) -> str:
     sueltos = modes.descargar_modelos()
     try:
@@ -1338,6 +1346,14 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
                    r"(?:memoria(?:\s+de\s+la\s+grafica)?|grafica|vram|ram|modelos?)\b|"
                    r"\b(?:pon(?:te)?\s+(?:en\s+)?(?:el\s+)?)?modo\s+(?:reposo|ahorro)\b", _F),
         _liberar_modelos,
+    ),
+    # Cuentas: exactas y sin despertar al modelo. Si no es una cuenta
+    # ("cuanto es el dolar"), devuelve None y sigue con el resto.
+    (
+        re.compile(r"^(?:jarvis\s*,?\s*)?(?:(?:me\s+)?(?:puedes\s+)?(?:dime|decirme)\s+)?"
+                   r"(?:cuanto\s+(?:es|son|da|seria|serian)|calcula(?:me)?|haz(?:me)?\s+la\s+cuenta(?:\s+de)?|"
+                   r"cual\s+es\s+(?:la\s+)?raiz)\s+(?P<expr>.+)$", _F),
+        _calcular,
     ),
     # Rutinas: antes que nada, para que "apaga la rutina de..." no apague el PC.
     (

@@ -61,6 +61,9 @@ archivo = logging.handlers.RotatingFileHandler(
 archivo.setFormatter(formato)
 
 logging.basicConfig(level=logging.INFO, handlers=[consola, archivo])
+# Ninguna clave ni token llega al log, ni a la consola ni al archivo.
+import seguridad  # noqa: E402
+seguridad.instalar_filtro_log(consola, archivo)
 log = logging.getLogger("jarvis")
 
 app = FastAPI(title="Jarvis", version="2.0")
@@ -101,7 +104,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-11-01-fase6-voz"
+SELLO_CODIGO = "2026-11-16-fase7-seguridad"
 
 
 def novedades_al_abrir() -> str:

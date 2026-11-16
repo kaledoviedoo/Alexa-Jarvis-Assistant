@@ -84,6 +84,9 @@ jobs:
       - name: El servidor contesta en formato Alexa
         run: python test_alexa.py
 
+      - name: Lee lo de fuera con cuidado y no se queda dando vueltas
+        run: python test_seguridad.py
+
       - name: Que ningun archivo se quede sin compilar
         # Coge los errores de sintaxis de los modulos que las pruebas no
         # llegan a importar (los de Windows, sobre todo).

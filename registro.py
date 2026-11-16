@@ -57,6 +57,7 @@ MODULOS = (
     "tools.rendimiento",
     "tools.catalogo",
     "tools.plan",
+    "tools.calculadora",
 )
 
 _TIPOS = {

@@ -21,6 +21,8 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import seguridad
+
 log = logging.getLogger("jarvis.tareas")
 
 ESTADOS = ("en_cola", "corriendo", "hecha", "fallo", "interrumpida")
@@ -171,6 +173,8 @@ def registrar_paso(herramienta: str, argumentos, resultado) -> None:
         args = json.dumps(argumentos, ensure_ascii=False, default=str)[:1000]
     except Exception:
         args = str(argumentos)[:1000]
+    args = seguridad.quitar_credenciales(args)
+    resultado = seguridad.quitar_credenciales(str(resultado))
     with _lock:
         n = _consulta("SELECT COUNT(*) FROM pasos WHERE tarea = ?", (tarea,))[0][0] + 1
         _ejecutar("INSERT INTO pasos (tarea, n, herramienta, argumentos, resultado, momento) "
@@ -315,7 +319,8 @@ def novedades(limite: int = 2, max_caracteres: int = 220) -> str:
 # ---------------------------------------------------------------------------
 def guardar_chat(identificador: str, texto: str, respuesta: str, origen: str = "", ms: int = 0) -> None:
     _ejecutar("INSERT OR REPLACE INTO chat (id, texto, respuesta, origen, ms, momento) VALUES (?, ?, ?, ?, ?, ?)",
-              (identificador, texto[:2000], (respuesta or "")[:20000], origen, int(ms or 0), _ahora()))
+              (identificador, seguridad.quitar_credenciales(texto[:2000]),
+               seguridad.quitar_credenciales((respuesta or "")[:20000]), origen, int(ms or 0), _ahora()))
 
 
 def historial_chat(limite: int = 300) -> list[dict]:

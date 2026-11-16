@@ -93,7 +93,7 @@ CASOS = [
     # ---- Charla: no hay que tocar nada ----
     ("hola, cómo vas", {NINGUNA}, {}),
     ("qué es la oferta y la demanda", {NINGUNA}, {}),
-    ("cuánto es 15 por 4", {NINGUNA}, {}),
+    ("cuánto es 15 por 4", {NINGUNA, "calcular"}, {}),
     ("ayer me acosté tardísimo y hoy no rindo", {NINGUNA}, {}),
 ]
 
