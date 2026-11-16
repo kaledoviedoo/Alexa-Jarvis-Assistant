@@ -313,6 +313,12 @@ def buenos_dias(r: dict, est: dict) -> str:
     diario = usar("obsidian_leer_diario", r)
     if diario:
         partes.append(_primera_linea(diario, 260))
+    # Tres titulares, salvo que la rutina diga  noticias: false
+    if r.get("noticias", True):
+        tema = r.get("tema_noticias", "") if isinstance(r.get("tema_noticias"), str) else ""
+        titulares = usar("noticias", r, tema=tema, cuantas=3)
+        if titulares.startswith("Titulares"):
+            partes.append(titulares.rstrip("."))
     return ". ".join(p for p in partes if p) + "."
 
 

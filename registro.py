@@ -58,6 +58,8 @@ MODULOS = (
     "tools.catalogo",
     "tools.plan",
     "tools.calculadora",
+    "tools.noticias",
+    "recuerdos",
 )
 
 _TIPOS = {

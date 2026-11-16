@@ -343,6 +343,16 @@ def construir_prompt_sistema() -> str:
         # no se entiende por que no apunta nada.
         log.debug("No pude anadir el contexto de Obsidian: %s", e)
 
+    # Lo que recuerda de el a largo plazo: solo lo que viene al caso.
+    try:
+        import recuerdos
+        num_ctx = int(modes.perfil_actual().get("num_ctx", 4096))
+        bloque = recuerdos.para_el_modelo(_frase_original() or "", 700 if num_ctx >= 8192 else 250)
+        if bloque:
+            partes.append("\n--- LO QUE RECUERDAS DEL USUARIO (te lo conto el) ---\n" + bloque)
+    except Exception as e:
+        log.debug("No pude añadir los recuerdos: %s", e)
+
     # Lo que llevamos hablado: sin esto "resumelo" no sabe que es "lo".
     try:
         num_ctx = int(modes.perfil_actual().get("num_ctx", 4096))

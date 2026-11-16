@@ -104,7 +104,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-11-16-fase7-seguridad"
+SELLO_CODIGO = "2026-11-16-fase7-memoria"
 
 
 def novedades_al_abrir() -> str:
@@ -395,6 +395,14 @@ def procesar_con_origen(texto: str, datos_alexa: dict | None = None,
         sesion.agregar(texto, respuesta, origen)
     except Exception as e:
         log.debug("No pude apuntar el turno: %s", e)
+
+    # Si contaste algo de ti ("me gusta...", "mi hermana se llama..."), se
+    # aprende en segundo plano. Solo de tu frase, nunca de lo que leyo.
+    try:
+        import recuerdos
+        recuerdos.quizas_aprender(texto, origen)
+    except Exception as e:
+        log.debug("No pude aprender de la orden: %s", e)
 
     try:
         from tools import aprendizaje

@@ -461,6 +461,43 @@ def _reiniciar(m) -> str:
 
 
 # ---- Ahorro: soltar los modelos ya ----
+def _recuerdo_guardar(m) -> str:
+    import recuerdos
+    return recuerdos.guardar(m.group("hecho"), fuente="dicho")[1]
+
+
+def _recuerdo_listar(m) -> str:
+    import recuerdos
+    return recuerdos.resumen_para_voz()
+
+
+def _recuerdo_olvidar(m) -> str:
+    import recuerdos
+    borrados = recuerdos.olvidar(m.group("que"))
+    if not borrados:
+        return "No tenía nada guardado sobre eso."
+    return "Olvidado: " + " ".join(borrados)
+
+
+def _recuerdo_olvidar_todo(m) -> str:
+    import recuerdos
+    n = len(recuerdos.listar())
+    if not n:
+        return "No tengo nada guardado de ti, aparte de tu archivo de contexto."
+    cosas = "la única cosa" if n == 1 else f"las {n} cosas"
+    return confirmaciones.pedir(
+        f"olvidar {cosas} que sé de ti",
+        lambda: (recuerdos.olvidar_todo(), f"Listo, olvidé {cosas} que sabía de ti. "
+                                           "Tu archivo de contexto sigue igual.")[1],
+        pregunta=f"¿Borro {cosas} que sé de ti? Esto no se puede deshacer. Di sí o no.")
+
+
+def _noticias(m):
+    from tools import noticias
+    tema = (m.group("tema") or "").strip()
+    return noticias.noticias(tema=tema, cuantas=5)
+
+
 def _calcular(m):
     from tools import calculadora
     try:
@@ -1384,6 +1421,36 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
         re.compile(r"^(?P<frase>(?:todos\s+los|todas\s+las|cada|de\s+lunes\s+a\s+viernes|entre\s+semana|"
                    r"los\s+(?:lunes|martes|miercoles|jueves|viernes|sabados|domingos))\s+.+)$", _F),
         _rutina_crear,
+    ),
+    # Memoria a largo plazo: "recuerda que...", "que sabes de mi", "olvida que...".
+    # Despues de las de hora: "recuerda que a las 5..." es una rutina, no un dato.
+    (
+        re.compile(r"^(?:jarvis\s*,?\s*)?(?:recuerda|acuerdate(?:\s+de)?|no\s+(?:te\s+)?olvides(?:\s+de)?|"
+                   r"memoriza|guarda\s+en\s+(?:tu\s+)?memoria)\s+(?:que|esto\s*:?)\s+(?P<hecho>.{3,})$", _F),
+        _recuerdo_guardar,
+    ),
+    (
+        re.compile(r"^(?:jarvis\s*,?\s*)?(?:olvida|borra)\s+todo\s+lo\s+que\s+(?:sabes|recuerdas)\s+de\s+mi\b|"
+                   r"\bborra\s+(?:toda\s+)?tu\s+memoria\b", _F),
+        _recuerdo_olvidar_todo,
+    ),
+    (
+        re.compile(r"\b(?:que\s+(?:sabes|recuerdas)\s+de\s+mi|que\s+(?:tienes|hay)\s+en\s+tu\s+memoria|"
+                   r"que\s+has\s+aprendido\s+de\s+mi)\b", _F),
+        _recuerdo_listar,
+    ),
+    (
+        re.compile(r"^(?:jarvis\s*,?\s*)?(?:olvida|olvidate\s+de|borra\s+de\s+tu\s+memoria)\s+"
+                   r"(?:que|lo\s+de)\s+(?P<que>.+)$", _F),
+        _recuerdo_olvidar,
+    ),
+    # Noticias: titulares por RSS, sin modelo.
+    (
+        re.compile(r"^(?:jarvis\s*,?\s*)?(?:(?:que|cuales)\s+(?:son\s+las\s+)?(?:noticias|titulares)\s+(?:hay|tienes)?|"
+                   r"(?:dame|dime|leeme|lee|ponme|cuentame)\s+(?:las\s+)?(?:noticias|titulares)|"
+                   r"(?:las\s+)?noticias|titulares)"
+                   r"(?:\s+(?:de|del|sobre|acerca\s+de)\s+(?P<tema>.+?))?\s*(?:de\s+hoy|hoy)?\s*$", _F),
+        _noticias,
     ),
     (
         re.compile(r"^\s*(?:s[ii][\s,]+)?(?:ordena|organiza|acomoda)(?:me)?\s+(?:las\s+|mis\s+)?descargas\s*$|"

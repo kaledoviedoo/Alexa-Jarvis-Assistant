@@ -26,3 +26,14 @@ Archivos de Jarvis que parten de OpenJarvis, y que se cambio en cada uno:
   tools/calculadora.py
     - tools/calculator.py: evaluador por arbol AST. Se anadieron frases en
       espanol, porcentajes, limites de tamano y la respuesta para la voz.
+
+  recuerdos.py
+    - memory/extractor.py y memory/store.py: extraccion de datos duraderos
+      de una frase y almacen en JSON. En espanol, con filtro previo para no
+      llamar al modelo en cada orden, cada dato tiene que salir de palabras
+      que dijo el usuario, sin cola de eventos ni bloqueo entre procesos.
+
+  tools/noticias.py
+    - connectors/news_rss.py: lectura de RSS y Atom con ElementTree. Con
+      urllib y la proteccion SSRF de seguridad.py en vez de httpx, cache de
+      30 minutos y fuentes en espanol.

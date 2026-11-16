@@ -87,6 +87,9 @@ jobs:
       - name: Lee lo de fuera con cuidado y no se queda dando vueltas
         run: python test_seguridad.py
 
+      - name: Se acuerda de lo tuyo y te cuenta lo que pasa
+        run: python test_memoria.py
+
       - name: Que ningun archivo se quede sin compilar
         # Coge los errores de sintaxis de los modulos que las pruebas no
         # llegan a importar (los de Windows, sobre todo).

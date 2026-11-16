@@ -48,6 +48,8 @@ No es un chatbot con acceso al sistema. Es un agente con frenos: cada herramient
 | Pantalla | "haz clic donde dice aceptar" · "dale a jugar" | OCR y clic por función, no por coordenadas |
 | Equipo | "por qué va lento el pc" · "cuánta vram queda" | Diagnóstico de CPU, RAM, gráfica y procesos |
 | Cuentas | "cuánto es el 15 por ciento de 80 mil" · "raíz cuadrada de 144" | Resultado exacto al instante, sin pasar por el modelo |
+| Memoria | "recuerda que mi hermana se llama Ana" · "qué sabes de mí" · "olvida lo de mi hermana" | Datos tuyos que no caducan; también aprende de lo que cuentas |
+| Noticias | "dame las noticias" · "noticias de inteligencia artificial" | Titulares por RSS, gratis y sin cuentas |
 | Varios pasos | "mira qué ventanas tengo abiertas y apunta en el diario cuáles son" | Encadena herramientas y usa el resultado de una en la siguiente |
 | Rutinas | "cada día a las 7 investiga noticias de inteligencia artificial" | Lo hace solo a esa hora y te avisa con el resultado |
 
@@ -56,7 +58,7 @@ Y además:
 - **Recuerda la conversación.** "Léelo", "el segundo", "muévelo a documentos" funcionan seguidos, por voz o por el chat.
 - **Termina lo que empieza.** Las tareas largas siguen en segundo plano, sobreviven a un reinicio y te avisan con una notificación de Windows.
 - **Rutinas de serie:**
-  - **buenos días:** estado del equipo, correos y lo apuntado hoy.
+  - **buenos días:** estado del equipo, correos, lo apuntado hoy y tres titulares.
   - **descargas:** propone cómo ordenarlas y no mueve nada sin tu "sí".
   - **disco lleno:** avisa con lo que más ocupa.
   - **modo juego:** pasa a gaming al abrir un juego.
@@ -99,7 +101,7 @@ flowchart LR
 
 1. **Router:** 145 expresiones regulares resuelven la mayoría de las órdenes al instante, sin tocar el modelo.
 2. **Capa semántica** (`nomic-embed-text`): si no dijiste las palabras exactas, busca una orden conocida que signifique lo mismo.
-3. **Modelo** (Ollama, function calling): solo lo que no encaja en lo anterior. De las 74 herramientas registradas, ve las más parecidas a la frase más las que casan por palabras clave.
+3. **Modelo** (Ollama, function calling): solo lo que no encaja en lo anterior. De las 77 herramientas registradas, ve las más parecidas a la frase más las que casan por palabras clave.
 4. **Freno:** una herramienta que cambia algo solo se ejecuta si alguna parte de la frase empieza pidiéndolo. "Ayer me acosté tarde" nunca escribe en el diario.
 5. **Comprobación:** después de crear, mover o apuntar, Jarvis mira si de verdad pasó. Si falla dos veces, para y te dice qué hizo y qué no.
 
@@ -123,6 +125,7 @@ Un agente que puede mover archivos y enviar mensajes necesita límites que no de
 - **Detector de inyecciones:** ese texto se revisa con patrones en español e inglés ("ignora las instrucciones anteriores", "a partir de ahora eres…", plantillas de chat). Si salta, el modelo recibe un aviso y en esa orden ya no se envía ni se borra nada.
 - **Guardia de bucles:** si el modelo repite la misma llamada o alterna dos herramientas sin avanzar, se le avisa una vez y luego se corta, diciendo lo que alcanzó a hacer.
 - **Credenciales:** claves y tokens (OpenAI, GitHub, Google, Tailscale, `CLAVE=valor`, llaves en URL) se tapan antes de llegar al log, al historial del chat o a los pasos de una tarea.
+- **Memoria:** no guarda contraseñas ni claves, solo aprende de lo que tú dices (nunca de una web o un correo) y vive en `~/.jarvis/recuerdos.json`, fuera del repositorio. "Qué sabes de mí" lo enseña todo y "olvida…" lo borra.
 - **SSRF:** las peticiones web de Jarvis solo salen a internet. Nada hacia `localhost`, la red de casa, la tailnet o servicios de metadatos, tampoco tras un redirect.
 - **Alexa:** se verifica la firma criptográfica de Amazon en cada petición.
 - **Rutas locales:** `/probar` y `/chat` exigen una llave. El chat solo existe desde `127.0.0.1` o la red de Tailscale (`100.64.0.0/10`); por el túnel público responde 404.
@@ -244,13 +247,13 @@ Resultados en una RTX 3050 de 6 GB:
 
 ## Pruebas
 
-12 baterías de pruebas, unas 900 comprobaciones. Corren en Linux sin GPU, sin Ollama y sin Windows, porque el modelo, la pantalla y el micrófono se sustituyen por piezas falsas. Se ejecutan en cada push con GitHub Actions, en Python 3.10 y 3.12.
+13 baterías de pruebas, casi 1.000 comprobaciones. Corren en Linux sin GPU, sin Ollama y sin Windows, porque el modelo, la pantalla y el micrófono se sustituyen por piezas falsas. Se ejecutan en cada push con GitHub Actions, en Python 3.10 y 3.12.
 
 ```powershell
 py test_router.py      # 188 frases → la intención correcta
 py test_frases.py      # 195 formas de decir lo mismo
 py test_archivos.py    # el sandbox de rutas y la selección, sobre disco real
-py test_registro.py    # las 74 herramientas bien declaradas
+py test_registro.py    # las 77 herramientas bien declaradas
 py test_sesion.py      # la memoria de la conversación
 py test_riesgo.py      # el freno, las confirmaciones, los datos externos
 py test_cerebro.py     # comprobar, insistir, parar a tiempo
@@ -259,6 +262,7 @@ py test_chat.py        # quién puede entrar al chat y qué ve
 py test_voz.py         # cuándo dejar de grabar, qué se dice en voz alta
 py test_alexa.py       # el formato que exige Amazon
 py test_seguridad.py   # inyecciones, bucles, credenciales, SSRF, calculadora
+py test_memoria.py     # recuerdos, qué aprende y qué no, noticias por RSS
 ```
 
 ## Estructura
@@ -272,6 +276,7 @@ jarvis/
 ├── verificar.py         Comprobaciones después de actuar
 ├── seguridad.py         Detector de inyecciones, credenciales tapadas, SSRF
 ├── guardia_bucles.py    Corta al modelo cuando se queda dando vueltas
+├── recuerdos.py         Memoria a largo plazo: lo que dices y lo que aprende
 ├── sesion.py            La conversación compartida por los tres canales
 ├── confirmaciones.py    El "¿lo envío?" de 45 segundos
 ├── tareas.py            Tareas de fondo en SQLite, con cada paso
@@ -281,12 +286,12 @@ jarvis/
 ├── voz_local.py         Whisper + Piper con un atajo de teclado
 ├── modes.py             Perfiles de modelo: normal, dedicado, gaming
 ├── banco_modelos.py     Compara modelos con órdenes reales
-├── tools/               25 módulos de capacidades (archivos, Obsidian, WhatsApp, pantalla…)
+├── tools/               26 módulos de capacidades (archivos, Obsidian, WhatsApp, pantalla…)
 ├── alexa/               Modelo de interacción de la skill
 ├── scripts/             Instalación, diagnóstico, autoarranque, vigilante
 ├── docs/                Capturas de la interfaz
 ├── NOTICE, licencias/    Atribución del código adaptado de OpenJarvis
-└── test_*.py            12 baterías de pruebas
+└── test_*.py            13 baterías de pruebas
 ```
 
 ## Cómo se construyó
@@ -302,13 +307,13 @@ Empezó como un asistente de voz con un router de expresiones regulares y 29 her
 | 4 · Cerebro | Comprobar después de actuar, insistir si falta un paso, banco de modelos |
 | 5 · Fondo | Tareas que sobreviven a reinicios, avisos de Windows, rutinas |
 | 6 · Canales | Chat local con pasos en vivo y voz sin Alexa |
-| 7 · OpenJarvis | Piezas probadas de [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) (Apache-2.0): detector de inyecciones, guardia de bucles, credenciales tapadas, SSRF y calculadora |
+| 7 · OpenJarvis | Piezas probadas de [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) (Apache-2.0): detector de inyecciones, guardia de bucles, credenciales tapadas, SSRF, calculadora, memoria a largo plazo y noticias por RSS |
 
 Una regla para todo el proyecto: **coste cero**. Nada de APIs de pago ni de tokens; todo corre en el equipo con herramientas libres.
 
 ## Hoja de ruta
 
-- [ ] **Fase 7.2:** memoria a largo plazo (hechos que Jarvis aprende de ti) y noticias por RSS en los buenos días, adaptados de OpenJarvis.
+- [ ] **Fase 7.3:** Google Calendar y Tasks con la cuenta propia, investigación a fondo con varias fuentes, y cliente MCP.
 - [ ] **Jarvis como servidor MCP**, para que otros clientes de IA usen tus herramientas pasando por las mismas reglas. Primero solo las de lectura.
 - [ ] Adelgazar el router: quitar las reglas que la capa semántica ya cubre, según `informe_router.py`.
 - [ ] Micrófono del chat en el celular, con HTTPS dentro de la red de Tailscale.
