@@ -498,6 +498,22 @@ def _noticias(m):
     return noticias.noticias(tema=tema, cuantas=5)
 
 
+def _resumir_youtube(m) -> str:
+    from tools import externas
+    url = m.group(0)
+    resto = m._texto.replace(url, " ")
+    # Lo que queda de la frase es la pregunta, si es algo mas que "resume este video".
+    pregunta = re.sub(r"(?i)\b(?:jarvis|por\s+favor|res[uú]me(?:me|lo)?|resumen|haz(?:me)?\s+un|de\s+qu[eé]\s+trata|"
+                      r"qu[eé]\s+dice|este|ese|el|un|del|de|video|v[ií]deo|link|enlace|en|porfa)\b", " ", resto)
+    pregunta = re.sub(r"[\s,.:;¿?¡!]+", " ", pregunta).strip()
+    return externas.resumen_video(url, pregunta if len(pregunta) > 3 else "")
+
+
+def _estado_mcp(m) -> str:
+    from tools import externas
+    return externas.estado_para_voz()
+
+
 def _calcular(m):
     from tools import calculadora
     try:
@@ -517,6 +533,11 @@ def _liberar_modelos(m) -> str:
     try:
         import voz_local
         voz_local.liberar()
+    except Exception:
+        pass
+    try:
+        import mcp_cliente
+        mcp_cliente.apagar_todos()
     except Exception:
         pass
     log.info("Ahorro: %d modelos soltados a peticion.", sueltos)
@@ -1391,6 +1412,16 @@ INTENTS: list[tuple[re.Pattern, callable]] = [
                    r"(?:cuanto\s+(?:es|son|da|seria|serian)|calcula(?:me)?|haz(?:me)?\s+la\s+cuenta(?:\s+de)?|"
                    r"cual\s+es\s+(?:la\s+)?raiz)\s+(?P<expr>.+)$", _F),
         _calcular,
+    ),
+    # Un enlace de YouTube en la frase: se resume el video (por partes si es largo).
+    (
+        re.compile(r"https?://(?:www\.|m\.|music\.)?(?:youtube\.com/(?:watch\?\S*v=|shorts/|live/|embed/)|youtu\.be/)[\w-]{6,}\S*", _F),
+        _resumir_youtube,
+    ),
+    (
+        re.compile(r"\b(?:estado\s+de\s+(?:las\s+)?herramientas\s+externas|que\s+herramientas\s+externas\s+tienes|"
+                   r"servidores\s+mcp|estado\s+(?:del?\s+|de\s+los\s+)?mcp)\b", _F),
+        _estado_mcp,
     ),
     # Rutinas: antes que nada, para que "apaga la rutina de..." no apague el PC.
     (

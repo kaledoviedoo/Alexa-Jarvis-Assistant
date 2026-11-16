@@ -104,7 +104,7 @@ async def medir_y_registrar(request, call_next):
     return respuesta
 
 
-SELLO_CODIGO = "2026-11-16-fase7-memoria"
+SELLO_CODIGO = "2026-11-16-fase7-mcp"
 
 
 def novedades_al_abrir() -> str:

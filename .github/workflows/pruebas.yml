@@ -90,6 +90,9 @@ jobs:
       - name: Se acuerda de lo tuyo y te cuenta lo que pasa
         run: python test_memoria.py
 
+      - name: Usa lo de fuera solo cuando hace falta
+        run: python test_mcp.py
+
       - name: Que ningun archivo se quede sin compilar
         # Coge los errores de sintaxis de los modulos que las pruebas no
         # llegan a importar (los de Windows, sobre todo).

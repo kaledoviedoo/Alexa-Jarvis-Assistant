@@ -37,3 +37,9 @@ Archivos de Jarvis que parten de OpenJarvis, y que se cambio en cada uno:
     - connectors/news_rss.py: lectura de RSS y Atom con ElementTree. Con
       urllib y la proteccion SSRF de seguridad.py en vez de httpx, cache de
       30 minutos y fuentes en espanol.
+
+  mcp_cliente.py
+    - mcp/client.py y mcp/transport.py: handshake MCP y transporte stdio con
+      un hilo lector, otro que vacia stderr y un candado por peticion. Sin
+      dependencias, con arranque bajo demanda, apagado por inactividad,
+      reinicio tras una caida y ventana oculta en Windows.

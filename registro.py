@@ -59,6 +59,7 @@ MODULOS = (
     "tools.plan",
     "tools.calculadora",
     "tools.noticias",
+    "tools.externas",
     "recuerdos",
 )
 
